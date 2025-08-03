@@ -8,8 +8,10 @@ Agentic RL Scaling Law Experiments
 - DeepSeek-R1-Distill-Qwen系列：1.5B、7B、14B
 - QwQ-32B
 
+### 算法
+PPO GRPO Reinforce++
 ### 数据集
-数据集：Guru-RL-92k，该数据集是一个混合数据集，本研究用该实验作为初始实验数据集有两大原因，一是保证各分工组的实验数据集和Code-Base保持一致，便于项目推进和讨论；二是在Scaling Law探究的初期可以尽量做出一个General的结论，而避免谈论具体的Domain。在实验后期，我们会做General Scaling Law->Domain-Specific Scaling Law的对比与迁移。同时由于该数据集不含SFT数据，相关数据若需使用需要人工合成。
+数据集：[Guru-RL-92k](https://huggingface.co/datasets/LLM360/guru-RL-92k) 该数据集是一个混合数据集，本研究用该实验作为初始实验数据集有两大原因，一是保证各分工组的实验数据集和Code-Base保持一致，便于项目推进和讨论；二是在Scaling Law探究的初期可以尽量做出一个General的结论，而避免谈论具体的Domain。在实验后期，我们会做General Scaling Law->Domain-Specific Scaling Law的对比与迁移。同时由于该数据集不含SFT数据，相关数据若需使用需要人工合成。
 
 ### Metric
 - Pass@1 平均性能提升（横坐标训练步数，纵坐标Pass@1）
@@ -28,7 +30,7 @@ Agentic RL Scaling Law Experiments
 - 参数量对于样本效率的影响：随着参数量提升，是否需要更多的训练步数才能让模型收敛（或者说，达到最大性能）
 - 更大的模型规模是否可以带来更加稳定的训练过程
 - 训练步数与过拟合到奖励信号、以及泛化性之间的关系：在训练过程中如果需要保持模型的泛化性能，是否需要early stop（观察Pass@k与训练步数之间的关系）
-**数据规模与比例(D)**【周恒、钰涛】
+**数据规模与比例(D)**【周恒、钰涛、zelin】
 - RFT过程中的样本数量记为$$D_{RL}$$，对于相同的数据集，更多的$$D_{RL}$$是否可以持续提升模型性能上限，性能上限何时出现（Pass@1），是否存在边际收益递减的情况？
 - SFT数据与RFT数据的“规模匹配”问题：通过调整$$
 D_{SFT}:D_{RL}$$，观察RFT过程中：1.模型性能的变化Scaling Law是否与上一点中提到的一致（比如，收敛到性能上限的速度，观察曲线斜率，SFT 性能随数据规模的提升是否会使 RL 微调的缩放斜率更陡峭）2. 对于性能上限的影响（Pass@1）
@@ -48,3 +50,13 @@ D_{SFT}:D_{RL}$$，观察RFT过程中：1.模型性能的变化Scaling Law是否
   
 **Long Horizon Task多轮交互次数**【想法待完善】
 依赖的数据集：https://github.com/abdulhaim/LMRL-Gym
+
+## 实验方法
+- 上述探究点需要在各领域数据集上利用不同的强化学习算法（PPO，GRPO，Reinforce++, ARPO）进行操作，观察Scaling Law在不同领域的变化情况。
+- 由于Guru-RL-92k数据集是一个纯RL数据集，目前打算由我、周恒、钰涛一起进行SFT数据合成。
+- 前三个探究点应该一起进行，具体负责人已经列在相关探究点之后，具体而言：
+  - 每个研究点都对应框架的不同功能，三个研究点都需要框架基础的RFT能力，例如第二个研究点需要在基础框架中引入SFT能力，需要在数据集中人工制造SFT数据。在实际推进过程中，每个方向都应该有一个branch，在周会前进行CodeReview。
+  - Literature Review应该在实验过程中同步进行，主要是为了收集近期相关工作并且cover在自己所研究的方向中。
+  - 混合数据训练应该以数据集对应paper：[Revisiting Reinforcement Learning for LLM Reasoning
+from A Cross-Domain Perspective](https://arxiv.org/pdf/2506.14965)的相关settings继续进行。
+  - 相关实验数据请统一存在[Google Excel](https://docs.google.com/spreadsheets/d/1fRCf3vYXwccsNcc5z_T6-jU20ErIVYOUCg7W_XfvRVs/edit?usp=sharing)中
