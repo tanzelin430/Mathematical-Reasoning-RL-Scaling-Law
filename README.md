@@ -83,7 +83,7 @@ from A Cross-Domain Perspective](https://arxiv.org/pdf/2506.14965)的相关setti
 #### 环境配置
 1. 克隆代码仓库：
 ```bash
-git clone https://github.com/your-repo/Agentic-RL-Scaling-Law.git
+git clone --recursive https://github.com/your-repo/Agentic-RL-Scaling-Law.git
 cd Agentic-RL-Scaling-Law
 ```
 
