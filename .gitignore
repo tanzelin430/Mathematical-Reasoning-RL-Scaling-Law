@@ -1,7 +1,7 @@
-*.log
-*.json
-outputs/
-results/
-data/
-CLAUDE.md
-.claude
+/*.log
+/*.json
+/outputs/
+/results/
+/data/
+/CLAUDE.md
+/.claude
