@@ -1,0 +1,7 @@
+*.log
+*.json
+outputs/
+results/
+data/
+CLAUDE.md
+.claude

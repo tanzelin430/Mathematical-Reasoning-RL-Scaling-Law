@@ -1,0 +1,82 @@
+# PPO configuration for DeepSeek-R1-Distill-Qwen-1.5B with mixed domain training
+hydra:
+  searchpath:
+    - file://verl/verl/trainer/config
+
+defaults:
+  - ppo_trainer
+  - _self_
+
+# Data configuration - mixed domains from guru-RL-92k
+data:
+  train_files: 
+    - /fs-computility/mabasic/shared/data/guru-RL-92k/train/*.parquet
+  val_files:
+    - /fs-computility/mabasic/shared/data/guru-RL-92k/online_eval/*.parquet
+  max_prompt_length: 1024
+  max_response_length: 1024
+  train_batch_size: 256
+  filter_overlong_prompts: True
+  truncation: 'error'
+  dataloader_num_workers: 4
+  # reward_fn_key will use data_source field to select appropriate reward function
+
+# Model configuration for 1.5B model
+actor_rollout_ref:
+  model:
+    path: /fs-computility/mabasic/shared/models/DeepSeek-R1-Distill-Qwen-1.5B
+    enable_gradient_checkpointing: True
+    trust_remote_code: True
+    
+  # Actor configuration
+  actor:
+    optim:
+      lr: 1e-6
+    ppo_mini_batch_size: 64
+    ppo_micro_batch_size_per_gpu: 16  # Larger batch for small model
+    use_kl_loss: True
+    kl_loss_coef: 0.01
+    entropy_coeff: 0.01
+    
+  # Rollout configuration  
+  rollout:
+    name: vllm
+    gpu_memory_utilization: 0.7
+    tensor_model_parallel_size: 1  # 1.5B fits on single GPU
+    temperature: 0.7
+    top_p: 0.9
+    n: 1  # PPO uses n=1
+    
+  # Reference model
+  ref:
+    log_prob_micro_batch_size_per_gpu: 16
+    fsdp_config:
+      param_offload: False
+
+# Critic configuration
+critic:
+  optim:
+    lr: 5e-6
+  model:
+    path: /fs-computility/mabasic/shared/models/DeepSeek-R1-Distill-Qwen-1.5B
+  ppo_micro_batch_size_per_gpu: 16
+
+# Algorithm configuration
+algorithm:
+  gamma: 1.0
+  lam: 0.95
+  adv_estimator: gae
+  use_kl_in_reward: False
+  
+# Training configuration
+trainer:
+  total_epochs: 30
+  save_freq: 5
+  test_freq: 2
+  n_gpus_per_node: 2  # Using 2 GPUs available
+  nnodes: 1
+  project_name: 'agentic_rl_scaling_law'
+  experiment_name: 'ppo_qwen_1.5b_mixed_guru92k'
+  logger: ['console', 'wandb']
+  critic_warmup: 0
+  default_local_dir: results/checkpoints/${trainer.project_name}/${trainer.experiment_name}

@@ -8,6 +8,9 @@ Agentic RL Scaling Law Experiments
 - DeepSeek-R1-Distill-Qwen系列：1.5B、7B、14B
 - QwQ-32B
 
+### 基础框架
+VeRL
+
 ### 算法
 PPO GRPO Reinforce++
 ### 数据集
@@ -72,3 +75,54 @@ D_{SFT}:D_{RL}$$，观察RFT过程中：1.模型性能的变化Scaling Law是否
   - 混合数据训练应该以数据集对应paper：[Revisiting Reinforcement Learning for LLM Reasoning
 from A Cross-Domain Perspective](https://arxiv.org/pdf/2506.14965)的相关settings继续进行。
   - 相关实验数据请统一存在[Google Excel](https://docs.google.com/spreadsheets/d/1fRCf3vYXwccsNcc5z_T6-jU20ErIVYOUCg7W_XfvRVs/edit?usp=sharing)中
+
+## 实验实现细节
+
+### 如何运行实验
+
+#### 环境配置
+1. 克隆代码仓库：
+```bash
+git clone https://github.com/your-repo/Agentic-RL-Scaling-Law.git
+cd Agentic-RL-Scaling-Law
+```
+
+2. 安装依赖：
+```bash
+pip install -r requirements.txt
+```
+
+3. 配置VeRL框架：
+```bash
+# 安装VeRL
+cd verl/
+pip install -e .
+# Install the latest stable version of vLLM
+pip3 install vllm==0.8.3
+# Install flash-attn
+pip3 install flash-attn --no-build-isolation
+
+
+```
+
+#### 数据预处理
+在 /src/data/ 中，依次运行`preprocess_guru_data.py`和`preprocess_guru_unified.py`和`preprocess_verl_format.py`
+
+中间可能会报错，请直接无视，我们只需要处理好的部分代码先行测试
+#### 运行模型规模实验
+
+```bash
+./scripts/test_math_only.sh
+```
+
+
+### 配置文件
+
+### 数据预处理
+
+### 实验监控与日志
+
+#### 结果保存
+实验结果将自动保存到：
+- `outputs/model_name/algorithm/`: 模型检查点
+- `results/`: 评估结果和分析图表
