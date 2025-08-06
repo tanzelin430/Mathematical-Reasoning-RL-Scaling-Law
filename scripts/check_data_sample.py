@@ -12,7 +12,7 @@ class NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 # Load a sample from the dataset
-df = pd.read_parquet('/fs-computility/mabasic/shared/data/guru-RL-92k/train/math__combined_54.4k.parquet')
+df = pd.read_parquet('/fs-computility/mabasic/shared/data/guru-RL-92k/train/codegen__livecodebench_440.parquet')
 sample = df.head(1).to_dict('records')[0]
 
 # Pretty print the sample
