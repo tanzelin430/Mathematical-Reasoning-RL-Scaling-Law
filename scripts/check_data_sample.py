@@ -1,3 +1,13 @@
+train_files = [
+        "math__combined_54.4k.parquet",
+        "logic__arcagi1_111.parquet",
+        "logic__arcagi2_190.parquet",
+        "logic__barc_1.6k.parquet",
+        "logic__graph_logical_1.2k.parquet",
+        "logic__ordering_puzzle_1.9k.parquet",
+        "logic__zebra_puzzle_1.3k.parquet",
+        "stem__web_3.6k.parquet"
+]
 import pandas as pd
 import json
 import numpy as np
@@ -11,8 +21,9 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.item()
         return super().default(obj)
 
-# Load a sample from the dataset
-df = pd.read_parquet('/fs-computility/mabasic/shared/data/guru-RL-92k/train/math__combined_54.4k.parquet')
+# base_dir = '/workspace/dev/Reasoning360/scripts/tools/data/train'
+base_dir = '/workspace/data/guru_unified/train'
+df = pd.read_parquet(f'{base_dir}/logic__arcagi1_111.parquet')
 sample = df.head(1).to_dict('records')[0]
 
 # Pretty print the sample

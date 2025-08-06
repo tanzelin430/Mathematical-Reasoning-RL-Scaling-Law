@@ -212,23 +212,37 @@ def process_file(input_path: Path, output_path: Path, domain: str) -> None:
 
 def main():
     # Define input and output directories
-    base_dir = Path("/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law")
+    base_dir = Path("/workspace")
     input_dir = base_dir / "data" / "guru_unified"
     output_dir = base_dir / "data" / "guru_standardized"
     
     # Process train files
+    # train_files = [
+    #     ("math__combined_54.4k.parquet", "math"),
+    #     ("codegen__leetcode2k_1.3k.parquet", "code"),
+    #     ("codegen__livecodebench_440.parquet", "code"),
+    #     ("codegen__primeintellect_7.5k.parquet", "code"),
+    #     ("codegen__taco_8.8k.parquet", "code"),
+    #     ("logic__arcagi1_111.parquet", "logic"),
+    #     ("logic__arcagi2_190.parquet", "logic"),
+    #     ("logic__barc_1.6k.parquet", "logic"),
+    #     ("logic__graph_logical_1.2k.parquet", "logic"),
+    #     ("logic__ordering_puzzle_1.9k.parquet", "logic"),
+    #     ("logic__zebra_puzzle_1.3k.parquet", "logic"),
+    # ]
     train_files = [
         ("math__combined_54.4k.parquet", "math"),
-        ("codegen__leetcode2k_1.3k.parquet", "code"),
-        ("codegen__livecodebench_440.parquet", "code"),
-        ("codegen__primeintellect_7.5k.parquet", "code"),
-        ("codegen__taco_8.8k.parquet", "code"),
+        # ("codegen__leetcode2k_1.3k.parquet", "code"),
+        # ("codegen__livecodebench_440.parquet", "code"),
+        # ("codegen__primeintellect_7.5k.parquet", "code"),
+        # ("codegen__taco_8.8k.parquet", "code"),
         ("logic__arcagi1_111.parquet", "logic"),
         ("logic__arcagi2_190.parquet", "logic"),
         ("logic__barc_1.6k.parquet", "logic"),
         ("logic__graph_logical_1.2k.parquet", "logic"),
         ("logic__ordering_puzzle_1.9k.parquet", "logic"),
         ("logic__zebra_puzzle_1.3k.parquet", "logic"),
+        ("stem__web_3.6k.parquet", "stem"),
     ]
     
     print("Processing training files...")
@@ -239,11 +253,14 @@ def main():
             process_file(input_path, output_path, domain)
     
     # Process eval files
+    # eval_files = [
+    #     ("math__math_500.parquet", "math"),
+    #     ("math__aime_repeated_8x_240.parquet", "math"),
+    #     ("math__amc_repeated_4x_332.parquet", "math"),
+    #     ("codegen__humaneval_164.parquet", "code"),
+    # ]
     eval_files = [
-        ("math__math_500.parquet", "math"),
-        ("math__aime_repeated_8x_240.parquet", "math"),
-        ("math__amc_repeated_4x_332.parquet", "math"),
-        ("codegen__humaneval_164.parquet", "code"),
+        
     ]
     
     print("\nProcessing evaluation files...")

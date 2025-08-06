@@ -14,9 +14,9 @@ from typing import Any, Dict, List, Union
 def extract_messages(row: pd.Series) -> List[Dict[str, str]]:
     """Extract messages in the format expected by VeRL."""
     # Check if prompt field exists and is in the right format
-    if 'prompt' in row and isinstance(row['prompt'], np.ndarray):
-        # Original format: array of message dicts
-        messages = row['prompt'].tolist()
+    if 'prompt' in row and isinstance(row['prompt'], (np.ndarray, list)):
+        # Handle numpy array or list of message dicts
+        messages = row['prompt'].tolist() if isinstance(row['prompt'], np.ndarray) else row['prompt']
         if messages and isinstance(messages[0], dict) and 'role' in messages[0]:
             return messages
     
@@ -53,6 +53,9 @@ def get_answer(row: pd.Series) -> str:
                 continue
             else:
                 return str(val)
+    # Fallback to ground_truth if no other answer found
+    if 'ground_truth' in row and pd.notna(row['ground_truth']):
+        return str(row['ground_truth'])
     return ""
 
 
@@ -159,19 +162,34 @@ def process_file(input_path: Path, output_path: Path, domain: str) -> bool:
 
 def main():
     # Define directories
-    base_dir = Path("/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law")
+    base_dir = Path("/workspace")
     input_dir = base_dir / "data" / "guru_unified"
     output_dir = base_dir / "data" / "guru_verl"
     
     # Process selected files for testing
+    # files_to_process = [
+    #     # Math
+    #     ("train/math__combined_54.4k.parquet", "math"),
+    #     # Code
+    #     ("train/codegen__leetcode2k_1.3k.parquet", "code"),
+    #     # Logic
+    #     ("train/logic__zebra_puzzle_1.3k.parquet", "logic"),
+    # ]
+
     files_to_process = [
         # Math
         ("train/math__combined_54.4k.parquet", "math"),
-        # Code
-        ("train/codegen__leetcode2k_1.3k.parquet", "code"),
         # Logic
         ("train/logic__zebra_puzzle_1.3k.parquet", "logic"),
+        ('train/logic__arcagi1_111.parquet', 'logic'),
+        ('train/logic__arcagi2_190.parquet', 'logic'),
+        ('train/logic__barc_1.6k.parquet', 'logic'),
+        ('train/logic__graph_logical_1.2k.parquet', 'logic'),
+        ('train/logic__ordering_puzzle_1.9k.parquet', 'logic'),
+        # stem
+        ('train/stem__web_3.6k.parquet', 'stem'),
     ]
+    
     
     success_count = 0
     for rel_path, domain in files_to_process:
