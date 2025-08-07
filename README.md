@@ -127,13 +127,13 @@ python scripts/train_data_check/detailed_reward_analysis.py
 | 领域 | 计算方法 | 特点 | 评分范围 |
 |------|----------|------|----------|
 | **Math** | VeRL内置math_score + 模式匹配 | 处理boxed答案和数学表达式 | 0.0-1.0 |
-| **Code** | 单元测试执行 + 通过率计算 | 安全代码执行环境，真实测试运行 | 0.0-1.0 (梯度评分) |
+| **Code** | 单元测试执行 + 通过率计算 | 安全代码执行环境，真实测试运行 | 0.0-1.0|
 | **Logic** | 规则模式匹配 | 是/否答案标准化 | 0.0-1.0 |
 | **STEM** | Math scorer + 模式匹配 | 数值问题和描述性答案处理 | 0.0-1.0 |
 
 #### 运行训练实验
 
-**单领域训练 (Math+STEM):**
+**单领域训练 (Math):**
 ```bash
 bash scripts/train/run_ppo_qwen2.5_3b_guru.sh
 ```
@@ -152,13 +152,11 @@ bash scripts/train/run_ppo_qwen2.5_3b_all_domains.sh
 - `trainer.logger='["console"]'` - 仅控制台输出
 - `trainer.logger='["console", "wandb"]'` - 控制台 + WandB记录 (需要WandB认证)
 
-### 项目成果
-- ✅ **四领域混合训练pipeline完全可用** - Math, Code, Logic, STEM
-- ✅ **所有领域奖励函数实现并验证** - 包括Code领域单元测试执行突破
-- ✅ **Repository结构优化完成** - 脚本按功能组织
-- ✅ **WandB集成问题解决** - 支持灵活的日志配置
+
 
 ### 实验监控与结果
+**TODO这部分相关功能还未完全实现**
+
 实验结果将自动保存到：
 - `outputs/`: 训练日志按时间戳组织
 - `results/`: 模型检查点、评估结果和分析图表
