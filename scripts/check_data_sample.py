@@ -18,4 +18,8 @@ sample = df.head(1).to_dict('records')[0]
 # Pretty print the sample
 print(json.dumps(sample, indent=2, ensure_ascii=False, cls=NumpyEncoder))
 print(f"\nTotal samples in this file: {len(df)}")
+<<<<<<< HEAD
 print(f"Columns: {list(df.columns)}")
+=======
+print(f"Columns: {list(df.columns)}")
+>>>>>>> fe04abc69fdd39de8df13ecb29ed08d457f04955
