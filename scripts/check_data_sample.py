@@ -16,7 +16,7 @@ import pandas as pd
 import json
 import numpy as np
 
-file = 'codegen__primeintellect_7.5k.parquet'
+file = 'math__combined_54.4k.parquet'
 
 # Custom JSON encoder to handle numpy arrays and pandas types
 class NumpyEncoder(json.JSONEncoder):
