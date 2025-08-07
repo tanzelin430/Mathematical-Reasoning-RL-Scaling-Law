@@ -11,30 +11,14 @@ from typing import Any, Dict, List
 
 
 def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
-    question = ''
-    # Extract question content from prompt field
-    if isinstance(row.get('prompt'), list) and row['prompt']:
-        question = row['prompt'][0].get('content', '')
-    elif pd.notna(row.get('prompt')):
-        question = str(row['prompt'])
-
-    solution = ''
-    # Use direct ground_truth or solution field
-    if pd.notna(row.get('ground_truth')):
-        solution = str(row['ground_truth'])
-    elif pd.notna(row.get('solution')):
-        solution = str(row['solution'])
-
-    data_source = row.get('data_source', 'math_unknown')
-
-    data = {
-        "data_source": data_source,
-        "prompt": [{"role": "user", "content": question}],
-        "ability": "math",
-        "reward_model": {"style": "rule", "ground_truth": solution},
-        "extra_info": {"split": split, "index": idx}
-    }
-    return data
+    #yifanL change the math format
+    return {
+            "data_source": row.get("data_source", "math_unknown"),
+            "prompt": row.get("prompt", []),
+            "ability": row.get("ability", "math"),
+            "reward_model": row.get("reward_model", {}),
+            "extra_info": {"split": split, "index": idx}
+        }
 
 
 def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
@@ -56,7 +40,7 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     data = {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": question}],
-        "ability": "code",
+        "ability": row.get("ability", "code"),
         "reward_model": {"style": "rule", "ground_truth": solution},
         "extra_info": {"split": split, "index": idx}
     }
@@ -64,12 +48,6 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
 
 def unify_logic_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
-    question = ''
-    if isinstance(row.get('prompt'), list) and row['prompt']:
-        question = row['prompt'][0].get('content', '')
-    elif pd.notna(row.get('prompt')):
-        question = str(row['prompt'])
-
     solution = ''
     if isinstance(row.get('reward_model'), dict):
         solution = str(row['reward_model'].get('ground_truth', ''))
@@ -80,8 +58,8 @@ def unify_logic_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data = {
         "data_source": data_source,
-        "prompt": [{"role": "user", "content": question}],
-        "ability": "logic",
+        "prompt": row.get("prompt", []),
+        "ability": row.get("ability", "logic"),
         "reward_model": {"style": "rule", "ground_truth": solution},
         "extra_info": {"split": split, "index": idx}
     }
@@ -89,12 +67,6 @@ def unify_logic_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
 
 def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
-    question = ''
-    if pd.notna(row.get('prompt')):
-        question = str(row['prompt'])
-    elif pd.notna(row.get('raw_prompt')):
-        question = str(row['raw_prompt'])
-
     solution = ''
     if isinstance(row.get('reward_model'), dict):
         solution = str(row['reward_model'].get('ground_truth', ''))
@@ -103,7 +75,7 @@ def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data = {
         "data_source": data_source,
-        "prompt": [{"role": "user", "content": question}],
+        "prompt": row.get("prompt", []),
         "ability": "stem",
         "reward_model": {"style": "rule", "ground_truth": solution},
         "extra_info": {"split": split, "index": idx}
@@ -145,6 +117,10 @@ def main():
         ("train/logic__ordering_puzzle_1.9k.parquet", "train"),
         ("train/logic__zebra_puzzle_1.3k.parquet", "train"),
         ("train/stem__web_3.6k.parquet", "train"),
+        ("train/codegen__leetcode2k_1.3k.parquet", "train"),
+        ("train/codegen__livecodebench_440.parquet", "train"),
+        ("train/codegen__primeintellect_7.5k.parquet", "train"),
+        ("train/codegen__taco_8.8k.parquet", "train"),
     ]
 
     for rel, split in files:
