@@ -12,7 +12,7 @@ import pandas as pd
 import json
 import numpy as np
 
-file = 'stem__web_3.6k.parquet'
+file = 'math__combined_54.4k.parquet'
 
 # Custom JSON encoder to handle numpy arrays
 class NumpyEncoder(json.JSONEncoder):
@@ -23,16 +23,16 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.item()
         return super().default(obj)
 
-base_dir = '/workspace/dev/Reasoning360/scripts/tools/data/train'
-df = pd.read_parquet(f'{base_dir}/{file}')
-sample = df.head(1).to_dict('records')[0]
+# base_dir = '/fs-computility/mabasic/shared/data/guru-RL-92k/train'
+# df = pd.read_parquet(f'{base_dir}/{file}')
+# sample = df.head(1).to_dict('records')[0]
 
-# Pretty print the sample
-print(json.dumps(sample, indent=2, ensure_ascii=False, cls=NumpyEncoder))
-print(f"\nTotal samples in this file: {len(df)}")
-print(f"Columns: {list(df.columns)}")
+# # Pretty print the sample
+# print(json.dumps(sample, indent=2, ensure_ascii=False, cls=NumpyEncoder))
+# print(f"\nTotal samples in this file: {len(df)}")
+# print(f"Columns: {list(df.columns)}")
 
-base_dir = '/workspace/data/guru_verl/train'
+base_dir = '~/work/Agentic-RL-Scaling-Law/data/guru_verl/train'
 df = pd.read_parquet(f'{base_dir}/{file}')
 sample = df.head(1).to_dict('records')[0]
 

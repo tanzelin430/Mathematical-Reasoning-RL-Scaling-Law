@@ -3,5 +3,7 @@
 /outputs/
 /results/
 /data/
+/dev/
 /CLAUDE.md
 /.claude
+/wandb/
