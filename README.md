@@ -160,4 +160,3 @@ bash scripts/train/run_ppo_qwen2.5_3b_all_domains.sh
 实验结果将自动保存到：
 - `outputs/`: 训练日志按时间戳组织
 - `results/`: 模型检查点、评估结果和分析图表
-- WandB集成：支持实时训练监控和指标可视化
