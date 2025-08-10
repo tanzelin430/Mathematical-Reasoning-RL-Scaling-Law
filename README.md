@@ -274,4 +274,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Note**: This is an active research project. For questions or collaboration, please open an issue or contact the maintainers.
