@@ -7,3 +7,6 @@
 /CLAUDE.md
 /.claude
 /wandb/
+*.egg-info/
+__pycache__/
+start.sh
