@@ -274,10 +274,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<<<<<<< HEAD
-实验结果将自动保存到：
-- `outputs/`: 训练日志按时间戳组织
-- `results/`: 模型检查点、评估结果和分析图表
-=======
-**Note**: This is an active research project. For questions or collaboration, please open an issue or contact the maintainers.
->>>>>>> tzlexp
