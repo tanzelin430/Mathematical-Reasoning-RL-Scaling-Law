@@ -28,11 +28,22 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     elif 'query' in row and pd.notna(row['query']):
         question = str(row['query'])
 
-    # Extract solution from test or ground_truth
+    # Extract test data from reward_model field (Reasoning360 format)
     solution = ''
-    if pd.notna(row.get('ground_truth')):
+    if isinstance(row.get('reward_model'), dict):
+        # Get ground_truth from reward_model dict
+        ground_truth = row['reward_model'].get('ground_truth', '')
+        if ground_truth:
+            # The ground_truth is already a JSON string with test data
+            # For leetcode: {"functional": "def check(candidate)..."}
+            # For others: {"inputs": [...], "outputs": [...]}
+            # We'll pass it through as-is since coder1 expects JSON
+            solution = ground_truth
+    elif pd.notna(row.get('ground_truth')):
+        # Fallback to old format if exists
         solution = str(row['ground_truth'])
     elif pd.notna(row.get('test')):
+        # Fallback to test field if exists
         solution = str(row['test'])
 
     data_source = row.get('data_source', 'code_unknown')
@@ -40,7 +51,7 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     data = {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": question}],
-        "ability": row.get("ability", "code"),
+        "ability": row.get("ability", "codegen"),  # Use 'codegen' to match the data
         "reward_model": {"style": "rule", "ground_truth": solution},
         "extra_info": {"split": split, "index": idx}
     }
@@ -50,16 +61,37 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 def unify_logic_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     solution = ''
     if isinstance(row.get('reward_model'), dict):
-        solution = str(row['reward_model'].get('ground_truth', ''))
+        # Get ground truth from reward_model
+        solution = row['reward_model'].get('ground_truth', '')
+        
+        # Convert numpy arrays to lists for compatibility with scorers
+        if isinstance(solution, np.ndarray):
+            # Check if it's an array of arrays (ARC-AGI format)
+            if len(solution) > 0 and isinstance(solution[0], np.ndarray):
+                # Convert array of arrays to 2D list
+                solution = [arr.tolist() for arr in solution]
+            else:
+                # Convert simple array to list
+                solution = solution.tolist()
+        elif not isinstance(solution, (list, dict, str)) and pd.notna(solution):
+            # For other types, convert to string
+            solution = str(solution)
     elif pd.notna(row.get('ground_truth')):
-        solution = str(row['ground_truth'])
+        solution = row['ground_truth']
+        if isinstance(solution, np.ndarray):
+            if len(solution) > 0 and isinstance(solution[0], np.ndarray):
+                solution = [arr.tolist() for arr in solution]
+            else:
+                solution = solution.tolist()
+        elif not isinstance(solution, (list, dict, str)):
+            solution = str(solution)
 
     data_source = row.get('data_source', 'logic_unknown')
 
     data = {
         "data_source": data_source,
         "prompt": row.get("prompt", []),
-        "ability": row.get("ability", "logic"),
+        "ability": row.get("ability", "logic"),  # Keep the default as 'logic'
         "reward_model": {"style": "rule", "ground_truth": solution},
         "extra_info": {"split": split, "index": idx}
     }

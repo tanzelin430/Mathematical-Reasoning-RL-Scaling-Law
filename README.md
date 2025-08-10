@@ -1,162 +1,276 @@
 # Agentic-RL-Scaling-Law
-Agentic RL Scaling Law Experiments
 
-## 实验设置
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
+[![Framework](https://img.shields.io/badge/framework-VeRL%20v0.3.1-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-### 模型
-我们的实验需要囊括各个参数量的模型，可从以下具有深度推理能力的基座模型中选择：
-- DeepSeek-R1-Distill-Qwen系列：1.5B、7B、14B
-- QwQ-32B
+## 🚀 Overview
 
-### 基础框架
-VeRL
+This repository implements **Agentic RL Scaling Law Experiments** using the VeRL framework to explore how reinforcement learning performance scales with model size, data volume, and training steps across multiple domains (Math, Code, Logic, STEM) using the guru-RL-92k dataset.
 
-### 算法
-PPO GRPO Reinforce++
-### 数据集
-数据集：[Guru-RL-92k](https://huggingface.co/datasets/LLM360/guru-RL-92k) 该数据集是一个混合数据集，本研究用该实验作为初始实验数据集有两大原因，一是保证各分工组的实验数据集和Code-Base保持一致，便于项目推进和讨论；二是在Scaling Law探究的初期可以尽量做出一个General的结论，而避免谈论具体的Domain。在实验后期，我们会做General Scaling Law->Domain-Specific Scaling Law的对比与迁移。同时由于该数据集不含SFT数据，相关数据若需使用需要人工合成。
+### Key Features
+- 🔧 **VeRL Framework Integration**: Leveraging VeRL's built-in reward system from Reasoning360
+- 🎯 **Multi-Domain Support**: Math, Code, Logic, and STEM domains with automatic reward routing
+- 📊 **Scaling Law Analysis**: Systematic exploration of model size, data, and compute scaling
+- 🏃 **Production-Ready**: Battle-tested training pipelines with checkpoint management
 
-### Metric
-- Pass@1 平均性能提升（横坐标训练步数，纵坐标Pass@1）
-- Pass@k曲线（横坐标k，纵坐标Pass@k，在不同的训练步数下放置多张图）
-  - 将k=128单独列出来，形成一个“创造性指数”，我们认为在这个k值下面模型已经sample出了它能找到的所有解
-  - 该指标用于评测模型是否过拟合到了奖励信号上
-  - k_max = 128
-- 每单位计算量的性能提升：计算量增加的Flops与Pass@1的上升之间的关系
+## 🎯 Quick Start
 
-### 探究点
-在实验中，我们遵循控制变量法这一基础原则，我们主要有三大主要变量：模型规模、数据量、训练步数
-重点关注前三点
-
-
-**模型规模与训练步数(N)**【Zelin、chenzhang、zaibin(literature review)】
-- 随着参数量增加，使用相同Setting进行RFT（Reinforcement Learning Fine-tuning）之后模型性能是否提升（Pass@1）
-- 参数量对于模型稳定性影响：RFT之后，观察模型是否过拟合到奖励模型（观察Pass@K）
-- 参数量对于样本效率的影响：随着参数量提升，是否需要更多的训练步数才能让模型收敛（或者说，达到最大性能）
-- 更大的模型规模是否可以带来更加稳定的训练过程
-- 训练步数与过拟合到奖励信号、以及泛化性之间的关系：在训练过程中如果需要保持模型的泛化性能，是否需要early stop（观察Pass@k与训练步数之间的关系）
-
-
-**数据规模与比例(D)**【周恒、钰涛、zelin】
-- RFT过程中的样本数量记为$$D_{RL}$$，对于相同的数据集，更多的$$D_{RL}$$是否可以持续提升模型性能上限，性能上限何时出现（Pass@1），是否存在边际收益递减的情况？
-- SFT数据与RFT数据的“规模匹配”问题：通过调整$$
-D_{SFT}:D_{RL}$$，观察RFT过程中：1.模型性能的变化Scaling Law是否与上一点中提到的一致（比如，收敛到性能上限的速度，观察曲线斜率，SFT 性能随数据规模的提升是否会使 RL 微调的缩放斜率更陡峭）2. 对于性能上限的影响（Pass@1）
-
-
-**混合数据训练**【Xiangyuan Yifan】
-- 对数据进行难度分级，观察由浅入深地分级进行训练和混合不同难度数据进行训练的收敛曲线是否一致（课程学习or直接开训）
-- 对于混合数据的跨领域训练，观察在新领域能够实现Domain-transfer的最小数据量要求，或者说能否有效地实现Domain Transfer。
-- 若Domain-Transfer是有效的，则需要探究：
-  - 是否越大参数量的模型，在新领域上强化学习效率更高，而参数量少的模型反而难以泛化【待观察实际效果】
-
-
-  
-**奖励模型（RM）的规模与质量**【Preference Based Only，想法待完善】
-- RM 的规模与 RL 微调性能的关系：相同数据微调出的更大的 RM 是否能更精准地引导 RL，使主模型性能随 RM规模提升而提升？
-- RM 的数据规模（$$D_{RM}$$）：当$$D_{RM}$$增加时，RL 微调的性能是否遵循特定规律？是否存在 “RM 数据瓶颈”（即 RM 的数据不足会限制主模型的缩放潜力）？
-
-
-**奖励规则的复杂度**【Rule Based Only，想法待完善】
-- 规则复杂度与模型规模的交互：更大规模的模型是否更能理解规则的深层逻辑？此时 scaling law 的斜率是否更陡峭（即模型规模对性能的边际效益更高）
-- 与 Preferenced RM 的对比：相同模型规模下，rule-based RM 的 scaling law 是否比 learned RM（基于数据训练的 RM）更早出现 “平台期”？
-
-  
-**Long Horizon Task多轮交互次数**【想法待完善】
-依赖的数据集：https://github.com/abdulhaim/LMRL-Gym
-
-
-
-## 实验方法
-- 上述探究点需要在各领域数据集上利用不同的强化学习算法（PPO，GRPO，Reinforce++, ARPO）进行操作，观察Scaling Law在不同领域的变化情况。
-- 由于Guru-RL-92k数据集是一个纯RL数据集，目前打算由我、周恒、钰涛一起进行SFT数据合成。
-- 前三个探究点应该一起进行，具体负责人已经列在相关探究点之后，具体而言：
-  - 每个研究点都对应框架的不同功能，三个研究点都需要框架基础的RFT能力，例如第二个研究点需要在基础框架中引入SFT能力，需要在数据集中人工制造SFT数据。在实际推进过程中，每个方向都应该有一个branch，在周会前进行CodeReview。
-  - Literature Review应该在实验过程中同步进行，主要是为了收集近期相关工作并且cover在自己所研究的方向中。
-  - 混合数据训练应该以数据集对应paper：[Revisiting Reinforcement Learning for LLM Reasoning
-from A Cross-Domain Perspective](https://arxiv.org/pdf/2506.14965)的相关settings继续进行。
-  - 相关实验数据请统一存在[Google Excel](https://docs.google.com/spreadsheets/d/1fRCf3vYXwccsNcc5z_T6-jU20ErIVYOUCg7W_XfvRVs/edit?usp=sharing)中
-
-## 实验实现细节
-
-### 如何运行实验
-
-#### 环境配置
-1. 克隆代码仓库：
+### Minimal Setup
 ```bash
-git clone --recursive https://github.com/your-repo/Agentic-RL-Scaling-Law.git
+# Clone repository
+git clone https://github.com/your-repo/Agentic-RL-Scaling-Law.git
 cd Agentic-RL-Scaling-Law
-```
 
-2. 安装依赖：
-```bash
+# Install dependencies
 pip install -r requirements.txt
+cd verl/ && pip install -e . && cd ..
+
+# Prepare data
+python src/data/pre_verl.py
+
+# Run training
+bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
 ```
 
-3. 配置VeRL框架：
+### Training Examples
+
+**Multi-domain training (all 4 domains):**
 ```bash
-# 安装VeRL
+bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
+```
+
+**Single-domain training (7B model):**
+```bash
+bash scripts/train/run_ppo_qwen2.5_7b_single_domain.sh
+```
+
+**Custom configuration:**
+```bash
+python3 -m verl.trainer.main_ppo \
+    data.train_files="['/path/to/math.parquet']" \
+    actor_rollout_ref.model.path="/path/to/model" \
+    trainer.n_gpus_per_node=8
+```
+
+## 📁 Project Structure
+
+```
+Agentic-RL-Scaling-Law/
+├── verl/                    # VeRL framework (from Reasoning360)
+│   └── utils/
+│       └── reward_score/    # Built-in reward scorers
+├── src/
+│   ├── data/               # Data preprocessing
+│   └── reward/             # Legacy reward functions (deprecated)
+├── scripts/
+│   ├── train/              # Training scripts
+│   └── train_data_check/   # Data validation tools
+├── data/
+│   └── guru_verl/          # Preprocessed guru-RL-92k dataset
+│       ├── train/          # Training data by domain
+│       ├── math/           # ~54.4k samples
+│       ├── code/           # ~18k samples  
+│       ├── logic/          # ~6.3k samples
+│       └── stem/           # ~3.6k samples
+└── results/                # Experiment outputs
+    └── checkpoints/        # Model checkpoints
+```
+
+## 🧪 Experimental Setup
+
+### Models
+We experiment with models of various sizes to study scaling behaviors:
+- **Qwen2.5 Series**: 3B, 7B, 14B, 32B
+- **DeepSeek-R1-Distill-Qwen Series**: 1.5B, 7B, 14B
+- **QwQ-32B**: For large-scale experiments
+
+### Algorithms
+- **PPO** (Proximal Policy Optimization)
+- **GRPO** (Group Relative Policy Optimization)  
+- **Reinforce++**
+
+### Dataset
+**[Guru-RL-92k](https://huggingface.co/datasets/LLM360/guru-RL-92k)**: A mixed-domain dataset with ~92k samples across:
+- Math: 54.4k samples
+- Code: 18k samples
+- Logic: 6.3k samples
+- STEM: 3.6k samples
+
+### Metrics
+- **Pass@1**: Average performance improvement over training steps
+- **Pass@k Curves**: k∈[1,128] for measuring solution diversity
+- **Compute Efficiency**: Performance gain per FLOP
+- **Domain-Specific Accuracy**: Individual domain performance tracking
+
+## 🔬 Research Focus
+
+### Model Scale & Training Steps (N)
+- Performance scaling with parameter count
+- Model stability and overfitting analysis via Pass@k
+- Sample efficiency across model sizes
+- Training stability improvements with scale
+
+### Data Scale & Proportions (D)
+- RL data volume impact on performance ceiling
+- SFT:RL data ratio optimization
+- Marginal returns analysis
+- Domain-specific data requirements
+
+### Mixed-Domain Training
+- Curriculum learning vs. mixed training
+- Cross-domain transfer effectiveness
+- Minimum data requirements for domain adaptation
+- Model size impact on transfer learning
+
+## 💻 Technical Implementation
+
+### Environment Setup
+
+```bash
+# Install VeRL and dependencies
 cd verl/
 pip install -e .
-# Install the latest stable version of vLLM
 pip3 install vllm==0.8.3
-# Install flash-attn
 pip3 install flash-attn --no-build-isolation
-
-
 ```
 
-#### 数据预处理
-**目的:** 将guru-RL-92k数据集转换为VeRL框架格式，涵盖Math、Code、Logic、STEM四个领域
+### Data Preprocessing
 
-**运行预处理:**
+Convert guru-RL-92k dataset to VeRL format:
 ```bash
+# Preprocess all domains
 python src/data/pre_verl.py
-```
 
-**验证预处理结果:**
-```bash
-# 检查数据格式
+# Validate preprocessing
 python scripts/train_data_check/check_data_sample.py
-
-# 详细奖励分析
 python scripts/train_data_check/detailed_reward_analysis.py
 ```
-#### 奖励计算方法
-各领域采用不同的奖励计算策略，确保评估的准确性和领域特异性：
 
-| 领域 | 计算方法 | 特点 | 评分范围 |
-|------|----------|------|----------|
-| **Math** | VeRL内置math_score + 模式匹配 | 处理boxed答案和数学表达式 | 0.0-1.0 |
-| **Code** | 单元测试执行 + 通过率计算 | 安全代码执行环境，真实测试运行 | 0.0-1.0|
-| **Logic** | 规则模式匹配 | 是/否答案标准化 | 0.0-1.0 |
-| **STEM** | Math scorer + 模式匹配 | 数值问题和描述性答案处理 | 0.0-1.0 |
+### VeRL Built-in Reward System
 
-#### 运行训练实验
+VeRL automatically routes reward computation based on the `data_source` field:
 
-**单领域训练 (Math):**
-```bash
-bash scripts/train/run_ppo_qwen2.5_3b_guru.sh
+| Domain | Data Source Pattern | Scorer | Description |
+|--------|-------------------|--------|-------------|
+| **Math** | `math__*` | naive_dapo.py | Mathematical expression evaluation |
+| **Code** | `codegen__*` | coder1 | Unit test execution with sandboxing |
+| **Logic** | `logic__*` | arcagi.py | Pattern matching for logical reasoning |
+| **STEM** | `stem__*` | stem scorer | Scientific problem evaluation |
+
+**Key Advantages:**
+- ✅ No custom reward function needed
+- ✅ Automatic domain detection
+- ✅ Battle-tested implementations
+- ✅ Consistent scoring across domains
+
+### Training Configuration
+
+**Key Parameters:**
+```yaml
+# Model Configuration
+actor_rollout_ref.model.path: "/path/to/Qwen2.5-3B"
+actor_rollout_ref.model.lora_rank: 32
+actor_rollout_ref.model.target_modules: [q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj]
+
+# Training Configuration
+algorithm.adv_estimator: gae
+algorithm.use_kl_in_reward: true
+trainer.total_epochs: 3-5
+trainer.n_gpus_per_node: 2-8
+
+# Checkpoint Management
+trainer.default_local_dir: results/checkpoints/${project}/${experiment}
+trainer.save_freq: 10
+
+# Logging
+trainer.logger: ["console", "wandb"]
 ```
 
-**四领域混合训练:**
+## 📊 Experiment Execution
+
+### Running Training
+
+**Basic Training:**
 ```bash
-bash scripts/train/run_ppo_qwen2.5_3b_all_domains.sh
+# Multi-domain training with all 4 domains
+bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
+
+# Single-domain training (configure domain in script)
+bash scripts/train/run_ppo_qwen2.5_7b_single_domain.sh
 ```
 
-#### 重要配置选项
-训练脚本支持以下关键配置的自定义：
+**Advanced Configuration:**
+```bash
+python3 -m verl.trainer.main_ppo \
+    algorithm.adv_estimator=grpo \
+    data.train_files="['path/to/data.parquet']" \
+    data.train_batch_size=128 \
+    actor_rollout_ref.rollout.n=8 \
+    trainer.total_epochs=5 \
+    trainer.logger='["console", "wandb"]'
+```
 
-**数据混洗:** `data.shuffle=True/False` - 控制是否随机打乱训练数据
+### Checkpoint Management
 
-**日志设置:**
-- `trainer.logger='["console"]'` - 仅控制台输出
-- `trainer.logger='["console", "wandb"]'` - 控制台 + WandB记录 (需要WandB认证)
+Checkpoints are automatically saved to:
+```
+results/
+└── checkpoints/
+    └── ${project_name}/
+        └── ${experiment_name}/
+            ├── epoch_0/
+            ├── epoch_10/
+            └── epoch_20/
+```
 
+Resume training from checkpoint:
+```bash
+trainer.resume_mode=auto  # Automatically find latest checkpoint
+```
 
+## 📈 Monitoring & Evaluation
 
-### 实验监控与结果
-**TODO这部分相关功能还未完全实现**
+### WandB Integration
+```bash
+# Enable WandB logging
+wandb login
+trainer.logger='["console", "wandb"]'
+trainer.project_name='agentic_rl_scaling'
+trainer.experiment_name='qwen3b_multi_domain'
+```
 
-实验结果将自动保存到：
-- `outputs/`: 训练日志按时间戳组织
-- `results/`: 模型检查点、评估结果和分析图表
+### Results Organization
+```
+results/
+├── checkpoints/     # Model checkpoints
+├── logs/           # Training logs
+└── metrics/        # Evaluation metrics
+```
+
+### Key Metrics Tracked
+- **Training Metrics**: Loss, rewards, KL divergence
+- **Performance Metrics**: Pass@1, Pass@k (k≤128)
+- **Domain Breakdown**: Per-domain accuracy and improvements
+- **Compute Efficiency**: FLOPs vs. performance curves
+
+## 🔗 References & Acknowledgments
+
+### Frameworks & Tools
+- **VeRL Framework**: Advanced RL training framework from Reasoning360 project
+- **vLLM**: High-performance inference engine
+- **Flash Attention**: Memory-efficient attention implementation
+
+### Datasets
+- **Guru-RL-92k**: Multi-domain RL dataset ([HuggingFace](https://huggingface.co/datasets/LLM360/guru-RL-92k))
+
+### Related Work
+- [Revisiting Reinforcement Learning for LLM Reasoning from A Cross-Domain Perspective](https://arxiv.org/pdf/2506.14965)
+- Reasoning360 Project (VeRL source)
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
