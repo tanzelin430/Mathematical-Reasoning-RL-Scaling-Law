@@ -76,7 +76,7 @@ n_gpus_per_node=8
 # Batch sizes (adjusted for 2x A800 GPUs)
 train_prompt_bsz=256  # Smaller batch for single domain
 gen_prompt_bsz=$((train_prompt_bsz * 1))
-n_resp_per_prompt=2  # Number of responses per prompt
+n_resp_per_prompt=1  # Number of responses per prompt
 train_prompt_mini_bsz=128  # Mini batch size for gradient updates
 # micro_batch_size_per_gpu=8  # Deprecated when using dynamic batch size
 
