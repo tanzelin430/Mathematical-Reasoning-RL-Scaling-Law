@@ -7,13 +7,17 @@ export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
 
 # =================== Data Configuration ===================
-SHARED_DATA_PATH=/root/work/Agentic-RL-Scaling-Law/data/guru_verl
+# Use consistent absolute path
+SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 
-# =================== Output and Checkpoint Configuration ===================                                                                                   │ │
-# Save checkpoints and outputs to results directory                                                                                                             │ │
-RESULTS_DIR=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/results                                                                              │ │
-CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints      
+# =================== Output and Checkpoint Configuration ===================
+# Save checkpoints and outputs to results directory
+# Use absolute path to ensure checkpoints are saved in the correct location
+RESULTS_DIR=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/results
+CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
+# Create checkpoint directory if it doesn't exist
+mkdir -p ${CHECKPOINT_DIR}      
 # Choose which domain to train on (uncomment one)
 # Option 1: Math domain only
 DOMAIN_NAME="math"
@@ -51,7 +55,7 @@ WANDB_EXPERIMENT_NAME=qwen2.5_7b_${DOMAIN_NAME}_verl_builtin
 adv_estimator=gae  # or grpo
 
 # KL penalty settings
-use_kl_in_reward=True
+use_kl_in_reward=False
 kl_coef=0.02
 use_kl_loss=False
 kl_loss_coef=0.0
@@ -62,7 +66,7 @@ clip_ratio_high=0.2
 
 # Sequence length limits
 max_prompt_length=2048
-max_response_length=2048
+max_response_length=8192
 
 #Hardware Platform
 num_nodes=1
@@ -87,11 +91,13 @@ sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.3
+gpu_memory_utilization=0.4
 
 
 
 # =================== Start RL Training ===================
+echo "Checkpoints will be saved to: ${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME}"
+
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=${adv_estimator} \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
@@ -112,12 +118,11 @@ python3 -m verl.trainer.main_ppo \
     data.shuffle=True \
     data.trust_remote_code=True \
     actor_rollout_ref.actor.use_kl_loss=${use_kl_loss} \
-    actor_rollout_ref.actor.kl_loss_coef=${kl_loss_coef} \
     actor_rollout_ref.actor.clip_ratio_low=${clip_ratio_low} \
     actor_rollout_ref.actor.clip_ratio_high=${clip_ratio_high} \
     actor_rollout_ref.actor.strategy="fsdp" \
     actor_rollout_ref.actor.optim.lr=1e-6 \
-    actor_rollout_ref.actor.optim.lr_warmup_steps=10 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps=5 \
     actor_rollout_ref.actor.optim.weight_decay=0.1 \
     actor_rollout_ref.actor.optim.warmup_style=constant \
     actor_rollout_ref.actor.optim.min_lr_ratio=0. \
@@ -135,7 +140,9 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 \
     actor_rollout_ref.rollout.gpu_memory_utilization=${gpu_memory_utilization} \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
-    actor_rollout_ref.rollout.enable_chunked_prefill=True \
+    actor_rollout_ref.rollout.enable_chunked_prefill=False \
+    actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
+    actor_rollout_ref.rollout.max_model_len=10240 \
     actor_rollout_ref.rollout.temperature=${temperature} \
     actor_rollout_ref.rollout.top_p=${top_p} \
     actor_rollout_ref.rollout.top_k=${top_k} \
@@ -167,6 +174,6 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=25 \
     trainer.test_freq=-1 \
     trainer.total_epochs=2 \
-    trainer.critic_warmup=5 \
+    trainer.critic_warmup=0 \
     trainer.resume_mode=disable \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
