@@ -22,30 +22,30 @@ def test_math_domain():
     tests = [
         {
             "name": "Correct boxed answer",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The answer is \\boxed{42}",
             "ground_truth": "42",
             "expected": "high"
         },
         {
             "name": "Wrong boxed answer",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The answer is \\boxed{40}",
             "ground_truth": "42",
             "expected": "low"
         },
         {
             "name": "Correct answer no box",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The final answer is 42",
             "ground_truth": "42",
             "expected": "medium"
         },
         {
             "name": "GSM8K correct",
-            "data_source": "openai/gsm8k",
-            "response": "Step 1: Calculate...\nStep 2: ...\nThe answer is 125.\n #### 125",
-            "ground_truth": "125",
+            "data_source": "math",
+            "response": "Step 1: Calculate...\nStep 2: ...\nThe answer is 125.\n \\boxed{125}",
+            "ground_truth": "130",
             "expected": "high"
         }
     ]

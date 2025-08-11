@@ -44,11 +44,12 @@ val_files="['${TRAIN_DATA_DIR}/logic__arcagi2_190.parquet']"
 # val_files="null"  # Uncomment to disable validation
 
 # =================== Model Configuration ===================
-BASE_MODEL=/fs-computility/mabasic/shared/models/Qwen2.5-7B
+MODEL_NAME=Qwen2.5-7B-Instruct
+BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=qwen2.5_7b_${DOMAIN_NAME}_verl_builtin
+WANDB_EXPERIMENT_NAME=qwen2.5_7b_Instruct_${DOMAIN_NAME}_verl_builtin
 
 # =================== RL Training Parameters ===================
 # Algorithm settings
@@ -73,11 +74,26 @@ num_nodes=1
 n_gpus_per_node=8
 
 # Batch sizes (adjusted for 2x A800 GPUs)
-train_prompt_bsz=64  # Smaller batch for single domain
+train_prompt_bsz=256  # Smaller batch for single domain
 gen_prompt_bsz=$((train_prompt_bsz * 1))
 n_resp_per_prompt=2  # Number of responses per prompt
-train_prompt_mini_bsz=32  # Mini batch size for gradient updates
-micro_batch_size_per_gpu=8
+train_prompt_mini_bsz=128  # Mini batch size for gradient updates
+# micro_batch_size_per_gpu=8  # Deprecated when using dynamic batch size
+
+# Dynamic batch size configuration
+use_dynamic_bsz=True
+
+# Global maximum tokens per GPU setting
+# For 8x A800 GPUs with Qwen2.5-7B model, we can use a more aggressive setting
+# This controls the maximum tokens per micro-batch on each GPU
+max_token_per_gpu=12288  
+# Alternative settings:
+# max_token_per_gpu=16384  # 16K tokens - balanced setting
+# max_token_per_gpu=32768  # 32K tokens - aggressive (may cause OOM)
+
+# Use the global setting for all components
+actor_ppo_max_token_len=${max_token_per_gpu}
+infer_ppo_max_token_len=${max_token_per_gpu}
 
 # Sampling parameters
 temperature=1.0
@@ -86,12 +102,12 @@ top_k=-1
 
 
 # Model parallelism settings
-gen_tp=4
+gen_tp=2
 sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.4
+gpu_memory_utilization=0.3
 
 
 
@@ -122,25 +138,28 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.clip_ratio_high=${clip_ratio_high} \
     actor_rollout_ref.actor.strategy="fsdp" \
     actor_rollout_ref.actor.optim.lr=1e-6 \
-    actor_rollout_ref.actor.optim.lr_warmup_steps=5 \
+    actor_rollout_ref.actor.optim.lr_warmup_steps=0 \
     actor_rollout_ref.actor.optim.weight_decay=0.1 \
     actor_rollout_ref.actor.optim.warmup_style=constant \
     actor_rollout_ref.actor.optim.min_lr_ratio=0. \
     actor_rollout_ref.actor.ppo_mini_batch_size=${train_prompt_mini_bsz} \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=${micro_batch_size_per_gpu} \
+    actor_rollout_ref.actor.use_dynamic_bsz=${use_dynamic_bsz} \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=${actor_ppo_max_token_len} \
     actor_rollout_ref.actor.fsdp_config.param_offload=${offload} \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=${offload} \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.grad_clip=1.0 \
     actor_rollout_ref.actor.fsdp_config.fsdp_size=-1 \
-    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=${micro_batch_size_per_gpu} \
+    actor_rollout_ref.ref.log_prob_use_dynamic_bsz=${use_dynamic_bsz} \
+    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=${infer_ppo_max_token_len} \
     actor_rollout_ref.ref.fsdp_config.param_offload=${offload} \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
-    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 \
+    actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=${use_dynamic_bsz} \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=${infer_ppo_max_token_len} \
     actor_rollout_ref.rollout.gpu_memory_utilization=${gpu_memory_utilization} \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
-    actor_rollout_ref.rollout.enable_chunked_prefill=False \
+    actor_rollout_ref.rollout.enable_chunked_prefill=True \
     actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
     actor_rollout_ref.rollout.max_model_len=10240 \
     actor_rollout_ref.rollout.temperature=${temperature} \
@@ -162,7 +181,8 @@ python3 -m verl.trainer.main_ppo \
     critic.model.path=${BASE_MODEL} \
     critic.model.trust_remote_code=True \
     critic.model.enable_gradient_checkpointing=True \
-    critic.ppo_micro_batch_size_per_gpu=${micro_batch_size_per_gpu} \
+    critic.use_dynamic_bsz=${use_dynamic_bsz} \
+    critic.ppo_max_token_len_per_gpu=${actor_ppo_max_token_len} \
     critic.model.fsdp_config.param_offload=${offload} \
     critic.model.fsdp_config.optimizer_offload=${offload} \
     trainer.logger='["console", "wandb"]' \
