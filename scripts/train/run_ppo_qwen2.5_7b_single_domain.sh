@@ -49,7 +49,7 @@ BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=qwen2.5_7b_Instruct_${DOMAIN_NAME}_verl_builtin
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward
 
 # =================== RL Training Parameters ===================
 # Algorithm settings
@@ -74,7 +74,7 @@ num_nodes=1
 n_gpus_per_node=8
 
 # Batch sizes (adjusted for 2x A800 GPUs)
-train_prompt_bsz=256  # Smaller batch for single domain
+train_prompt_bsz=128  # Smaller batch for single domain
 gen_prompt_bsz=$((train_prompt_bsz * 1))
 n_resp_per_prompt=1  # Number of responses per prompt
 train_prompt_mini_bsz=128  # Mini batch size for gradient updates
@@ -86,7 +86,7 @@ use_dynamic_bsz=True
 # Global maximum tokens per GPU setting
 # For 8x A800 GPUs with Qwen2.5-7B model, we can use a more aggressive setting
 # This controls the maximum tokens per micro-batch on each GPU
-max_token_per_gpu=12288  
+max_token_per_gpu=10240
 # Alternative settings:
 # max_token_per_gpu=16384  # 16K tokens - balanced setting
 # max_token_per_gpu=32768  # 32K tokens - aggressive (may cause OOM)
@@ -102,12 +102,12 @@ top_k=-1
 
 
 # Model parallelism settings
-gen_tp=2
+gen_tp=4
 sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.3
+gpu_memory_utilization=0.2
 
 
 

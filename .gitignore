@@ -10,3 +10,7 @@
 *.egg-info/
 __pycache__/
 start.sh
+
+# Training artifacts
+/scripts/train/outputs/
+/scripts/train/wandb/
