@@ -3,7 +3,7 @@
 详细分析各个领域的Reward计算过程和结果
 """
 import sys
-sys.path.append('/root/work/Agentic-RL-Scaling-Law')
+sys.path.append('/workspace')
 
 import pandas as pd
 import json

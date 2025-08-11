@@ -9,9 +9,11 @@ import os
 from pathlib import Path
 
 # Add verl path
-sys.path.append(str(Path(__file__).parent / "verl"))
+# sys.path.append(str(Path(__file__).parent / "verl"))
 
-from verl.utils.reward_score import default_compute_score
+import sys
+sys.path.insert(0, '/workspace/verl')
+from utils.reward_score import default_compute_score
 
 def test_math_domain():
     """Test math domain reward scoring."""
