@@ -49,19 +49,19 @@ BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin
 
-# =================== RL Training Parameters ===================
-# Algorithm settings
-adv_estimator=gae  # or grpo
+# =================== GRPO Training Parameters ===================
+# Algorithm settings - GRPO specific
+adv_estimator=grpo  # Changed from gae to grpo
 
-# KL penalty settings
-use_kl_in_reward=False
-kl_coef=0.02
-use_kl_loss=False
-kl_loss_coef=0.0
+# KL settings for GRPO
+use_kl_in_reward=False  # GRPO doesn't use KL in reward
+use_kl_loss=True  # GRPO uses KL loss instead
+kl_loss_coef=0.001  # Standard GRPO KL coefficient
+kl_loss_type=low_var_kl  # Low variance KL for GRPO
 
-# PPO clipping
+# PPO clipping (still used in GRPO)
 clip_ratio_low=0.2
 clip_ratio_high=0.2
 
@@ -69,37 +69,33 @@ clip_ratio_high=0.2
 max_prompt_length=1024
 max_response_length=8192
 
-#Hardware Platform
+# Hardware Platform
 num_nodes=1
 n_gpus_per_node=8
 
-# Batch sizes (adjusted for 2x A800 GPUs)
-train_prompt_bsz=128  # Smaller batch for single domain
-n_resp_per_prompt=8  # Number of responses per prompt
-train_prompt_mini_bsz=64  # Mini batch size for gradient updates
-# micro_batch_size_per_gpu=8  # Deprecated when using dynamic batch size
+# Batch sizes (adjusted for GRPO)
+train_prompt_bsz=256  # Larger batch for GRPO
+n_resp_per_prompt=8  # GRPO needs multiple responses (at least 2, typically 4-8)
+train_prompt_mini_bsz=128  # Mini batch size for gradient updates
 
 # Dynamic batch size configuration
 use_dynamic_bsz=True
 
 # Calculate max sequence length from input/output settings
-max_seq_length=$((max_prompt_length + max_response_length))  # 2048 + 8192 = 10240
+max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 9216
 
 # Token limit multipliers based on VeRL official example
-# In their example: seq_len=8192, actor=24000 (~3x), critic=98304 (~4x of actor)
-actor_seq_multiplier=2  # Actor should be ~3x max sequence length
-critic_actor_multiplier=2  # Critic should be ~4x Actor's limit
+# For GRPO, we don't need critic, so only actor and rollout
+actor_seq_multiplier=3  # Actor should be ~3x max sequence length
 
-# Calculate token limits for the three essential parameters
-actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 30720
-rollout_log_prob_max_token_len=${actor_ppo_max_token_len}  # Same as actor (following official example)
-critic_ppo_max_token_len=$((actor_ppo_max_token_len * critic_actor_multiplier))  # 122880
+# Calculate token limits for GRPO (no critic needed)
+actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 27648
+rollout_log_prob_max_token_len=${actor_ppo_max_token_len}  # Same as actor
 
 # Sampling parameters
 temperature=1.0
 top_p=1.0
 top_k=-1
-
 
 # Model parallelism settings
 gen_tp=2
@@ -109,17 +105,12 @@ sp_size=1
 offload=False
 gpu_memory_utilization=0.5
 
-
-
-# =================== Start RL Training ===================
+# =================== Start GRPO Training ===================
 echo "Checkpoints will be saved to: ${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME}"
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=${adv_estimator} \
     algorithm.use_kl_in_reward=${use_kl_in_reward} \
-    algorithm.kl_ctrl.type=adaptive \
-    algorithm.kl_ctrl.kl_coef=${kl_coef} \
-    algorithm.kl_ctrl.target_kl=0.01 \
     algorithm.gamma=1.0 \
     algorithm.lam=0.95 \
     data.train_files="${train_files}" \
@@ -133,6 +124,8 @@ python3 -m verl.trainer.main_ppo \
     data.shuffle=True \
     data.trust_remote_code=True \
     actor_rollout_ref.actor.use_kl_loss=${use_kl_loss} \
+    actor_rollout_ref.actor.kl_loss_coef=${kl_loss_coef} \
+    actor_rollout_ref.actor.kl_loss_type=${kl_loss_type} \
     actor_rollout_ref.actor.clip_ratio_low=${clip_ratio_low} \
     actor_rollout_ref.actor.clip_ratio_high=${clip_ratio_high} \
     actor_rollout_ref.actor.strategy="fsdp" \
@@ -149,6 +142,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.grad_clip=1.0 \
     actor_rollout_ref.actor.fsdp_config.fsdp_size=-1 \
+    actor_rollout_ref.ref.fsdp_config.param_offload=${offload} \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=${use_dynamic_bsz} \
@@ -170,14 +164,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.trust_remote_code=True \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    critic.optim.lr=1e-5 \
-    critic.model.path=${BASE_MODEL} \
-    critic.model.trust_remote_code=True \
-    critic.model.enable_gradient_checkpointing=True \
-    critic.use_dynamic_bsz=${use_dynamic_bsz} \
-    critic.ppo_max_token_len_per_gpu=${critic_ppo_max_token_len} \
-    critic.model.fsdp_config.param_offload=${offload} \
-    critic.model.fsdp_config.optimizer_offload=${offload} \
+    trainer.critic_warmup=0 \
     trainer.logger='["console", "wandb"]' \
     trainer.project_name=${WANDB_PROJECT} \
     trainer.experiment_name=${WANDB_EXPERIMENT_NAME} \
@@ -187,6 +174,5 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=25 \
     trainer.test_freq=-1 \
     trainer.total_epochs=2 \
-    trainer.critic_warmup=0 \
     trainer.resume_mode=disable \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
