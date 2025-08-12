@@ -74,10 +74,10 @@ num_nodes=1
 n_gpus_per_node=8
 
 # Batch sizes (adjusted for 2x A800 GPUs)
-train_prompt_bsz=128  # Smaller batch for single domain
+train_prompt_bsz=256  # Smaller batch for single domain
 gen_prompt_bsz=$((train_prompt_bsz * 1))
-n_resp_per_prompt=1  # Number of responses per prompt
-train_prompt_mini_bsz=128  # Mini batch size for gradient updates
+n_resp_per_prompt=8  # Number of responses per prompt
+train_prompt_mini_bsz=4  # Mini batch size for gradient updates
 # micro_batch_size_per_gpu=8  # Deprecated when using dynamic batch size
 
 # Dynamic batch size configuration
@@ -86,7 +86,7 @@ use_dynamic_bsz=True
 # Global maximum tokens per GPU setting
 # For 8x A800 GPUs with Qwen2.5-7B model, we can use a more aggressive setting
 # This controls the maximum tokens per micro-batch on each GPU
-max_token_per_gpu=10240
+max_token_per_gpu=16384
 # Alternative settings:
 # max_token_per_gpu=16384  # 16K tokens - balanced setting
 # max_token_per_gpu=32768  # 32K tokens - aggressive (may cause OOM)
