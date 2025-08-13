@@ -134,12 +134,24 @@ def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
                 prompt_list[0]['content'] = STEM_INSTRUCTION + content
                 prompt = np.array(prompt_list) if hasattr(prompt, 'tolist') else prompt_list
     
+    # Extract question for stem_llm_judge
+    question = ""
+    if prompt and len(prompt) > 0:
+        prompt_list = prompt.tolist() if hasattr(prompt, 'tolist') else prompt
+        if prompt_list and isinstance(prompt_list[0], dict) and prompt_list[0].get('role') == 'user':
+            content = prompt_list[0].get('content', '')
+            # Remove the STEM instruction to get just the question
+            if content.startswith(STEM_INSTRUCTION):
+                question = content[len(STEM_INSTRUCTION):].strip()
+            else:
+                question = content.strip()
+    
     data = {
         "data_source": data_source,
         "prompt": prompt,
         "ability": "stem",
         "reward_model": {"style": "rule", "ground_truth": solution},
-        "extra_info": {"split": split, "index": idx}
+        "extra_info": {"split": split, "index": idx, "question": question}
     }
     return data
 
