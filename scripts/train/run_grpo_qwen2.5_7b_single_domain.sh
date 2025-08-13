@@ -86,7 +86,7 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=3  # Actor should be ~3x max sequence length
+actor_seq_multiplier=2  # Actor should be ~3x max sequence length
 
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 27648
@@ -103,7 +103,7 @@ sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.5
+gpu_memory_utilization=0.65
 
 # =================== Start GRPO Training ===================
 echo "Checkpoints will be saved to: ${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME}"
@@ -142,7 +142,6 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.grad_clip=1.0 \
     actor_rollout_ref.actor.fsdp_config.fsdp_size=-1 \
-    actor_rollout_ref.ref.fsdp_config.param_offload=${offload} \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=${use_dynamic_bsz} \
