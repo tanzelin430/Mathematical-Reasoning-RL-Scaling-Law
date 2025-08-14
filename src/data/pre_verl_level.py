@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-Preprocess guru-RL-92k data directly into VeRL format.
-Each row is converted to a dict with keys: data_source, prompt, ability, reward_model, extra_info.
+Convert source parquet rows into VeRL format and split into three difficulty
+levels (easy / medium / hard) based on configurable pass-rate thresholds for
+two model columns (e.g., 7B and 30B).
+
+Each output example is a dict with keys: data_source, prompt, ability,
+reward_model, extra_info. The extra_info keeps its original format.
 """
+import argparse
 import pandas as pd
 import numpy as np
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
@@ -61,7 +66,6 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data_source = row.get('data_source', 'code_unknown')
 
-    # Based on Reasoning360: code domain doesn't use system prompt
     data = {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": question}],
@@ -156,31 +160,155 @@ def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     return data
 
 
-def process_file(input_path: Path, output_path: Path, split: str) -> None:
+def unify_simulation_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
+    data_source = row.get('data_source', 'simulation_unknown')
+    
+    data = {
+        "data_source": data_source,
+        "prompt": row.get("prompt", []),
+        "ability": row.get("ability", "coding-inference"),
+        "reward_model": row.get("reward_model", {}),
+        "extra_info": {"split": split, "index": idx}
+    }
+    return data
+
+
+def _parse_threshold_pair(pair_str: str) -> Tuple[float, float]:
+    parts = [p.strip() for p in str(pair_str).split(",")]
+    if len(parts) != 2:
+        raise ValueError(f"Threshold must be 'low,high', got: {pair_str}")
+    low, high = float(parts[0]), float(parts[1])
+    if not (0.0 <= low <= 1.0 and 0.0 <= high <= 1.0 and low < high):
+        raise ValueError(f"Invalid thresholds: low={low}, high={high}")
+    return low, high
+
+
+def _safe_get_float(row: pd.Series, key: Optional[str]) -> Optional[float]:
+    if not key:
+        return None
+    if key not in row:
+        return None
+    val = row.get(key)
+    try:
+        if pd.isna(val):
+            return None
+        return float(val)
+    except Exception:
+        return None
+
+
+def _classify_difficulty(pass_rate: Optional[float], low: float, high: float) -> str:
+    """Return 'hard' if < low, 'medium' if in [low, high), 'easy' if >= high.
+    Missing values default to 'hard'.
+    """
+    if pass_rate is None:
+        return "hard"
+    if pass_rate < low:
+        return "hard"
+    if pass_rate < high:
+        return "medium"
+    return "easy"
+
+
+def process_file(
+    input_path: Path,
+    split: str,
+    basis: str,
+    thr7b: Tuple[float, float],
+    thr30b: Tuple[float, float],
+    out_dir: Path,
+) -> None:
     df = pd.read_parquet(input_path)
-    unified: List[Dict[str, Any]] = []
-    domain = input_path.stem.split('__')[0]
+    domain_raw = input_path.stem.split('__')[0]
+    # Normalize domain name for consistency
+    domain_key = 'codegen' if domain_raw in ('code', 'codegen') else domain_raw
+    
+    # Create buckets for this specific file
+    file_buckets = {"easy": [], "medium": [], "hard": []}
 
     for idx, row in df.iterrows():
-        if domain == 'math':
+        if domain_key == 'math':
             rec = unify_math_data(row, idx, split)
-        elif domain in ('codegen', 'code'):
+        elif domain_key == 'codegen':
             rec = unify_code_data(row, idx, split)
-        elif domain == 'logic':
+        elif domain_key == 'logic':
             rec = unify_logic_data(row, idx, split)
-        elif domain == 'stem':
+        elif domain_key == 'stem':
             rec = unify_stem_data(row, idx, split)
+        elif domain_key == 'simulation':
+            rec = unify_simulation_data(row, idx, split)
         else:
             continue
-        unified.append(rec)
 
-    # Save as JSONL or parquet of dicts
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(unified).to_parquet(output_path, engine='pyarrow')
+        pr_7b = _safe_get_float(row, "qwen2.5_7b_pass_rate")
+        pr_30b = _safe_get_float(row, "qwen3_30b_pass_rate")
+
+        if basis == '7b':
+            low, high = thr7b
+            chosen = pr_7b
+        elif basis == '30b':
+            low, high = thr30b
+            chosen = pr_30b
+        else:
+            raise ValueError("basis must be '7b' or '30b'")
+
+        difficulty = _classify_difficulty(chosen, low, high)
+        file_buckets[difficulty].append(rec)
+    
+    # Save this file's data into three difficulty folders
+    original_filename = input_path.stem  # e.g., "logic__graph_logical_1.2k"
+    
+    for diff_name in ("easy", "medium", "hard"):
+        diff_dir = out_dir / diff_name
+        diff_dir.mkdir(parents=True, exist_ok=True)
+        
+        items = file_buckets[diff_name]
+        if not items or len(items) == 0:
+            print(f"⚠️  Skipping empty: {original_filename}_{diff_name} (0 examples)")
+            continue
+        
+        try:
+            df_out = pd.DataFrame(items)
+            if len(df_out) == 0:
+                print(f"⚠️  Skipping empty DataFrame: {original_filename}_{diff_name}")
+                continue
+                
+            out_path = diff_dir / f"{original_filename}_{diff_name}.parquet"
+            df_out.to_parquet(out_path, engine="pyarrow")
+            print(f"💾 Saved {len(items)} examples to {out_path}")
+        except Exception as e:
+            print(f"❌ Error saving {original_filename}_{diff_name}: {e}")
+            print(f"   Attempting to save as JSON instead...")
+            try:
+                out_path_json = diff_dir / f"{original_filename}_{diff_name}.json"
+                df_out.to_json(out_path_json, orient='records', lines=True)
+                print(f"💾 Saved {len(items)} examples to {out_path_json} (JSON format)")
+            except Exception as e2:
+                print(f"❌ Failed to save {original_filename}_{diff_name} in any format: {e2}")
+                continue
 
 
 def main():
-    base_dir = Path('/workspace/dev/Reasoning360/scripts/tools/data')
+    parser = argparse.ArgumentParser(description="Convert to VeRL format and split by difficulty")
+    parser.add_argument("--basis", choices=["7b", "30b"], default="7b",
+                        help="Which pass-rate column to use for difficulty bucketing")
+
+    parser.add_argument("--thr7b", default="0.3,0.6",
+                        help="Thresholds for 7B as 'low,high' (hard < low <= medium < high <= easy)")
+    parser.add_argument("--thr30b", default="0.4,0.7",
+                        help="Thresholds for 30B as 'low,high' (hard < low <= medium < high <= easy)")
+    parser.add_argument("--base_dir", default="/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/dev/Reasoning360/scripts/tools/data",
+                        help="Base directory of source parquet files")
+    parser.add_argument("--out_dir", default="/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/data/guru_verl_level",
+                        help="Output directory for VeRL parquets (three files)")
+    args = parser.parse_args()
+
+    thr7b = _parse_threshold_pair(args.thr7b)
+    thr30b = _parse_threshold_pair(args.thr30b)
+
+    base_dir = Path(args.base_dir)
+    out_dir = Path(args.out_dir)
+
     files = [
         ("train/math__combined_54.4k.parquet", "train"),
         ("train/logic__arcagi1_111.parquet", "train"),
@@ -196,10 +324,29 @@ def main():
         ("train/codegen__taco_8.8k.parquet", "train"),
     ]
 
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
     for rel, split in files:
         inp = base_dir / rel
-        out = Path('../../data/guru_verl') / rel
-        process_file(inp, out, split)
+        if not inp.exists():
+            print(f"⚠️  Skipping missing file: {inp}")
+            continue
+        print(f"📁 Processing: {rel}")
+        process_file(
+            input_path=inp,
+            split=split,
+            basis=args.basis,
+            thr7b=thr7b,
+            thr30b=thr30b,
+            out_dir=out_dir,
+        )
+        print(f"✅ Completed: {rel}")
+    
+    print(f"\n🎉 Processing completed! Files saved in {out_dir}")
+    print("📁 Output structure:")
+    print("   easy/")
+    print("   medium/") 
+    print("   hard/")
 
 if __name__ == '__main__':
     main()
