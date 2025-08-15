@@ -77,8 +77,6 @@ Agentic-RL-Scaling-Law/
 ### Models
 We experiment with models of various sizes to study scaling behaviors:
 - **Qwen2.5 Series**: 3B, 7B, 14B, 32B
-- **DeepSeek-R1-Distill-Qwen Series**: 1.5B, 7B, 14B
-- **QwQ-32B**: For large-scale experiments
 
 ### Algorithms
 - **PPO** (Proximal Policy Optimization)
