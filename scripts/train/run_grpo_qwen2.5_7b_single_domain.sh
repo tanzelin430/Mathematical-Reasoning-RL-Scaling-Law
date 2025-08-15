@@ -6,11 +6,16 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
 
+# =================== Proxy Configuration ===================
+# Ensure proxy settings are preserved
+# export https_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
+# export http_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
+# export WANDB_HTTP_TIMEOUT=300
 # =================== Data Configuration ===================
 # Use consistent absolute path
 SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
-
+VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -40,16 +45,16 @@ train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
 # train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet', '${TRAIN_DATA_DIR}/stem__web_3.6k.parquet']"
 
 # Validation file (optional)
-val_files="['${TRAIN_DATA_DIR}/logic__arcagi2_190.parquet']"
+val_files="['/fs-computility/mabasic/shared/data/guru-RL-92k/online_eval/math__math_500.parquet']"
 # val_files="null"  # Uncomment to disable validation
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
+MODEL_NAME=Qwen2.5-7B-Instruct
 BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_check
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -171,7 +176,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
     trainer.save_freq=25 \
-    trainer.test_freq=-1 \
+    trainer.test_freq=1 \
     trainer.total_epochs=2 \
     trainer.resume_mode=disable \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
