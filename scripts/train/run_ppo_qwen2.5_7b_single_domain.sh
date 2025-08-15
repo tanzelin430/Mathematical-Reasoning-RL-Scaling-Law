@@ -11,6 +11,8 @@ export VLLM_USE_V1=0
 SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 
+export https_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
+export http_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -46,10 +48,11 @@ val_files="['${TRAIN_DATA_DIR}/logic__arcagi2_190.parquet']"
 # =================== Model Configuration ===================
 MODEL_NAME=Qwen2.5-7B
 BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
+algorithm_name=ppo
 
-# =================== Logging Configuration ===================
+# =================== Logging Configuration =================[]==
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward_${algorithm_name}
 
 # =================== RL Training Parameters ===================
 # Algorithm settings
@@ -87,8 +90,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 2048 + 8192 = 102
 
 # Token limit multipliers based on VeRL official example
 # In their example: seq_len=8192, actor=24000 (~3x), critic=98304 (~4x of actor)
-actor_seq_multiplier=2  # Actor should be ~3x max sequence length
-critic_actor_multiplier=2  # Critic should be ~4x Actor's limit
+actor_seq_multiplier=1  # Actor should be ~3x max sequence length
+critic_actor_multiplier=1  # Critic should be ~4x Actor's limit
 
 # Calculate token limits for the three essential parameters
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 30720
@@ -107,7 +110,7 @@ sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.5
+gpu_memory_utilization=0.65
 
 
 
@@ -181,6 +184,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.logger='["console", "wandb"]' \
     trainer.project_name=${WANDB_PROJECT} \
     trainer.experiment_name=${WANDB_EXPERIMENT_NAME} \
+    +trainer.wandb_proxy=${https_proxy} \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
