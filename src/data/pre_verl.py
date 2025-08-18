@@ -157,7 +157,7 @@ def main():
 
     for rel, split in files:
         inp = base_dir / rel
-        out = Path('../../data/guru_verl') / rel
+        out = Path('./data/guru_verl') / rel
         process_file(inp, out, split)
 
 if __name__ == '__main__':
