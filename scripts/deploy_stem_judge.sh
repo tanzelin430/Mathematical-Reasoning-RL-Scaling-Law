@@ -13,7 +13,7 @@ if ! pip show vllm > /dev/null 2>&1; then
 fi
 
 # Set model path
-MODEL_PATH="/fs-computility/mabasic/shared/models/general-verifier"
+MODEL_PATH="/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/dev/general-verifier"
 PORT=8000
 GPU_MEMORY_UTILIZATION=0.15  # Adjust based on available GPU memory
 
