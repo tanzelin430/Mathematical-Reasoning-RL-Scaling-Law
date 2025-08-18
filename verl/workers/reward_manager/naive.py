@@ -84,7 +84,7 @@ class NaiveRewardManager:
                 reward = score
 
             reward_tensor[i, valid_response_length - 1] = reward
-
+            
             if data_source not in already_print_data_sources:
                 already_print_data_sources[data_source] = 0
 

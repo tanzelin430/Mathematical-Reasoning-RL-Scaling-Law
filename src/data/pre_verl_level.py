@@ -217,6 +217,7 @@ def process_file(
     thr7b: Tuple[float, float],
     thr30b: Tuple[float, float],
     out_dir: Path,
+    mode: str = "threshold",
 ) -> None:
     df = pd.read_parquet(input_path)
     domain_raw = input_path.stem.split('__')[0]
@@ -226,34 +227,79 @@ def process_file(
     # Create buckets for this specific file
     file_buckets = {"easy": [], "medium": [], "hard": []}
 
-    for idx, row in df.iterrows():
-        if domain_key == 'math':
-            rec = unify_math_data(row, idx, split)
-        elif domain_key == 'codegen':
-            rec = unify_code_data(row, idx, split)
-        elif domain_key == 'logic':
-            rec = unify_logic_data(row, idx, split)
-        elif domain_key == 'stem':
-            rec = unify_stem_data(row, idx, split)
-        elif domain_key == 'simulation':
-            rec = unify_simulation_data(row, idx, split)
-        else:
-            continue
+    if mode == "equal":
+        # Equal split mode: collect all records with their pass rates, then sort and split
+        records_with_rates = []
+        
+        for idx, row in df.iterrows():
+            if domain_key == 'math':
+                rec = unify_math_data(row, idx, split)
+            elif domain_key == 'codegen':
+                rec = unify_code_data(row, idx, split)
+            elif domain_key == 'logic':
+                rec = unify_logic_data(row, idx, split)
+            elif domain_key == 'stem':
+                rec = unify_stem_data(row, idx, split)
+            elif domain_key == 'simulation':
+                rec = unify_simulation_data(row, idx, split)
+            else:
+                continue
 
-        pr_7b = _safe_get_float(row, "qwen2.5_7b_pass_rate")
-        pr_30b = _safe_get_float(row, "qwen3_30b_pass_rate")
+            pr_7b = _safe_get_float(row, "qwen2.5_7b_pass_rate")
+            pr_30b = _safe_get_float(row, "qwen3_30b_pass_rate")
 
-        if basis == '7b':
-            low, high = thr7b
-            chosen = pr_7b
-        elif basis == '30b':
-            low, high = thr30b
-            chosen = pr_30b
-        else:
-            raise ValueError("basis must be '7b' or '30b'")
+            if basis == '7b':
+                chosen_rate = pr_7b
+            elif basis == '30b':
+                chosen_rate = pr_30b
+            else:
+                raise ValueError("basis must be '7b' or '30b'")
+            
+            # Use -1 for None values to sort them at the end (hardest)
+            sort_key = chosen_rate if chosen_rate is not None else -1
+            records_with_rates.append((rec, sort_key))
+        
+        # Sort by pass rate (descending: high pass rate = easy)
+        records_with_rates.sort(key=lambda x: x[1], reverse=True)
+        
+        # Split into three equal parts
+        n = len(records_with_rates)
+        third = n // 3
+        
+        file_buckets["easy"] = [rec for rec, _ in records_with_rates[:third]]
+        file_buckets["medium"] = [rec for rec, _ in records_with_rates[third:2*third]]
+        file_buckets["hard"] = [rec for rec, _ in records_with_rates[2*third:]]
+        
+    else:
+        # Threshold mode: original logic
+        for idx, row in df.iterrows():
+            if domain_key == 'math':
+                rec = unify_math_data(row, idx, split)
+            elif domain_key == 'codegen':
+                rec = unify_code_data(row, idx, split)
+            elif domain_key == 'logic':
+                rec = unify_logic_data(row, idx, split)
+            elif domain_key == 'stem':
+                rec = unify_stem_data(row, idx, split)
+            elif domain_key == 'simulation':
+                rec = unify_simulation_data(row, idx, split)
+            else:
+                continue
 
-        difficulty = _classify_difficulty(chosen, low, high)
-        file_buckets[difficulty].append(rec)
+            pr_7b = _safe_get_float(row, "qwen2.5_7b_pass_rate")
+            pr_30b = _safe_get_float(row, "qwen3_30b_pass_rate")
+
+            if basis == '7b':
+                low, high = thr7b
+                chosen = pr_7b
+            elif basis == '30b':
+                low, high = thr30b
+                chosen = pr_30b
+            else:
+                raise ValueError("basis must be '7b' or '30b'")
+
+            difficulty = _classify_difficulty(chosen, low, high)
+            file_buckets[difficulty].append(rec)
     
     # Save this file's data into three difficulty folders
     original_filename = input_path.stem  # e.g., "logic__graph_logical_1.2k"
@@ -292,6 +338,8 @@ def main():
     parser = argparse.ArgumentParser(description="Convert to VeRL format and split by difficulty")
     parser.add_argument("--basis", choices=["7b", "30b"], default="7b",
                         help="Which pass-rate column to use for difficulty bucketing")
+    parser.add_argument("--mode", choices=["threshold", "equal"], default="threshold",
+                        help="Split mode: 'threshold' for pass-rate-based thresholds, 'equal' for equal-count split sorted by pass rate")
 
     parser.add_argument("--thr7b", default="0.3,0.6",
                         help="Thresholds for 7B as 'low,high' (hard < low <= medium < high <= easy)")
@@ -339,6 +387,7 @@ def main():
             thr7b=thr7b,
             thr30b=thr30b,
             out_dir=out_dir,
+            mode=args.mode,
         )
         print(f"✅ Completed: {rel}")
     

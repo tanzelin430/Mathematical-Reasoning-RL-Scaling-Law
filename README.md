@@ -62,17 +62,12 @@ Agentic-RL-Scaling-Law/
 │       └── reward_score/    # Built-in reward scorers
 ├── src/
 │   ├── data/               # Data preprocessing
-│   └── reward/             # Legacy reward functions (deprecated)
 ├── scripts/
 │   ├── train/              # Training scripts
 │   └── train_data_check/   # Data validation tools
 ├── data/
 │   └── guru_verl/          # Preprocessed guru-RL-92k dataset
 │       ├── train/          # Training data by domain
-│       ├── math/           # ~54.4k samples
-│       ├── code/           # ~18k samples  
-│       ├── logic/          # ~6.3k samples
-│       └── stem/           # ~3.6k samples
 └── results/                # Experiment outputs
     └── checkpoints/        # Model checkpoints
 ```
@@ -82,8 +77,6 @@ Agentic-RL-Scaling-Law/
 ### Models
 We experiment with models of various sizes to study scaling behaviors:
 - **Qwen2.5 Series**: 3B, 7B, 14B, 32B
-- **DeepSeek-R1-Distill-Qwen Series**: 1.5B, 7B, 14B
-- **QwQ-32B**: For large-scale experiments
 
 ### Algorithms
 - **PPO** (Proximal Policy Optimization)
@@ -153,7 +146,7 @@ VeRL automatically routes reward computation based on the `data_source` field:
 
 | Domain | Data Source Pattern | Scorer | Description |
 |--------|-------------------|--------|-------------|
-| **Math** | `math__*` | naive_dapo.py | Mathematical expression evaluation |
+| **Math** | `math__*` | naive_dapo.py | Format check and answer check|
 | **Code** | `codegen__*` | coder1 | Unit test execution with sandboxing |
 | **Logic** | `logic__*` | arcagi.py | Pattern matching for logical reasoning |
 | **STEM** | `stem__*` | stem scorer | Scientific problem evaluation |
@@ -166,25 +159,47 @@ VeRL automatically routes reward computation based on the `data_source` field:
 
 ### Training Configuration
 
-**Key Parameters:**
+**Key Parameters for tuning:**
 ```yaml
-# Model Configuration
-actor_rollout_ref.model.path: "/path/to/Qwen2.5-3B"
-actor_rollout_ref.model.lora_rank: 32
-actor_rollout_ref.model.target_modules: [q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj]
+train batch size: It refers to the number of prompts/queries processed in each rollout phase. the total number of trajectories (prompt-response pairs) is calculated as train_batch_size * rollout.n
 
-# Training Configuration
-algorithm.adv_estimator: gae
-algorithm.use_kl_in_reward: true
-trainer.total_epochs: 3-5
-trainer.n_gpus_per_node: 2-8
+mini batch size: It defines the number of prompts used in each parameter update step, with the corresponding number of trajectories being mini_batch_size * n
 
-# Checkpoint Management
-trainer.default_local_dir: results/checkpoints/${project}/${experiment}
-trainer.save_freq: 10
+micro batch size: It controls the number of samples (or tokens, with use_dynamic_bsz=True) processed per GPU in forward/backward computations. In static mode, it directly affects GPU memory usage, while dynamic mode replaces it with token-based limits (e.g., *_max_token_len_per_gpu), optimizing for variable-length text.
+```
 
-# Logging
-trainer.logger: ["console", "wandb"]
+## 🛠️ Developer Guide: Customizing Rewards & Prompts
+
+### Modifying Reward Functions
+
+**Key files for reward customization:**
+- `verl/utils/reward_score/__init__.py` - Routing logic
+- `verl/utils/reward_score/naive_dapo.py` - Math scorer  
+- `verl/utils/reward_score/coder1.py` - Code scorer
+- `verl/utils/reward_score/arcagi.py` - Logic scorer
+- `verl/utils/reward_score/stem.py` - STEM scorer
+
+**Example: Custom math reward (naive_dapo.py):**
+```python
+# Current 3-tier reward system
+if correct:
+    reward = 1.0
+elif is_matched:  # Has \boxed{} format
+    reward = -0.5  
+else:
+    reward = -1.0
+```
+
+### Modifying Prompts
+
+**File to edit:** `src/data/pre_verl.py`
+
+**Reference:** Reasoning360 project at `/root/work/Reasoning360/` contains excellent prompt templates with thinking tags.
+
+**Testing your changes:**
+```bash
+python src/data/pre_verl.py  # Regenerate data
+python scripts/train_data_check/check_data_sample.py  # Verify
 ```
 
 ## 📊 Experiment Execution
@@ -200,16 +215,7 @@ bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
 bash scripts/train/run_ppo_qwen2.5_7b_single_domain.sh
 ```
 
-**Advanced Configuration:**
-```bash
-python3 -m verl.trainer.main_ppo \
-    algorithm.adv_estimator=grpo \
-    data.train_files="['path/to/data.parquet']" \
-    data.train_batch_size=128 \
-    actor_rollout_ref.rollout.n=8 \
-    trainer.total_epochs=5 \
-    trainer.logger='["console", "wandb"]'
-```
+
 
 ### Checkpoint Management
 

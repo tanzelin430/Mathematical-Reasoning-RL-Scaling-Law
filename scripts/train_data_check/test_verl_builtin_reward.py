@@ -24,30 +24,30 @@ def test_math_domain():
     tests = [
         {
             "name": "Correct boxed answer",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The answer is \\boxed{42}",
             "ground_truth": "42",
             "expected": "high"
         },
         {
             "name": "Wrong boxed answer",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The answer is \\boxed{40}",
             "ground_truth": "42",
             "expected": "low"
         },
         {
             "name": "Correct answer no box",
-            "data_source": "lighteval/MATH",
+            "data_source": "math",
             "response": "The final answer is 42",
             "ground_truth": "42",
             "expected": "medium"
         },
         {
             "name": "GSM8K correct",
-            "data_source": "openai/gsm8k",
-            "response": "Step 1: Calculate...\nStep 2: ...\nThe answer is 125.\n #### 125",
-            "ground_truth": "125",
+            "data_source": "math",
+            "response": "Step 1: Calculate...\nStep 2: ...\nThe answer is 125.\n \\boxed{125}",
+            "ground_truth": "130",
             "expected": "high"
         }
     ]
@@ -281,6 +281,10 @@ def test_stem_domain():
     print("STEM DOMAIN TESTS")
     print("="*60)
     
+    # Note: stem_web requires LLM judge service running, so we'll show what would happen
+    print("\n⚠️  Note: stem_web data source requires STEM_LLM_JUDGE_URL environment variable")
+    print("    pointing to an LLM judge service (e.g., vllm serve TIGER-Lab/general-verifier)")
+    
     tests = [
         {
             "name": "GPQA correct",
@@ -302,17 +306,54 @@ def test_stem_domain():
             "response": "\\boxed{C}",
             "ground_truth": "C",
             "expected": "high"
+        },
+        {
+            "name": "STEM Web - correct boxed answer (requires LLM judge)",
+            "data_source": "stem_web",
+            "response": "Looking at this problem, I need to calculate...\n\nThe final answer is \\boxed{F = \\frac{432m}{4913}}",
+            "ground_truth": "{eq}F = \\frac{432m}{4913}{/eq}",
+            "expected": "high",
+            "extra_info": {
+                "question": "An object of mass m travels along the parabola y=6x^2 with a constant speed of 6 units/s. What is the force on the object due to its acceleration at (2^(1/2), 12)?"
+            }
+        },
+        {
+            "name": "STEM Web - no boxed format (should fail)",
+            "data_source": "stem_web",
+            "response": "The force is F = 432m/4913",
+            "ground_truth": "{eq}F = \\frac{432m}{4913}{/eq}",
+            "expected": "low",
+            "extra_info": {
+                "question": "An object of mass m travels along the parabola y=6x^2 with a constant speed of 6 units/s. What is the force on the object due to its acceleration at (2^(1/2), 12)?"
+            }
         }
     ]
     
     for test in tests:
         try:
-            score = default_compute_score(
-                data_source=test["data_source"],
-                solution_str=test["response"],
-                ground_truth=test["ground_truth"]
-            )
-            print(f"✅ {test['name']}: score = {score}")
+            if test["data_source"] == "stem_web":
+                print(f"\n🧪 Testing: {test['name']}")
+                print(f"   (Would require LLM judge service for actual scoring)")
+                # Try to call it anyway to show the error
+                try:
+                    score = default_compute_score(
+                        data_source=test["data_source"],
+                        solution_str=test["response"],
+                        ground_truth=test["ground_truth"],
+                        extra_info=test.get("extra_info", {})
+                    )
+                    print(f"✅ {test['name']}: score = {score}")
+                except EnvironmentError as e:
+                    print(f"⚠️  {test['name']}: {e} (expected - no judge service running)")
+                except Exception as e:
+                    print(f"❌ {test['name']}: ERROR - {e}")
+            else:
+                score = default_compute_score(
+                    data_source=test["data_source"],
+                    solution_str=test["response"],
+                    ground_truth=test["ground_truth"]
+                )
+                print(f"✅ {test['name']}: score = {score}")
         except Exception as e:
             print(f"❌ {test['name']}: ERROR - {e}")
 

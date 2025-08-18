@@ -12,9 +12,22 @@ from typing import Any, Dict, List
 
 def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     #yifanL change the math format
+    # Based on Reasoning360: math domain doesn't use system prompt, just adds instruction
+    prompt = row.get("prompt", [])
+    
+    # Ensure prompt ends with the boxed instruction if not already present
+    if prompt and len(prompt) > 0:
+        prompt_list = prompt.tolist() if hasattr(prompt, 'tolist') else prompt
+        if prompt_list and isinstance(prompt_list[0], dict) and prompt_list[0].get('role') == 'user':
+            content = prompt_list[0].get('content', '')
+            # Add boxed instruction if not present
+            if '\\boxed{' not in content:
+                prompt_list[0]['content'] = content + " Please output the final answer within \\boxed{}."
+                prompt = np.array(prompt_list) if hasattr(prompt, 'tolist') else prompt_list
+    
     return {
             "data_source": row.get("data_source", "math_unknown"),
-            "prompt": row.get("prompt", []),
+            "prompt": prompt,
             "ability": row.get("ability", "math"),
             "reward_model": row.get("reward_model", {}),
             "extra_info": {"split": split, "index": idx}
@@ -48,6 +61,7 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data_source = row.get('data_source', 'code_unknown')
 
+    # Based on Reasoning360: code domain doesn't use system prompt
     data = {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": question}],
@@ -88,6 +102,7 @@ def unify_logic_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data_source = row.get('data_source', 'logic_unknown')
 
+    # Based on Reasoning360: logic domain doesn't use system prompt
     data = {
         "data_source": data_source,
         "prompt": row.get("prompt", []),
@@ -105,12 +120,38 @@ def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data_source = row.get('data_source', 'stem_unknown')
 
+    prompt = row.get("prompt", [])
+    
+    # Based on Reasoning360: STEM domain adds instruction in user content
+    STEM_INSTRUCTION = "You are a knowledgeable assistant. Answer the following questions and think step by step. Please output the final answer within \\boxed{}. "
+    
+    if prompt and len(prompt) > 0:
+        prompt_list = prompt.tolist() if hasattr(prompt, 'tolist') else prompt
+        if prompt_list and isinstance(prompt_list[0], dict) and prompt_list[0].get('role') == 'user':
+            content = prompt_list[0].get('content', '')
+            # Add STEM instruction at the beginning of user content
+            if not content.startswith(STEM_INSTRUCTION):
+                prompt_list[0]['content'] = STEM_INSTRUCTION + content
+                prompt = np.array(prompt_list) if hasattr(prompt, 'tolist') else prompt_list
+    
+    # Extract question for stem_llm_judge
+    question = ""
+    if prompt and len(prompt) > 0:
+        prompt_list = prompt.tolist() if hasattr(prompt, 'tolist') else prompt
+        if prompt_list and isinstance(prompt_list[0], dict) and prompt_list[0].get('role') == 'user':
+            content = prompt_list[0].get('content', '')
+            # Remove the STEM instruction to get just the question
+            if content.startswith(STEM_INSTRUCTION):
+                question = content[len(STEM_INSTRUCTION):].strip()
+            else:
+                question = content.strip()
+    
     data = {
         "data_source": data_source,
-        "prompt": row.get("prompt", []),
+        "prompt": prompt,
         "ability": "stem",
         "reward_model": {"style": "rule", "ground_truth": solution},
-        "extra_info": {"split": split, "index": idx}
+        "extra_info": {"split": split, "index": idx, "question": question}
     }
     return data
 
