@@ -5,25 +5,27 @@ set -x
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
+export CUDA_VISIBLE_DEVICES=2,3,4,5
+
+# Daytona API配置（混合模式：只对code数据源使用Daytona安全执行，其他数据源使用默认方法）
+export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
 
 # =================== Data Configuration ===================
 # Use consistent absolute path
-SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
+SHARED_DATA_PATH=/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 
-export https_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
-export http_proxy=https://tanzelin.p:6EEklxJn6slipeJzRoQ4Iy7V4xo58tmUThq8DdnAc1F6rKr0jFXbg9vO92YX@volc-proxy.pjlab.org.cn:13128/
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
-RESULTS_DIR=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/results
+RESULTS_DIR=/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/results
 CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 # Create checkpoint directory if it doesn't exist
 mkdir -p ${CHECKPOINT_DIR}      
 # Choose which domain to train on (uncomment one)
 # Option 1: Math domain only
-DOMAIN_NAME="math"
-train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
+# DOMAIN_NAME="math"
+# train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
 
 # Option 2: Code domain only
 # DOMAIN_NAME="code"
@@ -41,22 +43,25 @@ train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
 # DOMAIN_NAME="math_stem"
 # train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet', '${TRAIN_DATA_DIR}/stem__web_3.6k.parquet']"
 
+# Option 6: Mixed domains (to test Daytona hybrid mode - code sources use Daytona, others use default)
+# DOMAIN_NAME="mixed_math_code"
+# train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet', '${TRAIN_DATA_DIR}/codegen__leetcode2k_1.3k.parquet']"
+
 # Validation file (optional)
 val_files="['${TRAIN_DATA_DIR}/logic__arcagi2_190.parquet']"
 # val_files="null"  # Uncomment to disable validation
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
-BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
-algorithm_name=ppo
-
-# =================== Logging Configuration =================[]==
+MODEL_NAME=Qwen2.5-3B-Instruct
+BASE_MODEL=Qwen/${MODEL_NAME}
+# Qwen/Qwen2.5-3B-Instruct
+# =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward_${algorithm_name}
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_verl_builtin_new_reward
 
 # =================== RL Training Parameters ===================
 # Algorithm settings
-adv_estimator=gae  # or grpo
+adv_estimator=grpo  # or grpo
 
 # KL penalty settings
 use_kl_in_reward=False
@@ -74,12 +79,12 @@ max_response_length=8192
 
 #Hardware Platform
 num_nodes=1
-n_gpus_per_node=8
+n_gpus_per_node=4
 
 # Batch sizes (adjusted for 2x A800 GPUs)
-train_prompt_bsz=128  # Smaller batch for single domain
-n_resp_per_prompt=8  # Number of responses per prompt
-train_prompt_mini_bsz=64  # Mini batch size for gradient updates
+train_prompt_bsz=64  # Smaller batch for single domain
+n_resp_per_prompt=2  # Number of responses per prompt
+train_prompt_mini_bsz=32  # Mini batch size for gradient updates
 # micro_batch_size_per_gpu=8  # Deprecated when using dynamic batch size
 
 # Dynamic batch size configuration
@@ -90,8 +95,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 2048 + 8192 = 102
 
 # Token limit multipliers based on VeRL official example
 # In their example: seq_len=8192, actor=24000 (~3x), critic=98304 (~4x of actor)
-actor_seq_multiplier=1  # Actor should be ~3x max sequence length
-critic_actor_multiplier=1  # Critic should be ~4x Actor's limit
+actor_seq_multiplier=2  # Actor should be ~3x max sequence length
+critic_actor_multiplier=2  # Critic should be ~4x Actor's limit
 
 # Calculate token limits for the three essential parameters
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 30720
@@ -109,8 +114,8 @@ gen_tp=2
 sp_size=1
 
 # Memory optimization
-offload=False
-gpu_memory_utilization=0.65
+offload=True
+gpu_memory_utilization=0.5
 
 
 
@@ -181,10 +186,12 @@ python3 -m verl.trainer.main_ppo \
     critic.ppo_max_token_len_per_gpu=${critic_ppo_max_token_len} \
     critic.model.fsdp_config.param_offload=${offload} \
     critic.model.fsdp_config.optimizer_offload=${offload} \
-    trainer.logger='["console", "wandb"]' \
+    +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
+    +reward_model.daytona.max_concurrent=8 \
+    +reward_model.daytona.timeout=30 \
+    trainer.logger='["console"]' \
     trainer.project_name=${WANDB_PROJECT} \
     trainer.experiment_name=${WANDB_EXPERIMENT_NAME} \
-    +trainer.wandb_proxy=${https_proxy} \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \

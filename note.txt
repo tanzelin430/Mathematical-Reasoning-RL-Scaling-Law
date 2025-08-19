@@ -1,0 +1,26 @@
+stem 实验
+先clone下来 verifier 
+git clone https://huggingface.co/TIGER-Lab/general-verifier
+
+然后运行
+python -m vllm.entrypoints.openai.api_server \
+  --host localhost \
+  --port 8020 \
+  --model /home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/dev/general-verifier \
+  --served-model-name TIGER-Lab/general-verifier \
+  --gpu-memory-utilization 0.15 \
+  --max-model-len 2048 \
+  --tensor-parallel-size 1 \
+  --trust-remote-code
+
+
+然后开另一个
+运行脚本. train_grpo_qwen2.5*  
+
+
+
+code实验
+直接跑。 daytona api我放在脚本里了已经。 需要装一下daytona这个包就可以.
+
+
+
