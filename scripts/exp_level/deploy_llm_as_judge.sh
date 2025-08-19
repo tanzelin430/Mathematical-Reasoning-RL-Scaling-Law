@@ -13,48 +13,51 @@ if ! pip show vllm > /dev/null 2>&1; then
 fi
 
 # Set model path
-MODEL_PATH="/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/dev/general-verifier"
+HOST="localhost"
 PORT=8000
+MODEL_PATH="/fs-computility/mabasic/shared/models/general-verifier"
+SERVED_MODEL_NAME="TIGER-Lab/general-verifier"
 GPU_MEMORY_UTILIZATION=0.15  # Adjust based on available GPU memory
-
-# Kill any existing vllm process on the port
-echo "Checking for existing vllm processes on port $PORT..."
-lsof -ti:$PORT | xargs -r kill -9 2>/dev/null
+MAX_MODEL_LEN=2048
+TENSOR_PARALLEL_SIZE=1
 
 # Start vllm server
 echo "Starting vllm server with model at $MODEL_PATH on port $PORT..."
 echo "GPU memory utilization: $GPU_MEMORY_UTILIZATION"
 
 # Export the URL for STEM judge
-export STEM_LLM_JUDGE_URL="http://127.0.0.1:$PORT/v1/chat/completions"
+export STEM_LLM_JUDGE_URL="http://$HOST:$PORT/v1/chat/completions"
 echo "STEM_LLM_JUDGE_URL set to: $STEM_LLM_JUDGE_URL"
 
 # Start the server in background
-nohup vllm serve $MODEL_PATH \
+nohup python -m vllm.entrypoints.openai.api_server \
+    --host $HOST \
     --port $PORT \
+    --model $MODEL_PATH \
+    --served-model-name $SERVED_MODEL_NAME \
     --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
-    --trust-remote-code \
-    --max-seq-len 2048 \
-    > vllm_stem_judge.log 2>&1 &
+    --max-model-len $MAX_MODEL_LEN \
+    --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+    --trust-remote-code > outputs/vllm_stem_judge.log 2>&1 &
 
 echo "vllm server PID: $!"
-echo "Logs are being written to: vllm_stem_judge.log"
+echo "Logs are being written to: outputs/vllm_stem_judge.log"
 
 # Wait for server to be ready
 echo "Waiting for server to be ready..."
-for i in {1..30}; do
-    if curl -s http://127.0.0.1:$PORT/health > /dev/null 2>&1; then
+for i in {1..60}; do
+    if curl -s http://$HOST:$PORT/health > /dev/null 2>&1; then
         echo "✅ STEM LLM Judge server is ready!"
         echo ""
         echo "To use in training, make sure to export:"
-        echo "export STEM_LLM_JUDGE_URL=\"http://127.0.0.1:$PORT/v1/chat/completions\""
+        echo "export STEM_LLM_JUDGE_URL=\"http://$HOST:$PORT/v1/chat/completions\""
         echo ""
         echo "To stop the server:"
         echo "kill $!"
         exit 0
     fi
     echo -n "."
-    sleep 2
+    sleep 3
 done
 
 echo ""

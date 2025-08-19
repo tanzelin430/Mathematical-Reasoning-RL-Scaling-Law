@@ -23,13 +23,50 @@ TRAIN_EASY_DIR=${TRAIN_DATA_DIR}/easy
 TRAIN_MEDIUM_DIR=${TRAIN_DATA_DIR}/medium
 TRAIN_HARD_DIR=${TRAIN_DATA_DIR}/hard
 
-# Configure training files - all 3 difficulty levels
-train_files="['${TRAIN_EASY_DIR}/math__combined_54.4k_easy.parquet','${TRAIN_EASY_DIR}/logic__arcagi1_111_easy.parquet','${TRAIN_EASY_DIR}/logic__arcagi2_190_easy.parquet','${TRAIN_EASY_DIR}/logic__barc_1.6k_easy.parquet','${TRAIN_EASY_DIR}/logic__graph_logical_1.2k_easy.parquet','${TRAIN_EASY_DIR}/logic__ordering_puzzle_1.9k_easy.parquet','${TRAIN_EASY_DIR}/codegen__leetcode2k_1.3k_easy.parquet','${TRAIN_EASY_DIR}/codegen__livecodebench_440_easy.parquet','${TRAIN_EASY_DIR}/codegen__primeintellect_7.5k_easy.parquet','${TRAIN_EASY_DIR}/codegen__taco_8.8k_easy.parquet','${TRAIN_MEDIUM_DIR}/math__combined_54.4k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi1_111_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi2_190_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__barc_1.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__graph_logical_1.2k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__ordering_puzzle_1.9k_medium.parquet','${TRAIN_MEDIUM_DIR}/stem__web_3.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__leetcode2k_1.3k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__livecodebench_440_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__primeintellect_7.5k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__taco_8.8k_medium.parquet','${TRAIN_HARD_DIR}/math__combined_54.4k_hard.parquet','${TRAIN_HARD_DIR}/logic__arcagi1_111_hard.parquet','${TRAIN_HARD_DIR}/logic__arcagi2_190_hard.parquet','${TRAIN_HARD_DIR}/logic__barc_1.6k_hard.parquet','${TRAIN_HARD_DIR}/logic__graph_logical_1.2k_hard.parquet','${TRAIN_HARD_DIR}/logic__ordering_puzzle_1.9k_hard.parquet','${TRAIN_HARD_DIR}/logic__zebra_puzzle_1.3k_hard.parquet','${TRAIN_HARD_DIR}/stem__web_3.6k_hard.parquet','${TRAIN_HARD_DIR}/codegen__leetcode2k_1.3k_hard.parquet','${TRAIN_HARD_DIR}/codegen__livecodebench_440_hard.parquet','${TRAIN_HARD_DIR}/codegen__primeintellect_7.5k_hard.parquet','${TRAIN_HARD_DIR}/codegen__taco_8.8k_hard.parquet']"
-# train_files="['${TRAIN_EASY_DIR}/math__combined_54.4k_easy.parquet','${TRAIN_EASY_DIR}/logic__arcagi1_111_easy.parquet','${TRAIN_EASY_DIR}/logic__arcagi2_190_easy.parquet','${TRAIN_EASY_DIR}/logic__barc_1.6k_easy.parquet','${TRAIN_EASY_DIR}/logic__graph_logical_1.2k_easy.parquet','${TRAIN_EASY_DIR}/logic__ordering_puzzle_1.9k_easy.parquet','${TRAIN_EASY_DIR}/logic__zebra_puzzle_1.3k_easy.parquet','${TRAIN_EASY_DIR}/stem__web_3.6k_easy.parquet','${TRAIN_EASY_DIR}/codegen__leetcode2k_1.3k_easy.parquet','${TRAIN_EASY_DIR}/codegen__livecodebench_440_easy.parquet','${TRAIN_EASY_DIR}/codegen__primeintellect_7.5k_easy.parquet','${TRAIN_EASY_DIR}/codegen__taco_8.8k_easy.parquet','${TRAIN_MEDIUM_DIR}/math__combined_54.4k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi1_111_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi2_190_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__barc_1.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__graph_logical_1.2k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__ordering_puzzle_1.9k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__zebra_puzzle_1.3k_medium.parquet','${TRAIN_MEDIUM_DIR}/stem__web_3.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__leetcode2k_1.3k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__livecodebench_440_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__primeintellect_7.5k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__taco_8.8k_medium.parquet','${TRAIN_HARD_DIR}/math__combined_54.4k_hard.parquet','${TRAIN_HARD_DIR}/logic__arcagi1_111_hard.parquet','${TRAIN_HARD_DIR}/logic__arcagi2_190_hard.parquet','${TRAIN_HARD_DIR}/logic__barc_1.6k_hard.parquet','${TRAIN_HARD_DIR}/logic__graph_logical_1.2k_hard.parquet','${TRAIN_HARD_DIR}/logic__ordering_puzzle_1.9k_hard.parquet','${TRAIN_HARD_DIR}/logic__zebra_puzzle_1.3k_hard.parquet','${TRAIN_HARD_DIR}/stem__web_3.6k_hard.parquet','${TRAIN_HARD_DIR}/codegen__leetcode2k_1.3k_hard.parquet','${TRAIN_HARD_DIR}/codegen__livecodebench_440_hard.parquet','${TRAIN_HARD_DIR}/codegen__primeintellect_7.5k_hard.parquet','${TRAIN_HARD_DIR}/codegen__taco_8.8k_hard.parquet']"
+declare -a file_patterns=(
+    "math__combined_54.4k"
+    "logic__arcagi1_111"
+    "logic__arcagi2_190"
+    "logic__barc_1.6k"
+    "logic__graph_logical_1.2k"
+    "logic__ordering_puzzle_1.9k"
+    "logic__zebra_puzzle_1.3k"
+    "stem__web_3.6k"
+    "codegen__leetcode2k_1.3k"
+    "codegen__livecodebench_440"
+    "codegen__primeintellect_7.5k"
+    "codegen__taco_8.8k"
+)
 
-# Use medium difficulty as validation (optional, can be set to null)
-val_files="['${TRAIN_MEDIUM_DIR}/math__combined_54.4k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi1_111_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__arcagi2_190_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__barc_1.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__graph_logical_1.2k_medium.parquet','${TRAIN_MEDIUM_DIR}/logic__ordering_puzzle_1.9k_medium.parquet','${TRAIN_MEDIUM_DIR}/stem__web_3.6k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__leetcode2k_1.3k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__livecodebench_440_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__primeintellect_7.5k_medium.parquet','${TRAIN_MEDIUM_DIR}/codegen__taco_8.8k_medium.parquet']"
-# val_files="null"  # Uncomment to disable validation
+train_files=()
+for pattern in "${file_patterns[@]}"; do
+    file_path="${TRAIN_EASY_DIR}/${pattern}_easy.parquet"
+    if [[ -f "$file_path" ]]; then
+        train_files+=("'$file_path'")
+    fi
+done
+for pattern in "${file_patterns[@]}"; do
+    file_path="${TRAIN_MEDIUM_DIR}/${pattern}_medium.parquet"
+    if [[ -f "$file_path" ]]; then
+        train_files+=("'$file_path'")
+    fi
+done
+for pattern in "${file_patterns[@]}"; do
+    file_path="${TRAIN_HARD_DIR}/${pattern}_hard.parquet"
+    if [[ -f "$file_path" ]]; then
+        train_files+=("'$file_path'")
+    fi
+done
+train_files="[$(IFS=','; echo "${train_files[*]}")]"
+
+val_files=()
+for pattern in "${file_patterns[@]}"; do
+    file_path="${TRAIN_MEDIUM_DIR}/${pattern}_medium.parquet"
+    if [[ -f "$file_path" ]]; then
+        val_files+=("'$file_path'")
+    fi
+done
+val_files="[$(IFS=','; echo "${val_files[*]}")]"
 
 # =================== Model Configuration ===================
 BASE_MODEL=/fs-computility/mabasic/shared/models/Qwen2.5-7B-Instruct
@@ -156,7 +193,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
-    trainer.save_freq=25 \
+    trainer.save_freq=100 \
     trainer.test_freq=-1 \
     trainer.total_epochs=2 \
     trainer.resume_mode=disable \
