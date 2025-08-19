@@ -5,10 +5,6 @@ set -x
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
-export CUDA_VISIBLE_DEVICES=1,2,3,4
-export WANDB_API_KEY='1c01f395e45cd03487bdb9c72cbefe7cdef54426'
-export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
-export STEM_LLM_JUDGE_URL="http://localhost:8020"
 
 # =================== Proxy Configuration ===================
 # Ensure proxy settings are preserved
@@ -17,20 +13,20 @@ export STEM_LLM_JUDGE_URL="http://localhost:8020"
 # export WANDB_HTTP_TIMEOUT=300
 # =================== Data Configuration ===================
 # Use consistent absolute path
-SHARED_DATA_PATH=/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/data/guru_verl
+SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
-RESULTS_DIR=/home/local/PARTNERS/yz646/Agentic-RL-Scaling-Law/results
+RESULTS_DIR=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/results
 CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 # Create checkpoint directory if it doesn't exist
 mkdir -p ${CHECKPOINT_DIR}      
 # Choose which domain to train on (uncomment one)
 # Option 1: Math domain only
-# DOMAIN_NAME="math"
-# train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
+DOMAIN_NAME="math"
+train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet']"
 
 # Option 2: Code domain only
 # DOMAIN_NAME="code"
@@ -41,20 +37,20 @@ mkdir -p ${CHECKPOINT_DIR}
 # train_files="['${TRAIN_DATA_DIR}/logic__arcagi1_111.parquet']"
 
 # Option 4: STEM domain only
-DOMAIN_NAME="stem"
-train_files="['${TRAIN_DATA_DIR}/stem__web_3.6k.parquet']"
+# DOMAIN_NAME="stem"
+# train_files="['${TRAIN_DATA_DIR}/stem__web_3.6k.parquet']"
 
 # Option 5: Math + STEM (original configuration)
 # DOMAIN_NAME="math_stem"
 # train_files="['${TRAIN_DATA_DIR}/math__combined_54.4k.parquet', '${TRAIN_DATA_DIR}/stem__web_3.6k.parquet']"
 
 # Validation file (optional)
-val_files="['${TRAIN_DATA_DIR}/logic__arcagi2_190.parquet']"
-# val_files=""  # Uncomment to disable validation
+val_files="['/fs-computility/mabasic/shared/data/guru-RL-92k/online_eval/math__math_500.parquet']"
+# val_files="null"  # Uncomment to disable validation
 
 # =================== Model Configuration ===================
 MODEL_NAME=Qwen2.5-7B-Instruct
-BASE_MODEL=Qwen/${MODEL_NAME}
+BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
@@ -80,12 +76,12 @@ max_response_length=8192
 
 # Hardware Platform
 num_nodes=1
-n_gpus_per_node=4
+n_gpus_per_node=8
 
 # Batch sizes (adjusted for GRPO)
-train_prompt_bsz=128  # Larger batch for GRPO
+train_prompt_bsz=256  # Larger batch for GRPO
 n_resp_per_prompt=8  # GRPO needs multiple responses (at least 2, typically 4-8)
-train_prompt_mini_bsz=64  # Mini batch size for gradient updates
+train_prompt_mini_bsz=128  # Mini batch size for gradient updates
 
 # Dynamic batch size configuration
 use_dynamic_bsz=True
@@ -111,8 +107,8 @@ gen_tp=2
 sp_size=1
 
 # Memory optimization
-offload=True
-gpu_memory_utilization=0.5
+offload=False
+gpu_memory_utilization=0.65
 
 # =================== Start GRPO Training ===================
 echo "Checkpoints will be saved to: ${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME}"
@@ -179,11 +175,8 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
-    trainer.save_freq=1000 \
-    trainer.test_freq=-1 \
-    trainer.total_epochs=4 \
+    trainer.save_freq=25 \
+    trainer.test_freq=1 \
+    trainer.total_epochs=2 \
     trainer.resume_mode=disable \
-    +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
-    +reward_model.daytona.max_concurrent=8 \
-    +reward_model.daytona.timeout=30 \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@

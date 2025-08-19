@@ -82,27 +82,14 @@ def load_reward_manager(config, tokenizer, num_examine, **reward_kwargs):
     final_compute_score = compute_score
 
     if compute_score is None:
-        compute_score_kwargs = {}
-        
-        # Check Daytona config
-        daytona_config = config.reward_model.get("daytona")
-        if daytona_config and daytona_config.get("api_key"):
-            compute_score_kwargs['daytona_api_key'] = daytona_config["api_key"]
-            print(f"[Reward Manager] Daytona enabled for codegen data sources")
-        
-        # Check SandboxFusion config (retained original logic)
         sandbox_config = config.reward_model.get("sandbox_fusion")
-        if sandbox_config and sandbox_config.get("url"):
+        sandbox_url = sandbox_config.get("url") if sandbox_config else None
+        if sandbox_url:
             sandbox_manager = multiprocessing.Manager()
             _concurrent_semaphore = sandbox_manager.Semaphore(sandbox_config.get("max_concurrent", 64))
-            compute_score_kwargs['sandbox_fusion_url'] = sandbox_config.get("url")
-            compute_score_kwargs['concurrent_semaphore'] = _concurrent_semaphore
-            print(f"[Reward Manager] SandboxFusion enabled: {sandbox_config.get('url')}")
-        
-        final_compute_score = partial(default_compute_score, **compute_score_kwargs)
-        if not daytona_config or not daytona_config.get("api_key"):  # Only print if Daytona is not the primary
-            if not sandbox_config or not sandbox_config.get("url"):
-                print(f"[Reward Manager] Using default compute_score for all sources")
+            final_compute_score = partial(default_compute_score, sandbox_fusion_url=sandbox_url, concurrent_semaphore=_concurrent_semaphore)
+        else:
+            final_compute_score = default_compute_score
 
     return reward_manager_cls(
         tokenizer=tokenizer,
