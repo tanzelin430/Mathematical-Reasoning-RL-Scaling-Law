@@ -180,7 +180,7 @@ def process_file(input_path: Path, output_path: Path, split: str) -> None:
 
 
 def main():
-    base_dir = Path('/fs-computility/mabasic/shared/data/guru-RL-92k')
+    base_dir = Path('/home/myid/yz44466/guru-RL-92k')
     files = [
         ("train/math__combined_54.4k.parquet", "train"),
         ("train/logic__arcagi1_111.parquet", "train"),

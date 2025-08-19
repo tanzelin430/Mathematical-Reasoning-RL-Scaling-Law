@@ -16,7 +16,7 @@
 from verl.utils.import_utils import deprecated
 
 
-def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None):
+def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None, daytona_api_key=None):
     """Compute the score for a given solution based on the data source.
 
     Args:
@@ -50,8 +50,19 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
             res = naive_dapo.compute_score(solution_str, ground_truth, extra_info=extra_info)
     # code generation
     elif data_source.startswith('codegen'):
-        from . import coder1
-        res = coder1.compute_score(solution_str, ground_truth, extra_info=extra_info)
+        #yifan: add daytona check. this is remote
+        if daytona_api_key:
+            try:
+                from . import daytona
+                res = daytona.compute_score(solution_str, ground_truth, extra_info)
+                # print(res)
+                # print('using daytona')
+            except Exception as e:
+                print(f"[Reward] Daytona execution failed for {data_source}: {e}")
+                print(f"[Reward] Falling back to coder1")
+        else:
+            from . import coder1
+            res = coder1.compute_score(solution_str, ground_truth, extra_info=extra_info)
     # simulation (code)
     elif data_source.startswith("simulation__codeio"):
         from . import codeio
@@ -95,6 +106,7 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
         # Added stem__web for guru dataset compatibility
         from . import stem_llm_judge
         res = stem_llm_judge.compute_score(data_source=data_source, model_output=solution_str, ground_truth=ground_truth, extra_info=extra_info)
+        print(extra_info,res,solution_str,ground_truth)
     elif data_source in ["ood__ifeval"]:
         from . import ifeval
         res = ifeval.compute_score(solution_str, ground_truth, extra_info=extra_info)
@@ -166,11 +178,11 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
 
 
 @deprecated("verl.utils.reward_score.default_compute_score")
-def _default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None):
+def _default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None, daytona_api_key=None):
     """
     Legacy function API to be deprecated. Please use `default_compute_score` instead.
     """
-    return default_compute_score(data_source, solution_str, ground_truth, extra_info, sandbox_fusion_url, concurrent_semaphore)
+    return default_compute_score(data_source, solution_str, ground_truth, extra_info, sandbox_fusion_url, concurrent_semaphore, daytona_api_key)
 
 
 __all__ = ["default_compute_score"]

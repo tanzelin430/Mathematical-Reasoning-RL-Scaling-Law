@@ -14,3 +14,4 @@ start.sh
 # Training artifacts
 /scripts/train/outputs/
 /scripts/train/wandb/
+/general-verifier/
