@@ -791,8 +791,23 @@ class RayPPOTrainer:
             data_source_dataset_reward[key].append(sample_scores[i])
 
         # Record the mean reward for each data source and dataset
+        domain_pass1_scores = {}  # Store pass@1 for each domain
         for (data_source, dataset), rewards in data_source_dataset_reward.items():
-            metric_dict[f"val/test_score/{data_source}/{dataset}"] = np.mean(rewards)
+            mean_reward = np.mean(rewards)
+            metric_dict[f"val/test_score/{data_source}/{dataset}"] = mean_reward
+            
+            # Extract domain from data_source (e.g., "math__math_500" -> "math")
+            domain = data_source.split("__")[0]
+            if domain not in domain_pass1_scores:
+                domain_pass1_scores[domain] = []
+            domain_pass1_scores[domain].append(mean_reward)
+        
+        # Calculate overall pass@1 (average across all domains)
+        if domain_pass1_scores:
+            all_domain_scores = [np.mean(scores) for scores in domain_pass1_scores.values()]
+            overall_pass1 = np.mean(all_domain_scores)
+            metric_dict["val/overall_pass1"] = overall_pass1
+            print(f"Overall Pass@1 across {len(domain_pass1_scores)} domains: {overall_pass1:.4f}")
             
         return metric_dict
 

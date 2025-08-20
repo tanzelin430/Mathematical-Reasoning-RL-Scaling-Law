@@ -68,6 +68,8 @@ Agentic-RL-Scaling-Law/
 ├── data/
 │   └── guru_verl/          # Preprocessed guru-RL-92k dataset
 │       ├── train/          # Training data by domain
+│       ├── online_eval/    # val files
+│       ├── balanced_samples/  # Training data balanced by domain
 └── results/                # Experiment outputs
     └── checkpoints/        # Model checkpoints
 ```

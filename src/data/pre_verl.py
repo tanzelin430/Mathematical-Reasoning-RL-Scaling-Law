@@ -180,8 +180,9 @@ def process_file(input_path: Path, output_path: Path, split: str) -> None:
 
 
 def main():
-    base_dir = Path('/home/myid/yz44466/guru-RL-92k')
+    base_dir = Path('/fs-computility/mabasic/shared/data/guru-RL-92k')
     files = [
+        # Training data
         ("train/math__combined_54.4k.parquet", "train"),
         ("train/logic__arcagi1_111.parquet", "train"),
         ("train/logic__arcagi2_190.parquet", "train"),
@@ -194,6 +195,12 @@ def main():
         ("train/codegen__livecodebench_440.parquet", "train"),
         ("train/codegen__primeintellect_7.5k.parquet", "train"),
         ("train/codegen__taco_8.8k.parquet", "train"),
+        
+        # Validation data - one representative dataset per domain
+        ("online_eval/math__math_500.parquet", "val"),
+        ("online_eval/codegen__humaneval_164.parquet", "val"),
+        ("online_eval/logic__zebra_puzzle_dataset_200.parquet", "val"),
+        ("online_eval/stem__supergpqa_200.parquet", "val"),
     ]
 
     for rel, split in files:
