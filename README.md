@@ -126,6 +126,7 @@ cd verl/
 pip install -e .
 pip3 install vllm==0.8.3
 pip3 install flash-attn --no-build-isolation
+pip install daytona_sdk
 ```
 
 ### Data Preprocessing
@@ -170,12 +171,70 @@ micro batch size: It controls the number of samples (or tokens, with use_dynamic
 
 ## 🛠️ Developer Guide: Customizing Rewards & Prompts
 
+### Code Execution Environment Setup
+
+Now supports two code execution environments for code domain training:
+
+**Setup:**
+1. Get Daytona API key from [Daytona Platform](https://daytona.io)
+2. Export in your training script:
+
+
+### STEM
+
+**Prerequisites:**
+First, clone the STEM LLM Judge model:
+```bash
+git clone https://huggingface.co/TIGER-Lab/general-verifier
+```
+
+For STEM domain training, you have two options to run the training with LLM-as-a-Judge evaluation:
+
+#### Method 1: Manual vLLM Server Setup
+
+1. **Start the vLLM server manually** for STEM LLM Judge:
+   ```bash
+   python -m vllm.entrypoints.openai.api_server \
+     --host localhost \
+     --port 8040 \
+     --model /path/to/your/general-verifier \
+     --served-model-name TIGER-Lab/general-verifier \
+     --gpu-memory-utilization 0.7 \
+     --max-model-len 512 \
+     --tensor-parallel-size 1 \
+     --trust-remote-code
+   ```
+
+2. **Run the training script**:
+   ```bash
+   bash scripts/train_yifan/run_grpo_qwen2.5_0.5b_single_domain.sh
+   ```
+
+#### Method 2: Automated Setup (Recommended)
+
+Simply run the enhanced training script that automatically manages the vLLM server:
+
+```bash
+bash scripts/train_yifan/run_grpo_qwen2.5_0.5b_single_domain_new.sh
+```
+
+This script will:
+- Automatically detect STEM domain training
+- Start the vLLM server on a dedicated GPU
+- Wait for the server to be ready
+- Run the training with proper cleanup on exit
+
+**Note**: The automated script reserves GPU 0 for the vLLM server and uses GPUs 1-7 for training to avoid resource conflicts.
+
+
+
 ### Modifying Reward Functions
 
 **Key files for reward customization:**
 - `verl/utils/reward_score/__init__.py` - Routing logic
 - `verl/utils/reward_score/naive_dapo.py` - Math scorer  
 - `verl/utils/reward_score/coder1.py` - Code scorer
+- `verl/utils/reward_score/daytona.py` - Code Sandbox Scorer
 - `verl/utils/reward_score/arcagi.py` - Logic scorer
 - `verl/utils/reward_score/stem.py` - STEM scorer
 
