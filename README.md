@@ -37,12 +37,12 @@ bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
 
 **Multi-domain training (all 4 domains):**
 ```bash
-bash scripts/train/run_ppo_qwen2.5_3b_verl_builtin.sh
+SAMPLE_SIZE=5000 bash scripts/train/run_grpo_qwen2.5_7b_mixed_domain.sh
 ```
 
 **Single-domain training (7B model):**
 ```bash
-bash scripts/train/run_ppo_qwen2.5_7b_single_domain.sh
+bash scripts/train/run_grpo_qwen2.5_7b_single_domain.sh
 ```
 
 **Custom configuration:**
