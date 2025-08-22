@@ -24,7 +24,7 @@ cd Agentic-RL-Scaling-Law
 
 # Install dependencies
 pip install -r requirements.txt
-cd verl/ && pip install -e . && cd ..
+pip install -e .[gpu,math,vllm,test,code]
 
 # Prepare data
 python src/data/pre_verl.py
@@ -119,17 +119,6 @@ We experiment with models of various sizes to study scaling behaviors:
 - Model size impact on transfer learning
 
 ## 💻 Technical Implementation
-
-### Environment Setup
-
-```bash
-# Install VeRL and dependencies
-cd verl/
-pip install -e .
-pip3 install vllm==0.8.3
-pip3 install flash-attn --no-build-isolation
-pip install daytona_sdk
-```
 
 ### Data Preprocessing
 
