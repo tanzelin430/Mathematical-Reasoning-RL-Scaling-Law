@@ -68,12 +68,21 @@ class NaiveRewardManager:
 
             extra_info = data_item.non_tensor_batch.get("extra_info", None)
 
-            score = self.compute_score(
-                data_source=data_source,
-                solution_str=response_str,
-                ground_truth=ground_truth,
-                extra_info=extra_info,
-            )
+            try:
+                score = self.compute_score(
+                    data_source=data_source,
+                    solution_str=response_str,
+                    ground_truth=ground_truth,
+                    extra_info=extra_info,
+                )
+            except Exception as e:
+                print(f"\n[REWARD ERROR] Failed to compute score for sample {i}:")
+                print(f"  Data source: {data_source}")
+                print(f"  Prompt: {prompt_str[:200]}...")
+                print(f"  Response: {response_str[:200]}...")
+                print(f"  Ground truth: {ground_truth}")
+                print(f"  Error: {str(e)}")
+                raise RuntimeError(f"Reward computation failed for sample {i} from {data_source}: {str(e)}")
 
             if isinstance(score, dict):
                 reward = score["score"]

@@ -106,7 +106,8 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
         # Added stem__web for guru dataset compatibility
         from . import stem_llm_judge
         res = stem_llm_judge.compute_score(data_source=data_source, model_output=solution_str, ground_truth=ground_truth, extra_info=extra_info)
-        print(extra_info,res,solution_str,ground_truth)
+        # Remove debug print
+        # print(extra_info,res,solution_str,ground_truth)
     elif data_source in ["ood__ifeval"]:
         from . import ifeval
         res = ifeval.compute_score(solution_str, ground_truth, extra_info=extra_info)
