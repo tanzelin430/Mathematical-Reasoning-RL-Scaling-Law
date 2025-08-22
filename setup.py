@@ -35,7 +35,7 @@ install_requires = [
     "pyarrow>=19.0.0",
     "pybind11",
     "pylatexenc",
-    "ray[default]>=2.41.0",
+    "ray==2.48.0",
     "torchdata",
     "tensordict<=0.6.2",    # NOTE: Reasoning360 used a fixed version ==0.72
     "transformers", # NOTE Reasoning360 used a fixed version ==4.51.0
@@ -55,6 +55,7 @@ GPU_REQUIRES = ["liger-kernel", "flash-attn", "nvitop",]    # NOTE: nvitop is ad
 # NOTE: Reasoning360 used "math-verify[antlr4_9_3]==0.6.0"
 MATH_REQUIRES = ["math-verify"]  # Add math-verify as an optional dependency
 VLLM_REQUIRES = ["tensordict<=0.6.2", "vllm<=0.8.5"]
+CODE_REQUIRES = ["daytona_sdk"]
 SGLANG_REQUIRES = [
     "tensordict<=0.6.2",
     "sglang[srt,openai]==0.4.6.post5",
@@ -70,6 +71,7 @@ extras_require = {
     "math": MATH_REQUIRES,
     "vllm": VLLM_REQUIRES,
     "sglang": SGLANG_REQUIRES,
+    "code": CODE_REQUIRES,
 }
 
 

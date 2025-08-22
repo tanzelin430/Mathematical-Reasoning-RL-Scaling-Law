@@ -180,7 +180,7 @@ def process_file(input_path: Path, output_path: Path, split: str) -> None:
 
 
 def main():
-    base_dir = Path('/fs-computility/mabasic/shared/data/guru-RL-92k')
+    base_dir = Path('/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k')
     files = [
         # Training data
         ("train/math__combined_54.4k.parquet", "train"),

@@ -4,7 +4,7 @@ set -x
 # =================== Environment Configuration ===================
 # STEM LLM Judge Configuration
 STEM_JUDGE_PORT=8040  # Port for STEM LLM Judge server
-STEM_JUDGE_MODEL_PATH="/fs-computility/mabasic/shared/models/general-verifier/"  # Path to STEM Judge model
+STEM_JUDGE_MODEL_PATH="/mnt/shared-storage-user/ma4agi-gpu/data/model/general-verifier/"  # Path to STEM Judge model
 STEM_JUDGE_GPU=0  # GPU for STEM LLM Judge (separate from training GPUs)
 
 # GPU Configuration
@@ -14,19 +14,19 @@ export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
 export WANDB_API_KEY='1328200322cf91b211452e5b4ca7ce9148bc7250'
-export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
+# export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
 export STEM_LLM_JUDGE_URL="http://localhost:${STEM_JUDGE_PORT}"
-
+export WANDB_MODE=offline
 # =================== Data Configuration ===================
 # Use consistent absolute path
-SHARED_DATA_PATH=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl
+SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
 
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
-RESULTS_DIR=/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/results
+RESULTS_DIR=../../results
 CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 # Create checkpoint directory if it doesn't exist
 mkdir -p ${CHECKPOINT_DIR}      
@@ -39,7 +39,7 @@ if [ ! -z "$SAMPLE_SIZE" ]; then
     SAMPLED_DATA_DIR=${SHARED_DATA_PATH}/balanced_samples/${SAMPLE_SIZE}
     
     # Run the sampling script
-    python3 /fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/src/data/sample_balanced_data_v2.py \
+    python3 /fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/src/data/sample_balanced_data.py \
         --total_samples ${SAMPLE_SIZE} \
         --output_dir ${SAMPLED_DATA_DIR}
     
@@ -89,8 +89,8 @@ fi
 val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/codegen__humaneval_164.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet']"
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B-Instruct
-BASE_MODEL=/fs-computility/mabasic/shared/models/${MODEL_NAME}
+MODEL_NAME=Qwen2.5-7B
+BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
@@ -177,7 +177,7 @@ start_stem_judge() {
             return 0
         fi
         echo -n "."
-        sleep 2
+        sleep 3
     done
     
     echo "❌ STEM Judge server failed to start. Check stem_judge.log"
@@ -271,7 +271,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=10 \
     trainer.total_epochs=2 \
     trainer.resume_mode=disable \
-    +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
-    +reward_model.daytona.max_concurrent=8 \
-    +reward_model.daytona.timeout=5 \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
+    # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
+    # +reward_model.daytona.max_concurrent=8 \
+    # +reward_model.daytona.timeout=5 \
