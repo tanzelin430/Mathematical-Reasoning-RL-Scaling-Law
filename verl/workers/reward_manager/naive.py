@@ -43,6 +43,13 @@ class NaiveRewardManager:
         reward_extra_info = defaultdict(list)
 
         already_print_data_sources = {}
+        
+        # Debug: Print batch size info
+        print(f"\n[NaiveRewardManager] Processing batch:")
+        print(f"  len(data): {len(data)}")
+        print(f"  reward_tensor.shape: {reward_tensor.shape}")
+        if hasattr(data, 'batch') and data.batch:
+            print(f"  data.batch.batch_size: {data.batch.batch_size}")
 
         for i in range(len(data)):
             data_item = data[i]  # DataProtoItem
@@ -107,6 +114,12 @@ class NaiveRewardManager:
                         print(f"[{key}]", value)
                 else:
                     print("[score]", score)
+
+        # Debug: Print final reward_extra_info sizes
+        print(f"\n[NaiveRewardManager] Finished processing:")
+        print(f"  Total samples processed: {len(data)}")
+        for key, values in reward_extra_info.items():
+            print(f"  reward_extra_info['{key}'] length: {len(values)}")
 
         if return_dict:
             return {

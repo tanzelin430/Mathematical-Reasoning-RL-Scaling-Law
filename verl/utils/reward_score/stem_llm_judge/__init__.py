@@ -147,14 +147,20 @@ def compute_score(data_source: str,
     is_matched, extracted_model_output = match_answer(model_output)
     question    = extra_info["question"]
     if is_matched==False:
-        return 0.
+        score = 0.0
     else:
         try:
             is_correct = _llm_judge(question, extracted_model_output, ground_truth, verbose=False)
+            score = float(is_correct)
         except Exception as e:
             print(f"[judge-error] {e}")
-            return 0.
-        return float(is_correct)
+            score = 0.0
+    
+    # Return in the same format as other reward functions
+    return {
+        "score": score,
+        "acc": score  # For STEM, score and acc are the same
+    }
     
 # ---------------- Demo -------------------------------------------------------
 if __name__ == "__main__":
