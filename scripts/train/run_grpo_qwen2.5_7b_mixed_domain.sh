@@ -124,8 +124,7 @@ n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=64  # Reduced for mixed domain
 
 # Dynamic batch size configuration
-# Disabled due to reward_extra_info length mismatch issue with mixed domains
-use_dynamic_bsz=False
+use_dynamic_bsz=True
 
 # Calculate max sequence length from input/output settings
 max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 9216
@@ -137,12 +136,6 @@ actor_seq_multiplier=2  # Actor should be ~2x max sequence length
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=${actor_ppo_max_token_len}  # Same as actor
-
-# Micro batch sizes for non-dynamic batching
-# These control how many samples are processed per GPU in each forward/backward pass
-actor_micro_batch_size_per_gpu=2  # Start small, can increase if GPU memory allows
-rollout_micro_batch_size_per_gpu=4  # Forward-only can be larger
-ref_micro_batch_size_per_gpu=4  # Reference model for KL computation, forward-only
 
 # Sampling parameters
 temperature=1.0
@@ -168,7 +161,7 @@ start_stem_judge() {
         --port ${STEM_JUDGE_PORT} \
         --model ${STEM_JUDGE_MODEL_PATH} \
         --served-model-name TIGER-Lab/general-verifier \
-        --gpu-memory-utilization 0.15 \
+        --gpu-memory-utilization 0.1 \
         --max-model-len 512 \
         --tensor-parallel-size 1 \
         --trust-remote-code > stem_judge.log 2>&1 &
@@ -240,7 +233,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.optim.min_lr_ratio=0. \
     actor_rollout_ref.actor.ppo_mini_batch_size=${train_prompt_mini_bsz} \
     actor_rollout_ref.actor.use_dynamic_bsz=${use_dynamic_bsz} \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=${actor_micro_batch_size_per_gpu} \
+    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=${actor_ppo_max_token_len} \
     actor_rollout_ref.actor.fsdp_config.param_offload=${offload} \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=${offload} \
     actor_rollout_ref.actor.entropy_coeff=0 \
@@ -249,7 +242,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.n=${n_resp_per_prompt} \
     actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=${use_dynamic_bsz} \
-    actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=${rollout_micro_batch_size_per_gpu} \
+    actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=${rollout_log_prob_max_token_len} \
     actor_rollout_ref.rollout.gpu_memory_utilization=${gpu_memory_utilization} \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
     actor_rollout_ref.rollout.enable_chunked_prefill=True \
