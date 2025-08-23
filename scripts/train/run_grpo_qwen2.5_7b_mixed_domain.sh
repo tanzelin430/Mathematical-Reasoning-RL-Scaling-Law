@@ -131,11 +131,11 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=2  # Actor should be ~2x max sequence length
-
+actor_seq_multiplier=3  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=6
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
-rollout_log_prob_max_token_len=${actor_ppo_max_token_len}  # Same as actor
+rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
 
 # Sampling parameters
 temperature=1.0
@@ -161,7 +161,7 @@ start_stem_judge() {
         --port ${STEM_JUDGE_PORT} \
         --model ${STEM_JUDGE_MODEL_PATH} \
         --served-model-name TIGER-Lab/general-verifier \
-        --gpu-memory-utilization 0.1 \
+        --gpu-memory-utilization 0.06 \
         --max-model-len 512 \
         --tensor-parallel-size 1 \
         --trust-remote-code > stem_judge.log 2>&1 &
