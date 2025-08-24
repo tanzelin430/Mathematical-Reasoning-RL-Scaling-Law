@@ -34,7 +34,7 @@ def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
         }
 
 
-def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
+def unify_code_data(row: pd.Series, idx: int, split: str, dataset_name: str) -> Dict[str, Any]:
     question = ''
     if pd.notna(row.get('prompt')):
         question = str(row['prompt'])
@@ -61,13 +61,30 @@ def unify_code_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
 
     data_source = row.get('data_source', 'code_unknown')
 
+    # Start from the row's original extra_info (may be dict or JSON string)
+    extra_info = row.get('extra_info', {})
+    if isinstance(extra_info, str):
+        try:
+            extra_info = json.loads(extra_info)
+        except Exception:
+            extra_info = {}
+    if not isinstance(extra_info, dict):
+        extra_info = {}
+
+    # Determine optional starter code prefix; only non-empty for LeetCode-like datasets (fuzzy match)
+    prefix = ''
+    if 'leetcode' in str(dataset_name).lower():
+        existing_prefix = extra_info.get('prefix')
+        if isinstance(existing_prefix, str):
+            prefix = existing_prefix or ''
+
     # Based on Reasoning360: code domain doesn't use system prompt
     data = {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": question}],
         "ability": row.get("ability", "codegen"),  # Use 'codegen' to match the data
         "reward_model": {"style": "rule", "ground_truth": solution},
-        "extra_info": {"split": split, "index": idx}
+        "extra_info": {'split': split, 'index': idx, 'prefix': prefix}
     }
     return data
 
@@ -165,7 +182,7 @@ def process_file(input_path: Path, output_path: Path, split: str) -> None:
         if domain == 'math':
             rec = unify_math_data(row, idx, split)
         elif domain in ('codegen', 'code'):
-            rec = unify_code_data(row, idx, split)
+            rec = unify_code_data(row, idx, split, input_path.name)
         elif domain == 'logic':
             rec = unify_logic_data(row, idx, split)
         elif domain == 'stem':
@@ -194,18 +211,12 @@ def main():
         ("train/codegen__leetcode2k_1.3k.parquet", "train"),
         ("train/codegen__livecodebench_440.parquet", "train"),
         ("train/codegen__primeintellect_7.5k.parquet", "train"),
-        ("train/codegen__taco_8.8k.parquet", "train"),
-        
-        # Validation data - one representative dataset per domain
-        ("online_eval/math__math_500.parquet", "val"),
-        ("online_eval/codegen__humaneval_164.parquet", "val"),
-        ("online_eval/logic__zebra_puzzle_dataset_200.parquet", "val"),
-        ("online_eval/stem__supergpqa_200.parquet", "val"),
+        ("train/codegen__taco_8.8k.parquet", "train")
     ]
 
     for rel, split in files:
         inp = base_dir / rel
-        out = Path('../../data/guru_verl') / rel
+        out = Path('/home/tanzelin-p/Agentic-RL-Scaling-Law/data/guru_verl') / rel
         process_file(inp, out, split)
 
 if __name__ == '__main__':

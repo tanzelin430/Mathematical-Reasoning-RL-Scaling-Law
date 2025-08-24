@@ -519,13 +519,13 @@ def compute_score(solution_str: str,
     # - Format correct but answer wrong: reward = -0.5
     # - Format wrong and answer wrong: reward = -1.0
     
-    if correct:
-        reward = 1.0
-    elif is_matched:  # Format is correct (has \\boxed{}) but answer is wrong
-        reward = -0.5
-    else:  # Both format and answer are wrong
-        reward = -1.0
-    
+    # if correct:
+    #     reward = 1.0
+    # elif is_matched:  # Format is correct (has \\boxed{}) but answer is wrong
+    #     reward = -0.5
+    # else:  # Both format and answer are wrong
+    #     reward = -1.0
+    reward = 1.0 if correct else 0.
     acc = correct
 
     return {

@@ -22,7 +22,7 @@ def main():
     print(f"Samples per domain: {samples_per_domain}")
     
     # Define data files for each domain
-    base_dir = Path("/fs-computility/mabasic/tanzelin.p/work/Agentic-RL-Scaling-Law/data/guru_verl/train")
+    base_dir = Path("/home/tanzelin-p/Agentic-RL-Scaling-Law/data/guru_verl/train")
     
     domain_files = {
         "math": ["math__combined_54.4k.parquet"],
