@@ -95,7 +95,8 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin
+EPOCHS=50
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -268,9 +269,9 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
-    trainer.save_freq=50 \
-    trainer.test_freq=10 \
-    trainer.total_epochs=2 \
+    trainer.save_freq=10 \
+    trainer.test_freq=5 \
+    trainer.total_epochs=${EPOCHS} \
     trainer.resume_mode=disable \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \

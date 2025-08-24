@@ -211,12 +211,18 @@ def main():
         ("train/codegen__leetcode2k_1.3k.parquet", "train"),
         ("train/codegen__livecodebench_440.parquet", "train"),
         ("train/codegen__primeintellect_7.5k.parquet", "train"),
-        ("train/codegen__taco_8.8k.parquet", "train")
+        ("train/codegen__taco_8.8k.parquet", "train"),
+        
+        # Validation data - one representative dataset per domain
+        ("online_eval/math__math_500.parquet", "val"),
+        ("online_eval/codegen__humaneval_164.parquet", "val"),
+        ("online_eval/logic__zebra_puzzle_dataset_200.parquet", "val"),
+        ("online_eval/stem__supergpqa_200.parquet", "val"),
     ]
 
     for rel, split in files:
         inp = base_dir / rel
-        out = Path('/home/tanzelin-p/Agentic-RL-Scaling-Law/data/guru_verl') / rel
+        out = Path('../../data/guru_verl') / rel
         process_file(inp, out, split)
 
 if __name__ == '__main__':
