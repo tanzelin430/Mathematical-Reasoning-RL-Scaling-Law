@@ -57,6 +57,7 @@ def code_exec_sandboxfusion(code, stdin: str = None, timeout=_DEFAULT_TIMEOUT_SE
             sandbox_servers = os.getenv('SANDBOX_FUSION_SERVERS', '')
         
         servers = _parse_sandbox_servers(sandbox_servers)
+        # print(f"Servers: {servers}")
         server_cycle = cycle(servers)
         
         if not servers:
@@ -73,9 +74,9 @@ def code_exec_sandboxfusion(code, stdin: str = None, timeout=_DEFAULT_TIMEOUT_SE
         for _ in range(len(servers)):
             try:
                 server = _get_next_server(server_cycle)
-                url = f"http://{server}:8080/run_code"
+                url = f"http://{server}/run_code"
                 response = requests.post(url, json=request_data, timeout=timeout + 2)
-                
+                # print(f"Response: {response}")
                 if response.status_code != 200:
                     continue  # Try next server
                     

@@ -12,7 +12,7 @@ class NumpyEncoder(json.JSONEncoder):
             return obj.item()
         return super().default(obj)
 
-base_dir = Path('/root/work/Agentic-RL-Scaling-Law/data/guru_verl/math')
+base_dir = Path('/home/tanzelin-p/Agentic-RL-Scaling-Law/data/guru_verl/code')
 
 # Get all parquet files in the directory
 parquet_files = sorted(base_dir.glob('*.parquet'))

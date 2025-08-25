@@ -17,13 +17,27 @@ export WANDB_API_KEY='1328200322cf91b211452e5b4ca7ce9148bc7250'
 # export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
 export STEM_LLM_JUDGE_URL="http://localhost:${STEM_JUDGE_PORT}"
 export WANDB_MODE=offline
-SAMPLE_SIZE=5000
+
+# =================== SandboxFusion Configuration ===================
+# Enable SandboxFusion for code execution
+export CODER1_EXEC=sandboxfusion
+NUM_SANDBOX=8
+BASE_PORT=10086
+SERVERS=""
+for i in $(seq 0 $((NUM_SANDBOX-1))); do
+    PORT=$((BASE_PORT + i))
+    [ -z "$SERVERS" ] && SERVERS="localhost:$PORT" || SERVERS="$SERVERS,localhost:$PORT"
+done
+export SANDBOX_FUSION_SERVERS="$SERVERS"
+# Optional: For multiple servers (load balancing)
+# export SANDBOX_FUSION_SERVERS="server1:8080,server2:8080,server3:8080"
+
 # =================== Data Configuration ===================
 # Use consistent absolute path
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-
+SAMPLE_SIZE=5000
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location

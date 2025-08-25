@@ -1,5 +1,5 @@
 HOST ?= 0.0.0.0
-PORT ?= 8080
+PORT ?= 10086
 TEST_NP ?= 4
 run:
 	uvicorn sandbox.server.server:app --reload --host $(HOST) --port $(PORT)
