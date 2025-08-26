@@ -5,7 +5,7 @@ set -x
 # STEM LLM Judge Configuration
 STEM_JUDGE_PORT=8040  # Port for STEM LLM Judge server
 STEM_JUDGE_MODEL_PATH="/mnt/shared-storage-user/ma4agi-gpu/data/model/general-verifier/"  # Path to STEM Judge model
-STEM_JUDGE_GPU=6,7  # GPU for STEM LLM Judge (separate from training GPUs)
+STEM_JUDGE_GPU=0  # GPU for STEM LLM Judge (separate from training GPUs)
 
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
@@ -177,9 +177,9 @@ start_stem_judge() {
         --port ${STEM_JUDGE_PORT} \
         --model ${STEM_JUDGE_MODEL_PATH} \
         --served-model-name TIGER-Lab/general-verifier \
-        --gpu-memory-utilization 0.15 \
+        --gpu-memory-utilization 0.2 \
         --max-model-len 1024 \
-        --tensor-parallel-size 2 \
+        --tensor-parallel-size 1 \
         --trust-remote-code > stem_judge.log 2>&1 &
     
     STEM_JUDGE_PID=$!
