@@ -11,6 +11,7 @@ Exploring RL scaling laws across Math, Code, Logic, and STEM domains using VeRL 
 
 ```bash
 # Clone and install
+Basic Info: Python 3.12 Cuda 12.4 torch 2.6.0
 git clone https://github.com/your-repo/Agentic-RL-Scaling-Law.git
 cd Agentic-RL-Scaling-Law
 pip install -r requirements.txt
