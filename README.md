@@ -25,9 +25,10 @@ python src/data/pre_verl.py
 
 ```bash
 # Install SandboxFusion
-git clone https://github.com/bytedance/SandboxFusion.git sandbox_deployment
-cd sandbox_deployment
+git clone https://github.com/bytedance/SandboxFusion.git 
+cd SandboxFusion
 poetry install
+mkdir -p docs/build
 cd runtime/python && bash install-python-runtime.sh && cd ../..
 
 # Start multiple instances for training
