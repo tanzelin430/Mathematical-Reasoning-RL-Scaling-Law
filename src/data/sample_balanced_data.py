@@ -17,24 +17,24 @@ def main():
     args = parser.parse_args()
     
     # Calculate samples per domain
-    samples_per_domain = args.total_samples // 2
+    samples_per_domain = args.total_samples // 1
     print(f"Total samples: {args.total_samples}")
     print(f"Samples per domain: {samples_per_domain}")
     
     # Define data files for each domain
-    base_dir = Path("/home/tanzelin-p/Agentic-RL-Scaling-Law/data/guru_verl/train")
+    base_dir = Path("../../data/guru_verl/train")
     
     domain_files = {
-        "math": ["math__combined_54.4k.parquet"],
-        "logic": [
-            "logic__arcagi1_111.parquet",
-            "logic__arcagi2_190.parquet",
-            "logic__barc_1.6k.parquet",
-            "logic__graph_logical_1.2k.parquet",
-            "logic__ordering_puzzle_1.9k.parquet",
-            "logic__zebra_puzzle_1.3k.parquet"
-        ]
+        "math": ["math__combined_54.4k.parquet"]
     }
+        #     "logic": [
+        #     "logic__arcagi1_111.parquet",
+        #     "logic__arcagi2_190.parquet",
+        #     "logic__barc_1.6k.parquet",
+        #     "logic__graph_logical_1.2k.parquet",
+        #     "logic__ordering_puzzle_1.9k.parquet",
+        #     "logic__zebra_puzzle_1.3k.parquet"
+        # ]
         # "stem": ["stem__web_3.6k.parquet"],
         #     "code": [
         #     "codegen__leetcode2k_1.3k.parquet",

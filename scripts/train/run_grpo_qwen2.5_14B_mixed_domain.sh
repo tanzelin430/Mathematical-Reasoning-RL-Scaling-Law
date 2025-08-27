@@ -39,7 +39,7 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=5000
+SAMPLE_SIZE=4096
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -109,10 +109,7 @@ val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__ze
 MODEL_NAME=Qwen2.5-14B
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
-# =================== Logging Configuration ===================
-WANDB_PROJECT=agentic_rl_scaling_law
-EPOCHS=50
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
+
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -140,6 +137,15 @@ n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
 train_prompt_bsz=512  # Reduced from 256 for mixed domain
 n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
+
+# 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
+Required_Train_step=1000
+EPOCHS=$((Required_Train_step * train_prompt_bsz / SAMPLE_SIZE))
+
+# =================== Logging Configuration ===================
+WANDB_PROJECT=agentic_rl_scaling_law
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
+
 
 # Dynamic batch size configuration
 use_dynamic_bsz=True
@@ -282,13 +288,13 @@ python3 -m verl.trainer.main_ppo \
     trainer.logger='["console", "wandb"]' \
     trainer.project_name=${WANDB_PROJECT} \
     trainer.experiment_name=${WANDB_EXPERIMENT_NAME} \
-    trainer.val_before_train=False \
+    trainer.val_before_train=True \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
     trainer.save_freq=10 \
     trainer.test_freq=5 \
     trainer.total_epochs=${EPOCHS} \
-    trainer.resume_mode=disable \
+    trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
     # +reward_model.daytona.max_concurrent=8 \
