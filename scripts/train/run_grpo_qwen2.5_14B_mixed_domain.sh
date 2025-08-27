@@ -23,7 +23,7 @@ export WANDB_MODE=offline
 # =================== SandboxFusion Configuration ===================
 # Enable SandboxFusion for code execution
 # export CODER1_EXEC=sandboxfusion
-# NUM_SANDBOX=8
+# NUM_SANDBOX=1
 # BASE_PORT=10086
 # SERVERS=""
 # for i in $(seq 0 $((NUM_SANDBOX-1))); do
@@ -39,7 +39,7 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=4096
+SAMPLE_SIZE=1000
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -103,7 +103,7 @@ else
 fi
 
 # Validation files - one per domain for mixed domain evaluation
-val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet']"
+val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet', '${VAL_DATA_DIR}/codegen__humaneval_164.parquet']"
 #  '${VAL_DATA_DIR}/codegen__humaneval_164.parquet'
 # =================== Model Configuration ===================
 MODEL_NAME=Qwen2.5-14B

@@ -103,7 +103,7 @@ else
 fi
 
 # Validation files - one per domain for mixed domain evaluation
-val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet']"
+val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet','${VAL_DATA_DIR}/codegen__humaneval_164.parquet']"
 #  '${VAL_DATA_DIR}/codegen__humaneval_164.parquet'
 # =================== Model Configuration ===================
 MODEL_NAME=Qwen2.5-7B
@@ -111,7 +111,8 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-EPOCHS=50
+Required_Train_step=1000
+
 WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
 
 # =================== GRPO Training Parameters ===================
@@ -141,6 +142,8 @@ train_prompt_bsz=512  # Reduced from 256 for mixed domain
 n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
 
+# 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
+EPOCHS=$((Required_Train_step * train_prompt_bsz / SAMPLE_SIZE))
 # Dynamic batch size configuration
 use_dynamic_bsz=True
 
@@ -288,7 +291,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=10 \
     trainer.test_freq=5 \
     trainer.total_epochs=${EPOCHS} \
-    trainer.resume_mode=disable \
+    trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
     # +reward_model.daytona.max_concurrent=8 \
