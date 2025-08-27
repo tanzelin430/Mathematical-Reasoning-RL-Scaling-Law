@@ -103,10 +103,10 @@ else
 fi
 
 # Validation files - one per domain for mixed domain evaluation
-val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet']"
+val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet']"
 #  '${VAL_DATA_DIR}/codegen__humaneval_164.parquet'
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
+MODEL_NAME=Qwen2.5-14B
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
@@ -149,8 +149,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=4  # Actor should be ~2x max sequence length
-rollout_seq_multiplier=6
+actor_seq_multiplier=10  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=15
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
@@ -166,7 +166,7 @@ sp_size=1
 
 # Memory optimization
 offload=False
-gpu_memory_utilization=0.7  # Reduced from 0.65 for stability with mixed domains
+gpu_memory_utilization=0.65  # Reduced from 0.65 for stability with mixed domains
 
 # =================== Conditional STEM LLM Judge Setup ===================
 start_stem_judge() {

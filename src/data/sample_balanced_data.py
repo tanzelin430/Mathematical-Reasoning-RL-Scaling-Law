@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
     
     # Calculate samples per domain
-    samples_per_domain = args.total_samples // 4
+    samples_per_domain = args.total_samples // 2
     print(f"Total samples: {args.total_samples}")
     print(f"Samples per domain: {samples_per_domain}")
     
@@ -26,12 +26,6 @@ def main():
     
     domain_files = {
         "math": ["math__combined_54.4k.parquet"],
-        "code": [
-            "codegen__leetcode2k_1.3k.parquet",
-            "codegen__livecodebench_440.parquet", 
-            "codegen__primeintellect_7.5k.parquet",
-            "codegen__taco_8.8k.parquet"
-        ],
         "logic": [
             "logic__arcagi1_111.parquet",
             "logic__arcagi2_190.parquet",
@@ -39,10 +33,16 @@ def main():
             "logic__graph_logical_1.2k.parquet",
             "logic__ordering_puzzle_1.9k.parquet",
             "logic__zebra_puzzle_1.3k.parquet"
-        ],
-        "stem": ["stem__web_3.6k.parquet"]
+        ]
     }
-    
+        # "stem": ["stem__web_3.6k.parquet"],
+        #     "code": [
+        #     "codegen__leetcode2k_1.3k.parquet",
+        #     "codegen__livecodebench_440.parquet", 
+        #     "codegen__primeintellect_7.5k.parquet",
+        #     "codegen__taco_8.8k.parquet"
+        # ],
+        # "stem": ["stem__web_3.6k.parquet"]
     # Create output directory structure
     output_path = Path(args.output_dir)
     
