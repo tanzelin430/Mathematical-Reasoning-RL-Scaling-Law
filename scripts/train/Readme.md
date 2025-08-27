@@ -1,4 +1,5 @@
-# 需要更改的参数
+# 个性化需要更改的参数
+- SAMPLE_SIZE
 - TRAINING_GPUS
 - AUTHOR_NAME
 - WANDB_DIR
