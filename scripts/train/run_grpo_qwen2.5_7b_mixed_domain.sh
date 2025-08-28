@@ -10,7 +10,7 @@ set -x
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
-export WANDB_DIR=/mnt/shared-storage-user/ma4agi-gpu/RLscaleckpt/wandb_${AUTHOR_NAME}
+export WANDB_DIR=~/Agentic-RL-Scaling-Law/wandb_${AUTHOR_NAME}
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
@@ -113,7 +113,7 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 WANDB_PROJECT=agentic_rl_scaling_law
 Required_Train_step=1000
 
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${SAMPLE_SIZE}
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -143,7 +143,8 @@ n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
-EPOCHS=$((Required_Train_step * train_prompt_bsz / SAMPLE_SIZE))
+Required_total_Traj = 100000
+EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
 # Dynamic batch size configuration
 use_dynamic_bsz=True
 

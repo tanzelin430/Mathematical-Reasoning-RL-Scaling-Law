@@ -10,7 +10,7 @@ set -x
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
-export WANDB_DIR=/mnt/shared-storage-user/ma4agi-gpu/RLscaleckpt/wandb_${AUTHOR_NAME}
+export WANDB_DIR=~/Agentic-RL-Scaling-Law/wandb_${AUTHOR_NAME}
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
@@ -67,7 +67,7 @@ if [ ! -z "$SAMPLE_SIZE" ]; then
     fi
     
     # Use sampled data files - get all parquet files from sampled directories
-    DOMAIN_NAME="mixed_all_domains_${SAMPLE_SIZE}"
+    DOMAIN_NAME="Math"
     # Find all parquet files in the sampled data directory
     SAMPLED_FILES=$(find ${SAMPLED_DATA_DIR} -name "*.parquet" -type f | sort)
     # Convert to Python list format
@@ -132,19 +132,19 @@ max_response_length=4096
 # Hardware Platform
 num_nodes=1
 n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
-
+# 512*512*8
 # Batch sizes (adjusted for GRPO and 7B model)
 train_prompt_bsz=512  # Reduced from 256 for mixed domain
 n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
-Required_Train_step=1000
-EPOCHS=$((Required_Train_step * train_prompt_bsz / SAMPLE_SIZE))
+Required_total_Traj = 100000
+EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${EPOCHS}
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${SAMPLE_SIZE}
 
 
 # Dynamic batch size configuration
@@ -155,8 +155,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=10  # Actor should be ~2x max sequence length
-rollout_seq_multiplier=15
+actor_seq_multiplier=8  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=10
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
