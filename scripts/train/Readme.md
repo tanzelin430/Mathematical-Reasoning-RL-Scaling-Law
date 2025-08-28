@@ -3,9 +3,11 @@
 - TRAINING_GPUS
 - AUTHOR_NAME
 - WANDB_DIR
-- Required_Train_step
+- Required_total_Traj
 - WANDB_MODE(如果您的集群可以联网，请设置为online，否则设置为offline)
 - WANDB_API_KEY
+- DOMAIN_NAME
+
 ## 如果您的显存不够，请减小以下参数值
 - train_prompt_bsz
 - train_prompt_mini_bsz

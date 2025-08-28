@@ -143,7 +143,7 @@ n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
-Required_total_Traj = 100000
+Required_total_Traj=100000
 EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
 # Dynamic batch size configuration
 use_dynamic_bsz=True
