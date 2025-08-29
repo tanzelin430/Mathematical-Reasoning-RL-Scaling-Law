@@ -39,7 +39,7 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=1000
+SAMPLE_SIZE=10000
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -139,7 +139,7 @@ n_resp_per_prompt=8  # GRPO needs multiple responses
 train_prompt_mini_bsz=128  # Reduced for mixed domain
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
-Required_total_Traj = 100000
+Required_total_Traj=100000
 EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
 
 # =================== Logging Configuration ===================
