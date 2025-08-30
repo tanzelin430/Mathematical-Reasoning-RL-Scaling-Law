@@ -57,6 +57,7 @@ def categorize_difficulty(pass_rate):
 def main():
     parser = argparse.ArgumentParser(description='Sample math data by difficulty levels')
     parser.add_argument('--total_samples', type=int, required=True, help='Total number of samples')
+    parser.add_argument('--batch_size', type=int, required=True, help='Batch size for training')
     parser.add_argument('--output_dir', type=str, default='../../data/difficulty_balanced_math', help='Output directory for sampled data')
     parser.add_argument('--seed', type=int, default=42, help='Random seed for sampling')
     args = parser.parse_args()
@@ -128,6 +129,34 @@ def main():
     
     print(f"\nTotal samples selected: {len(final_df)}")
     
+    # Handle small datasets by duplicating to reach batch size
+    original_size = len(final_df)
+    if original_size < args.batch_size:
+        print(f"\nDataset size ({original_size}) is smaller than batch size ({args.batch_size})")
+        print(f"Duplicating data to reach batch size...")
+        
+        # Calculate how many times to duplicate
+        num_duplicates = args.batch_size // original_size
+        remainder_to_add = args.batch_size % original_size
+        
+        # Create duplicated dataframes
+        duplicated_dfs = [final_df] * num_duplicates
+        
+        # Add partial duplicate if needed
+        if remainder_to_add > 0:
+            duplicated_dfs.append(final_df.iloc[:remainder_to_add])
+        
+        # Combine all duplicates
+        final_df = pd.concat(duplicated_dfs, ignore_index=True)
+        
+        # Re-sort by pass rate after duplication
+        final_df['sort_key'] = final_df['qwen2.5_7b_pass_rate'].fillna(0.0)
+        final_df = final_df.sort_values('sort_key', ascending=False).reset_index(drop=True)
+        final_df = final_df.drop('sort_key', axis=1)
+        
+        print(f"Created synthetic dataset: {original_size} samples duplicated to {len(final_df)} samples")
+        print(f"Duplication factor: {len(final_df) / original_size:.1f}x")
+    
     # Convert to VeRL format
     print("\nConverting to VeRL format...")
     unified_data = []
@@ -139,7 +168,12 @@ def main():
     output_path = Path(args.output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
-    output_file = output_path / f"math__difficulty_balanced_{len(final_df)}.parquet"
+    # Include both original size and final size in filename if duplicated
+    if original_size < args.batch_size:
+        output_file = output_path / f"math__difficulty_balanced_{original_size}_duplicated_to_{len(final_df)}.parquet"
+    else:
+        output_file = output_path / f"math__difficulty_balanced_{len(final_df)}.parquet"
+    
     pd.DataFrame(unified_data).to_parquet(output_file, engine='pyarrow')
     
     print(f"\nSaved to: {output_file}")
