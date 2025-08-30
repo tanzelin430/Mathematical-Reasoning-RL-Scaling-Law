@@ -25,12 +25,21 @@ def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
                 prompt_list[0]['content'] = content + " Please output the final answer within \\boxed{}."
                 prompt = np.array(prompt_list) if hasattr(prompt, 'tolist') else prompt_list
     
+    # Include pass rates in extra_info
+    extra_info = {"split": split, "index": idx}
+    
+    # Add pass rates if available
+    if pd.notna(row.get("qwen2.5_7b_pass_rate")):
+        extra_info["qwen2.5_7b_pass_rate"] = float(row["qwen2.5_7b_pass_rate"])
+    if pd.notna(row.get("qwen3_30b_pass_rate")):
+        extra_info["qwen3_30b_pass_rate"] = float(row["qwen3_30b_pass_rate"])
+    
     return {
             "data_source": row.get("data_source", "math_unknown"),
             "prompt": prompt,
             "ability": row.get("ability", "math"),
             "reward_model": row.get("reward_model", {}),
-            "extra_info": {"split": split, "index": idx}
+            "extra_info": extra_info
         }
 
 
@@ -197,7 +206,7 @@ def process_file(input_path: Path, output_path: Path, split: str) -> None:
 
 
 def main():
-    base_dir = Path('/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k')
+    base_dir = Path('/fs-computility/mabasic/shared/data/guru-RL-92k')
     files = [
         # Training data
         ("train/math__combined_54.4k.parquet", "train"),
