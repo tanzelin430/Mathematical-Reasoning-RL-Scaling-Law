@@ -37,7 +37,7 @@ import verl.utils.torch_functional as verl_F
 from verl import DataProto
 from verl.models.transformers.monkey_patch import apply_monkey_patch
 from verl.single_controller.base import Worker
-from verl.single_controller.base.decorator import Dispatch, register
+from verl.single_controller.base.decorator import Dispatch, Execute, register
 from verl.utils import hf_processor, hf_tokenizer
 from verl.utils.activation_offload import enable_activation_offloading
 from verl.utils.checkpoint.fsdp_checkpoint_manager import FSDPCheckpointManager
@@ -767,7 +767,7 @@ class ActorRolloutRefWorker(Worker):
         if self._is_offload_optimizer:
             offload_fsdp_optimizer(self.actor_optimizer)
     
-    @register(dispatch_mode=Dispatch.ALL_TO_ONE)
+    @register(dispatch_mode=Dispatch.ALL_TO_ALL, execute_mode=Execute.RANK_ZERO)
     def get_wandb_run_id(self):
         """Get wandb_run_id from checkpoint_manager if available."""
         return self.checkpoint_manager.get_wandb_run_id() if hasattr(self.checkpoint_manager, 'get_wandb_run_id') else None

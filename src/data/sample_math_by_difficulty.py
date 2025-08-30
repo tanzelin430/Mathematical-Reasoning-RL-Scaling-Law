@@ -72,7 +72,7 @@ def main():
         print(f"Remainder {remainder} will be added to the hard difficulty level")
     
     # Read original math data with pass rates
-    base_dir = Path("/fs-computility/mabasic/shared/data/guru-RL-92k/train")
+    base_dir = Path("/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train")
     math_file = base_dir / "math__combined_54.4k.parquet"
     
     print(f"\nReading data from: {math_file}")

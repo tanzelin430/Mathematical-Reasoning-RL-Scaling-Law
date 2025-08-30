@@ -48,15 +48,21 @@ CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 # Create checkpoint directory if it doesn't exist
 mkdir -p ${CHECKPOINT_DIR}      
 
+
+train_prompt_bsz=512  # Reduced from 256 for mixed domain
+n_resp_per_prompt=8  # GRPO needs multiple responses
+train_prompt_mini_bsz=128  # Reduced for mixed domain
+
 # =================== Check for balanced sampling ===================
 if [ ! -z "$SAMPLE_SIZE" ]; then
     echo "Using balanced sampling with total size: $SAMPLE_SIZE"
     
     # Create output directory for sampled data
-    SAMPLED_DATA_DIR=${SHARED_DATA_PATH}/balanced_samples/${SAMPLE_SIZE}
+    SAMPLED_DATA_DIR=${SHARED_DATA_PATH}/difficulty_balanced_math/${SAMPLE_SIZE}
     
     # Run the sampling script
-    python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/sample_balanced_data.py \
+    python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/sample_math_by_difficulty.py \
+        --batch_size ${train_prompt_bsz} \
         --total_samples ${SAMPLE_SIZE} \
         --output_dir ${SAMPLED_DATA_DIR}
     
@@ -67,7 +73,7 @@ if [ ! -z "$SAMPLE_SIZE" ]; then
     fi
     
     # Use sampled data files - get all parquet files from sampled directories
-    DOMAIN_NAME="Math"
+    DOMAIN_NAME="math_${SAMPLE_SIZE}"
     # Find all parquet files in the sampled data directory
     SAMPLED_FILES=$(find ${SAMPLED_DATA_DIR} -name "*.parquet" -type f | sort)
     # Convert to Python list format
@@ -134,17 +140,20 @@ num_nodes=1
 n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
 # 512*512*8
 # Batch sizes (adjusted for GRPO and 7B model)
-train_prompt_bsz=512  # Reduced from 256 for mixed domain
-n_resp_per_prompt=8  # GRPO needs multiple responses
-train_prompt_mini_bsz=128  # Reduced for mixed domain
+
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
 Required_total_Traj=100000
-EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
+if [ $SAMPLE_SIZE -lt $train_prompt_bsz ]; then
+    REAL_DATASET_SIZE=$train_prompt_bsz
+else
+    REAL_DATASET_SIZE=$SAMPLE_SIZE
+fi
+EPOCHS=$((Required_total_Traj / REAL_DATASET_SIZE))
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${SAMPLE_SIZE}
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin
 
 
 # Dynamic batch size configuration
@@ -245,7 +254,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=${max_response_length} \
     data.train_batch_size=${train_prompt_bsz} \
     data.filter_overlong_prompts=True \
-    data.shuffle=True \
+    data.shuffle=False \
     data.trust_remote_code=True \
     actor_rollout_ref.actor.use_kl_loss=${use_kl_loss} \
     actor_rollout_ref.actor.kl_loss_coef=${kl_loss_coef} \

@@ -39,7 +39,14 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=5000
+SAMPLE_SIZE=2
+
+
+# Batch sizes (adjusted for GRPO and 7B model)
+train_prompt_bsz=512  # Reduced from 256 for mixed domain
+n_resp_per_prompt=8  # GRPO needs multiple responses
+train_prompt_mini_bsz=128  # Reduced for mixed domain
+
 # =================== Output and Checkpoint Configuration ===================
 # Save checkpoints and outputs to results directory
 # Use absolute path to ensure checkpoints are saved in the correct location
@@ -53,10 +60,11 @@ if [ ! -z "$SAMPLE_SIZE" ]; then
     echo "Using balanced sampling with total size: $SAMPLE_SIZE"
     
     # Create output directory for sampled data
-    SAMPLED_DATA_DIR=${SHARED_DATA_PATH}/balanced_samples/${SAMPLE_SIZE}
+    SAMPLED_DATA_DIR=${SHARED_DATA_PATH}/difficulty_balanced_math/${SAMPLE_SIZE}
     
     # Run the sampling script
-    python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/sample_balanced_data.py \
+    python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/sample_math_by_difficulty.py \
+        --batch_size ${train_prompt_bsz} \
         --total_samples ${SAMPLE_SIZE} \
         --output_dir ${SAMPLED_DATA_DIR}
     
@@ -67,7 +75,7 @@ if [ ! -z "$SAMPLE_SIZE" ]; then
     fi
     
     # Use sampled data files - get all parquet files from sampled directories
-    DOMAIN_NAME="mixed_all_domains_${SAMPLE_SIZE}"
+    DOMAIN_NAME="math_${SAMPLE_SIZE}"
     # Find all parquet files in the sampled data directory
     SAMPLED_FILES=$(find ${SAMPLED_DATA_DIR} -name "*.parquet" -type f | sort)
     # Convert to Python list format
@@ -113,7 +121,7 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 WANDB_PROJECT=agentic_rl_scaling_law
 Required_Train_step=1000
 
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_${SAMPLE_SIZE}
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -137,14 +145,16 @@ max_response_length=4096
 num_nodes=1
 n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
 
-# Batch sizes (adjusted for GRPO and 7B model)
-train_prompt_bsz=512  # Reduced from 256 for mixed domain
-n_resp_per_prompt=8  # GRPO needs multiple responses
-train_prompt_mini_bsz=128  # Reduced for mixed domain
+
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
 Required_total_Traj=100000
-EPOCHS=$((Required_total_Traj / SAMPLE_SIZE))
+if [ $SAMPLE_SIZE -lt $train_prompt_bsz ]; then
+    REAL_DATASET_SIZE=$train_prompt_bsz
+else
+    REAL_DATASET_SIZE=$SAMPLE_SIZE
+fi
+EPOCHS=$((Required_total_Traj / REAL_DATASET_SIZE))
 # Dynamic batch size configuration
 use_dynamic_bsz=True
 
@@ -153,8 +163,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=4  # Actor should be ~2x max sequence length
-rollout_seq_multiplier=6
+actor_seq_multiplier=10  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=12
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
@@ -243,7 +253,7 @@ python3 -m verl.trainer.main_ppo \
     data.max_response_length=${max_response_length} \
     data.train_batch_size=${train_prompt_bsz} \
     data.filter_overlong_prompts=True \
-    data.shuffle=True \
+    data.shuffle=False \
     data.trust_remote_code=True \
     actor_rollout_ref.actor.use_kl_loss=${use_kl_loss} \
     actor_rollout_ref.actor.kl_loss_coef=${kl_loss_coef} \
@@ -289,7 +299,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
-    trainer.save_freq=10 \
+    trainer.save_freq=2 \
     trainer.test_freq=5 \
     trainer.total_epochs=${EPOCHS} \
     trainer.resume_mode=auto \
