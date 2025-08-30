@@ -909,7 +909,12 @@ class RayPPOTrainer:
         max_actor_ckpt_to_keep = self.config.trainer.get("max_actor_ckpt_to_keep", None) if not remove_previous_ckpt_in_save else 1
         max_critic_ckpt_to_keep = self.config.trainer.get("max_critic_ckpt_to_keep", None) if not remove_previous_ckpt_in_save else 1
 
-        self.actor_rollout_wg.save_checkpoint(actor_local_path, actor_remote_path, self.global_steps, max_ckpt_to_keep=max_actor_ckpt_to_keep)
+        # Get current wandb run id from logger if using wandb
+        wandb_run_id = None
+        if hasattr(self, '_current_logger') and self._current_logger:
+            wandb_run_id = self._current_logger.get_run_id()
+        
+        self.actor_rollout_wg.save_checkpoint(actor_local_path, actor_remote_path, self.global_steps, max_ckpt_to_keep=max_actor_ckpt_to_keep, wandb_run_id=wandb_run_id)
 
         if self.use_critic:
             critic_local_path = os.path.join(local_global_step_folder, "critic")
@@ -1002,17 +1007,28 @@ class RayPPOTrainer:
 
         from verl.utils.tracking import Tracking
 
+        self.global_steps = 0
+
+        # load checkpoint before doing anything
+        self._load_checkpoint()
+        
+        # Get wandb_run_id from checkpoint if we resumed (global_steps > 0 means we loaded a checkpoint)
+        wandb_run_id = None
+        if self.global_steps > 0:
+            wandb_run_id = self.actor_rollout_wg.get_wandb_run_id()
+            if wandb_run_id:
+                print(f"Resuming WandB run with ID: {wandb_run_id}")
+
         logger = Tracking(
             project_name=self.config.trainer.project_name,
             experiment_name=self.config.trainer.experiment_name,
             default_backend=self.config.trainer.logger,
             config=OmegaConf.to_container(self.config, resolve=True),
+            run_id=wandb_run_id,
         )
-
-        self.global_steps = 0
-
-        # load checkpoint before doing anything
-        self._load_checkpoint()
+        
+        # Store logger reference for checkpoint saving
+        self._current_logger = logger
 
         # perform validation before training
         # currently, we only support validation using the reward_function.

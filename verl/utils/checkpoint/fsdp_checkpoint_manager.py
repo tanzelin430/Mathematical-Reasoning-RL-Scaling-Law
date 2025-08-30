@@ -125,14 +125,24 @@ class FSDPCheckpointManager(BaseCheckpointManager):
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.load_state_dict(lr_scheduler_state_dict)
+        
+        # Store wandb_run_id as an instance attribute if it exists
+        if "wandb_run_id" in extra_state_dict:
+            self.wandb_run_id = extra_state_dict["wandb_run_id"]
+        else:
+            self.wandb_run_id = None
+    
+    def get_wandb_run_id(self):
+        """Get the loaded wandb_run_id if it exists."""
+        return getattr(self, 'wandb_run_id', None)
 
-    def save_checkpoint(self, local_path: str, hdfs_path: str = None, global_step: int = 0, max_ckpt_to_keep=None):
+    def save_checkpoint(self, local_path: str, hdfs_path: str = None, global_step: int = 0, max_ckpt_to_keep=None, wandb_run_id=None):
         """
         Save an FSDP checkpoint for this rank.
 
         Writes:
           - model & optimizer shard files
-          - extra state dict (scheduler + RNG)
+          - extra state dict (scheduler + RNG + wandb_run_id)
           - HF tokenizer/processor and model/config on rank 0
           - optional full HF model under 'huggingface/' if requested
 
@@ -143,6 +153,7 @@ class FSDPCheckpointManager(BaseCheckpointManager):
             hdfs_path: Unused (for API compatibility).
             global_step: Current training step (used for bookkeeping).
             max_ckpt_to_keep: Number of recent checkpoints to retain.
+            wandb_run_id: WandB run ID to save for resuming.
         """
         if local_path is None:
             return
@@ -175,6 +186,9 @@ class FSDPCheckpointManager(BaseCheckpointManager):
                     "lr_scheduler": lr_scheduler_state_dict,
                     "rng": self.get_rng_state(),
                 }
+                # Add wandb_run_id if provided
+                if wandb_run_id is not None:
+                    extra_state_dict["wandb_run_id"] = wandb_run_id
                 model_path = os.path.join(local_path, f"model_world_size_{self.world_size}_rank_{self.rank}.pt")
                 optim_path = os.path.join(local_path, f"optim_world_size_{self.world_size}_rank_{self.rank}.pt")
                 extra_path = os.path.join(local_path, f"extra_state_world_size_{self.world_size}_rank_{self.rank}.pt")

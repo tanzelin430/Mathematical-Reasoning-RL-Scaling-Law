@@ -715,14 +715,14 @@ class ActorRolloutRefWorker(Worker):
         return output
 
     @register(dispatch_mode=Dispatch.ONE_TO_ALL)
-    def save_checkpoint(self, local_path, hdfs_path=None, global_step=0, max_ckpt_to_keep=None):
+    def save_checkpoint(self, local_path, hdfs_path=None, global_step=0, max_ckpt_to_keep=None, wandb_run_id=None):
         # only support save and load ckpt for actor
         assert self._is_actor
 
         if self._is_offload_param:
             load_fsdp_model_to_gpu(self.actor_module_fsdp)
 
-        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, max_ckpt_to_keep=max_ckpt_to_keep)
+        self.checkpoint_manager.save_checkpoint(local_path=local_path, hdfs_path=hdfs_path, global_step=global_step, max_ckpt_to_keep=max_ckpt_to_keep, wandb_run_id=wandb_run_id)
         dist.barrier()
 
         if self._is_lora and hasattr(getattr(self, "actor_module", self.actor_module_fsdp), "peft_config"):
@@ -766,6 +766,11 @@ class ActorRolloutRefWorker(Worker):
 
         if self._is_offload_optimizer:
             offload_fsdp_optimizer(self.actor_optimizer)
+    
+    @register(dispatch_mode=Dispatch.ALL_TO_ONE)
+    def get_wandb_run_id(self):
+        """Get wandb_run_id from checkpoint_manager if available."""
+        return self.checkpoint_manager.get_wandb_run_id() if hasattr(self.checkpoint_manager, 'get_wandb_run_id') else None
 
 
 class CriticWorker(Worker):

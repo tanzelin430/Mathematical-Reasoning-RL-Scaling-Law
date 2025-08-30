@@ -35,7 +35,7 @@ class Tracking:
 
     supported_backend = ["wandb", "mlflow", "swanlab", "vemlp_wandb", "tensorboard", "console", "clearml"]
 
-    def __init__(self, project_name, experiment_name, default_backend: Union[str, List[str]] = "console", config=None):
+    def __init__(self, project_name, experiment_name, default_backend: Union[str, List[str]] = "console", config=None, run_id=None):
         if isinstance(default_backend, str):
             default_backend = [default_backend]
         for backend in default_backend:
@@ -47,6 +47,7 @@ class Tracking:
                 assert backend in self.supported_backend, f"{backend} is not supported"
 
         self.logger = {}
+        self.run_id = None  # Store the run ID for later access
 
         if "tracking" in default_backend or "wandb" in default_backend:
             import wandb
@@ -54,7 +55,15 @@ class Tracking:
             settings = None
             if config["trainer"].get("wandb_proxy", None):
                 settings = wandb.Settings(https_proxy=config["trainer"]["wandb_proxy"])
-            wandb.init(project=project_name, name=experiment_name, config=config, settings=settings)
+            
+            # If run_id is provided, use it for resuming
+            if run_id:
+                wandb_run = wandb.init(project=project_name, name=experiment_name, config=config, settings=settings, id=run_id, resume="allow")
+                print(f"Resuming WandB run with ID: {run_id}")
+            else:
+                wandb_run = wandb.init(project=project_name, name=experiment_name, config=config, settings=settings)
+            
+            self.run_id = wandb_run.id  # Store the run ID
             self.logger["wandb"] = wandb
 
         if "mlflow" in default_backend:
@@ -131,6 +140,10 @@ class Tracking:
         for default_backend, logger_instance in self.logger.items():
             if backend is None or default_backend in backend:
                 logger_instance.log(data=data, step=step)
+    
+    def get_run_id(self):
+        """Get the current run ID if using WandB."""
+        return self.run_id
 
     def __del__(self):
         if "wandb" in self.logger:
