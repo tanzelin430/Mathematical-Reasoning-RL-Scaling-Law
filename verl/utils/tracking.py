@@ -51,16 +51,23 @@ class Tracking:
 
         if "tracking" in default_backend or "wandb" in default_backend:
             import wandb
+            import os
 
             settings = None
             if config["trainer"].get("wandb_proxy", None):
                 settings = wandb.Settings(https_proxy=config["trainer"]["wandb_proxy"])
             
-            # If run_id is provided, use it for resuming
-            if run_id:
+            # Check if wandb is in offline mode
+            wandb_mode = os.environ.get("WANDB_MODE", "online")
+            
+            # If run_id is provided and we're not in offline mode, use it for resuming
+            if run_id and wandb_mode != "offline":
                 wandb_run = wandb.init(project=project_name, name=experiment_name, config=config, settings=settings, id=run_id, resume="allow")
                 print(f"Resuming WandB run with ID: {run_id}")
             else:
+                # In offline mode or no run_id, always create a new run
+                if run_id and wandb_mode == "offline":
+                    print(f"WandB is in offline mode. Cannot resume run {run_id}. Creating new run.")
                 wandb_run = wandb.init(project=project_name, name=experiment_name, config=config, settings=settings)
             
             self.run_id = wandb_run.id  # Store the run ID
