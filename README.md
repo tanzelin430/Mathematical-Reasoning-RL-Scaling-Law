@@ -84,8 +84,8 @@ Agentic-RL-Scaling-Law/
 ## 🐛 Troubleshooting
 
 - **SandboxFusion not responding**: Check ports 8080-808X are free
-- **OOM errors**: Reduce batch size or use gradient checkpointing
-- **Code format issues**: Model must output code in \`\`\`python blocks
+- **OOM errors**: Reduce batch size or Seq length Multiplier
+- **GPU Cluster has no internet access**: Use Wandb Offline Mode, if the training process is split into multiple parts, you can use wandb sync and wandb sync --append
 
 ## 🔗 Acknowledgments
 
