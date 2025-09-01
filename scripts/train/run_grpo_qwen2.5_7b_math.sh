@@ -39,7 +39,7 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=2
+SAMPLE_SIZE=10
 
 
 # Batch sizes (adjusted for GRPO and 7B model)
@@ -114,7 +114,7 @@ fi
 val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet','${VAL_DATA_DIR}/codegen__humaneval_164.parquet']"
 #  '${VAL_DATA_DIR}/codegen__humaneval_164.parquet'
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
+MODEL_NAME=Qwen2.5-0.5B
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
@@ -299,9 +299,10 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.nnodes=${num_nodes} \
-    trainer.save_freq=2 \
+    trainer.save_freq=50 \
     trainer.test_freq=5 \
     trainer.total_epochs=${EPOCHS} \
+    trainer.max_actor_ckpt_to_keep=1 \
     trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
