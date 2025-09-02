@@ -8,7 +8,7 @@ set -x
 # STEM_JUDGE_GPU=0,1,2,3  # GPU for STEM LLM Judge (separate from training GPUs)
 
 # GPU Configuration
-TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
+TRAINING_GPUS="0,1,2,3"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
 export WANDB_DIR=~/Agentic-RL-Scaling-Law/wandb_${AUTHOR_NAME}
 mkdir -p $WANDB_DIR
@@ -114,7 +114,7 @@ fi
 val_files="['${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet','${VAL_DATA_DIR}/codegen__humaneval_164.parquet']"
 #  '${VAL_DATA_DIR}/codegen__humaneval_164.parquet'
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
+MODEL_NAME=Qwen2.5-1.5B
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
@@ -142,7 +142,7 @@ max_response_length=4096
 
 # Hardware Platform
 num_nodes=1
-n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
+n_gpus_per_node=4  # Default to 7 GPUs (GPU 0 reserved for vLLM)
 
 
 
@@ -162,8 +162,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=10  # Actor should be ~2x max sequence length
-rollout_seq_multiplier=12
+actor_seq_multiplier=14  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=16
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
@@ -289,12 +289,12 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.val_kwargs.do_sample=True \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=False \
-    actor_rollout_ref.rollout.max_num_seqs=64 \
+    actor_rollout_ref.rollout.max_num_seqs=128 \
     actor_rollout_ref.model.path=${BASE_MODEL} \
     actor_rollout_ref.model.trust_remote_code=True \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
-    reward_model.reward_manager=Prime \
+    reward_model.reward_manager=naive \
     trainer.critic_warmup=0 \
     trainer.logger='["console", "wandb"]' \
     trainer.project_name=${WANDB_PROJECT} \

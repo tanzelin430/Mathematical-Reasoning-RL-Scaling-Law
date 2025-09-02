@@ -73,7 +73,6 @@ def load_reward_manager(config, tokenizer, num_examine, **reward_kwargs):
         reward_manager_cls = BatchRewardManager
     elif reward_manager_name == "dapo":
         from verl.workers.reward_manager import DAPORewardManager
-
         reward_manager_cls = DAPORewardManager
     else:
         raise NotImplementedError
