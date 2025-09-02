@@ -476,6 +476,7 @@ def match_answer(response):
 
 import math
 
+@timeout(timeout_seconds=10)
 def compute_score(solution_str: str,
                   ground_truth: str,
                   extra_info: dict) -> float:
@@ -489,46 +490,57 @@ def compute_score(solution_str: str,
     Returns:
         Reward score (1.0 for correct, -1.0 for incorrect)
     """
-    # First assert intended generation and gt type
-    model_output = str(solution_str)
-    ground_truth = str(ground_truth)
+    try:
+        # First assert intended generation and gt type
+        model_output = str(solution_str)
+        ground_truth = str(ground_truth)
 
-    # Extract answer from generated output
-    is_matched, extracted_model_output = match_answer(model_output)
-    
-    # TWK NOTE: WE REMOVED THE RESPONSE TRUNCATION FROM math_dapo.compute_score
+        # Extract answer from generated output
+        is_matched, extracted_model_output = match_answer(model_output)
+        
+        # TWK NOTE: WE REMOVED THE RESPONSE TRUNCATION FROM math_dapo.compute_score
 
-    # Verify the solution, first check simple comparisons.
-    correct, pred = grade_answer(extracted_model_output, ground_truth)
+        # Verify the solution, first check simple comparisons.
+        correct, pred = grade_answer(extracted_model_output, ground_truth)
 
-    if not correct: 
-        try:
-            if "\\pi" in extracted_model_output or "\\pi" in ground_truth:
-                equivs = []
-                for pi in [math.pi, 3.14]:
-                    equivs.append(math_equal(extracted_model_output, ground_truth, tiemout=True, pi=pi))
-                    correct = any(equivs)
-            else:
-                correct = math_equal(extracted_model_output, ground_truth, timeout=True)
-        except:
-            correct = False
+        if not correct: 
+            try:
+                if "\\pi" in extracted_model_output or "\\pi" in ground_truth:
+                    equivs = []
+                    for pi in [math.pi, 3.14]:
+                        equivs.append(math_equal(extracted_model_output, ground_truth, tiemout=True, pi=pi))
+                        correct = any(equivs)
+                else:
+                    correct = math_equal(extracted_model_output, ground_truth, timeout=True)
+            except:
+                correct = False
 
 
-    # Reward logic:
-    # - Answer correct: reward = 1.0
-    # - Format correct but answer wrong: reward = -0.5
-    # - Format wrong and answer wrong: reward = -1.0
-    
-    # if correct:
-    #     reward = 1.0
-    # elif is_matched:  # Format is correct (has \\boxed{}) but answer is wrong
-    #     reward = -0.5
-    # else:  # Both format and answer are wrong
-    #     reward = -1.0
-    reward = 1.0 if correct else 0.
-    acc = correct
+        # Reward logic:
+        # - Answer correct: reward = 1.0
+        # - Format correct but answer wrong: reward = -0.5
+        # - Format wrong and answer wrong: reward = -1.0
+        
+        # if correct:
+        #     reward = 1.0
+        # elif is_matched:  # Format is correct (has \\boxed{}) but answer is wrong
+        #     reward = -0.5
+        # else:  # Both format and answer are wrong
+        #     reward = -1.0
+        reward = 1.0 if correct else 0.
+        acc = correct
 
-    return {
-        "score": reward,
-        "acc": acc,
-    }
+        return {
+            "score": reward,
+            "acc": acc,
+        }
+    except TimeoutError:
+        error_msg = (
+            f"Timeout after 10 seconds while computing score!\n"
+            f"Answer being validated: {solution_str[:500]}{'...' if len(solution_str) > 500 else ''}\n"
+            f"Ground truth: {ground_truth}"
+        )
+        return {
+            "score": 0.0,
+            "acc": 0.0,
+        }
