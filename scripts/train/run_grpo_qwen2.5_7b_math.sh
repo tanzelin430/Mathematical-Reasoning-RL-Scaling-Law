@@ -39,7 +39,7 @@ export WANDB_MODE=offline
 SHARED_DATA_PATH=../../data/guru_verl
 TRAIN_DATA_DIR=${SHARED_DATA_PATH}/train/
 VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
-SAMPLE_SIZE=500
+SAMPLE_SIZE=1000
 
 
 # Batch sizes (adjusted for GRPO and 7B model)
@@ -148,12 +148,12 @@ n_gpus_per_node=8  # Default to 7 GPUs (GPU 0 reserved for vLLM)
 
 # 根据train_step计算EPOCHS,epoch = (total_steps × train_prompt_bsz) ÷ data_sample_size
 Required_total_Traj=100000
-if [ $SAMPLE_SIZE -lt $train_prompt_bsz ]; then
-    REAL_DATASET_SIZE=$train_prompt_bsz
-else
-    REAL_DATASET_SIZE=$SAMPLE_SIZE
-fi
-EPOCHS=$((Required_total_Traj / REAL_DATASET_SIZE))
+# if [ $SAMPLE_SIZE -lt $train_prompt_bsz ]; then
+#     REAL_DATASET_SIZE=$train_prompt_bsz
+# else
+#     REAL_DATASET_SIZE=$SAMPLE_SIZE
+# fi
+EPOCHS=$((Required_total_Traj / train_prompt_bsz))
 # Dynamic batch size configuration
 use_dynamic_bsz=True
 
@@ -301,6 +301,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.val_before_train=False \
     trainer.n_gpus_per_node=${n_gpus_per_node} \
     trainer.test_freq=5 \
+    trainer.save_freq=10 \
     trainer.total_epochs=${EPOCHS} \
     trainer.max_actor_ckpt_to_keep=1 \
     trainer.resume_mode=auto \

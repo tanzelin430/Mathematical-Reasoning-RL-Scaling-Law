@@ -46,7 +46,6 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
             )
         else:
             # Default
-            print("Using naive_dapo for math")
             from . import naive_dapo
             res = naive_dapo.compute_score(solution_str, ground_truth, extra_info=extra_info)
     # code generation
