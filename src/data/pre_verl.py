@@ -34,6 +34,8 @@ def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     if pd.notna(row.get("qwen3_30b_pass_rate")):
         extra_info["qwen3_30b_pass_rate"] = float(row["qwen3_30b_pass_rate"])
     
+    math_prefix = "You are a knowledgeable math assistant. Answer the following questions and think step by step. "
+    prompt[0]['content'] = math_prefix + prompt[0]['content']
     return {
             "data_source": row.get("data_source", "math_unknown"),
             "prompt": prompt,
@@ -182,23 +184,115 @@ def unify_stem_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
     return data
 
 
+def unify_aime_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
+    """Process AIME data - competition math problems requiring boxed format"""
+    problem = str(row.get('problem', ''))
+    answer = str(row.get('answer', ''))
+    
+    # Add instruction for AIME format (boxed answer)
+    AIME_INSTRUCTION = " Please solve step by step and put your final answer within \\boxed{}."
+    AIME_PREFIX = "You are a knowledgeable math assistant. Answer the following questions and think step by step. "
+    problem = AIME_PREFIX + problem
+    if not problem.endswith(AIME_INSTRUCTION):
+        problem += AIME_INSTRUCTION
+    
+    data = {
+        "data_source": "aime2024",  # This will trigger math_dapo scorer
+        "prompt": [{"role": "user", "content": problem}],
+        "ability": "math", 
+        "reward_model": {"style": "rule", "ground_truth": answer},
+        "extra_info": {"split": split, "index": idx}
+    }
+    return data
+
+
+def unify_gsm8k_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
+    """Process GSM8K data - math word problems now requiring boxed format in answers"""
+    question = str(row.get('question', ''))
+    answer = str(row.get('answer', ''))
+    
+    # Extract the final numeric answer from #### format
+    ground_truth = ""
+    if '####' in answer:
+        # Get the part after ####
+        ground_truth = answer.split('####')[-1].strip()
+    else:
+        ground_truth = answer.strip()
+    
+    # Add instruction for boxed format (changed from #### to \boxed{})
+    GSM8K_INSTRUCTION = " Please solve step by step and put your final answer within \\boxed{}."
+    GSM8K_PREFIX = "You are a knowledgeable math assistant. Answer the following questions and think step by step. "
+    question = GSM8K_PREFIX + question
+    if not question.endswith(GSM8K_INSTRUCTION):
+        question += GSM8K_INSTRUCTION
+    
+    data = {
+        "data_source": "openai/gsm8k",  # This will trigger gsm8k scorer
+        "prompt": [{"role": "user", "content": question}],
+        "ability": "math",
+        "reward_model": {"style": "rule", "ground_truth": ground_truth},
+        "extra_info": {"split": split, "index": idx}
+    }
+    return data
+
+def unify_amc_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
+    """Process AMC data - American Mathematics Competitions requiring boxed format"""
+    # Use 'problem' field for question, 'question' seems to be duplicate
+    problem = str(row.get('problem', ''))
+    answer = str(row.get('answer', ''))
+    
+    # Add instruction for AMC format (boxed answer)
+    AMC_INSTRUCTION = " Please output the final answer within \\boxed{}."
+    AMC_PREFIX = "You are a knowledgeable math assistant. Answer the following questions and think step by step. "
+    problem = AMC_PREFIX + problem
+    if not problem.endswith(AMC_INSTRUCTION):
+        problem += AMC_INSTRUCTION
+    
+    data = {
+        "data_source": "aimeamc2023",  # This will trigger math_dapo scorer (starts with 'aime')
+        "prompt": [{"role": "user", "content": problem}],
+        "ability": "math",
+        "reward_model": {"style": "rule", "ground_truth": answer},
+        "extra_info": {"split": split, "index": idx}
+    }
+    return data
+
 def process_file(input_path: Path, output_path: Path, split: str) -> None:
     df = pd.read_parquet(input_path)
     unified: List[Dict[str, Any]] = []
-    domain = input_path.stem.split('__')[0]
-
-    for idx, row in df.iterrows():
-        if domain == 'math':
-            rec = unify_math_data(row, idx, split)
-        elif domain in ('codegen', 'code'):
-            rec = unify_code_data(row, idx, split, input_path.name)
-        elif domain == 'logic':
-            rec = unify_logic_data(row, idx, split)
-        elif domain == 'stem':
-            rec = unify_stem_data(row, idx, split)
-        else:
-            continue
-        unified.append(rec)
+    
+    # Determine data type from file path
+    file_name = input_path.name.lower()
+    if 'aime' in file_name:
+        # AIME data
+        for idx, row in df.iterrows():
+            rec = unify_aime_data(row, idx, split)
+            unified.append(rec)
+    elif 'gsm8k' in file_name:
+        # GSM8K data
+        for idx, row in df.iterrows():
+            rec = unify_gsm8k_data(row, idx, split)
+            unified.append(rec)
+    elif 'amc' in file_name:
+        # AMC data
+        for idx, row in df.iterrows():
+            rec = unify_amc_data(row, idx, split)
+            unified.append(rec)
+    else:
+        # Original guru-RL-92k data
+        domain = input_path.stem.split('__')[0]
+        for idx, row in df.iterrows():
+            if domain == 'math':
+                rec = unify_math_data(row, idx, split)
+            elif domain in ('codegen', 'code'):
+                rec = unify_code_data(row, idx, split, input_path.name)
+            elif domain == 'logic':
+                rec = unify_logic_data(row, idx, split)
+            elif domain == 'stem':
+                rec = unify_stem_data(row, idx, split)
+            else:
+                continue
+            unified.append(rec)
 
     # Save as JSONL or parquet of dicts
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -227,6 +321,9 @@ def main():
         ("online_eval/codegen__humaneval_164.parquet", "val"),
         ("online_eval/logic__zebra_puzzle_dataset_200.parquet", "val"),
         ("online_eval/stem__supergpqa_200.parquet", "val"),
+        ("online_eval/aime2024.parquet", "val"),
+        ("online_eval/gsm8k.parquet", "val"),
+        ("online_eval/amc2023.parquet", "val"),
     ]
 
     for rel, split in files:

@@ -214,7 +214,7 @@ def is_correct_strict_box(pred: str, gt: str, pause_tokens_index: Optional[list[
     return 1 if (extracted_pred == gt) else -1, extracted_pred
 
 
-def verify(solution_str: str, answer: str, strict_box_verify: bool = False, pause_tokens_index: Optional[list[int]] = None) -> bool:
+def verify(solution_str: str, answer: str, strict_box_verify: bool = True, pause_tokens_index: Optional[list[int]] = None) -> bool:
     """Verify if the solution is correct.
 
     Args:
@@ -237,7 +237,7 @@ def verify(solution_str: str, answer: str, strict_box_verify: bool = False, paus
 def compute_score(
     solution_str: str,
     ground_truth: str,
-    strict_box_verify: bool = False,
+    strict_box_verify: bool = True,
     pause_tokens_index: Optional[list[int]] = None,
 ) -> float:
     """Compute the reward score for a solution.
@@ -249,19 +249,17 @@ def compute_score(
         pause_tokens_index: Indices of pause tokens
 
     Returns:
-        Reward score (1.0 for correct, -1.0 for incorrect)
+        Reward score (1.0 for correct, 0 for incorrect)
     """
     # Limit solution length for efficiency
     solution_str = solution_str[-300:]  # The longest answer in MATH-500 has 159 characters
 
     # Verify the solution
-    correct, pred = verify(solution_str, ground_truth, strict_box_verify, pause_tokens_index)
+    correct, pred = verify(solution_str, ground_truth, True, pause_tokens_index)
 
-    reward = 1.0 if correct else -1.0
+    reward = 1.0 if correct else 0
     acc = correct
-
     return {
         "score": reward,
         "acc": acc,
-        "pred": pred,
     }

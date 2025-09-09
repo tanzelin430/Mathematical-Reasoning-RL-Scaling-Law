@@ -135,7 +135,6 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
         # res = math_verify.compute_score(solution_str, ground_truth)
     elif data_source == "math_dapo" or data_source.startswith("aime"):
         from . import math_dapo
-
         res = math_dapo.compute_score(solution_str, ground_truth)
     elif data_source in [
         "numina_aops_forum",

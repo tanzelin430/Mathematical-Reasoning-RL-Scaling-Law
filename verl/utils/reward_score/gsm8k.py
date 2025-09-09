@@ -13,51 +13,121 @@
 # limitations under the License.
 
 import re
+from typing import Optional
 
 
-def extract_solution(solution_str, method="strict"):
-    assert method in ["strict", "flexible"]
+def _last_boxed_only_string(string: str) -> Optional[str]:
+    """Extract the last LaTeX boxed expression from a string.
+    
+    Args:
+        string: Input string containing LaTeX code
+        
+    Returns:
+        The last boxed expression or None if not found
+    """
+    idx = string.rfind("\\boxed{")
+    if idx < 0:
+        return None
 
-    if method == "strict":
-        # this also tests the formatting of the model
-        solution = re.search("#### (\\-?[0-9\\.\\,]+)", solution_str)
-        if solution is None:
-            final_answer = None
-        else:
-            final_answer = solution.group(0)
-            final_answer = final_answer.split("#### ")[1].replace(",", "").replace("$", "")
-    elif method == "flexible":
-        answer = re.findall("(\\-?[0-9\\.\\,]+)", solution_str)
-        final_answer = None
-        if len(answer) == 0:
-            # no reward is there is no answer
+    i = idx
+    right_brace_idx = None
+    num_left_braces_open = 0
+
+    while i < len(string):
+        if string[i] == "{":
+            num_left_braces_open += 1
+        if string[i] == "}":
+            num_left_braces_open -= 1
+            if num_left_braces_open == 0:
+                right_brace_idx = i
+                break
+        i += 1
+
+    return string[idx : right_brace_idx + 1] if right_brace_idx is not None else None
+
+
+def _remove_boxed(s: str) -> str:
+    """Remove the LaTeX boxed command from a string.
+    
+    Args:
+        s: String with format "\\boxed{content}"
+        
+    Returns:
+        The content inside the boxed command
+    """
+    left = "\\boxed{"
+    assert s[: len(left)] == left, f"box error: {s}"
+    assert s[-1] == "}", f"box error: {s}"
+    return s[len(left) : -1]
+
+
+def _normalize_number(num_str: str) -> str:
+    """Normalize a number string by removing commas and dollar signs."""
+    if num_str is None:
+        return None
+    return num_str.replace(",", "").replace("$", "").strip()
+
+
+def extract_boxed_answer(solution_str: str) -> Optional[str]:
+    """Extract answer from boxed format in GSM8K solutions.
+    
+    Args:
+        solution_str: The solution string
+        
+    Returns:
+        Extracted and normalized answer or None if not found
+    """
+    # First try to find boxed answer
+    boxed = _last_boxed_only_string(solution_str)
+    if boxed is not None:
+        try:
+            extracted = _remove_boxed(boxed)
+            return _normalize_number(extracted)
+        except:
             pass
-        else:
-            invalid_str = ["", "."]
-            # find the last number that is not '.'
-            for final_answer in reversed(answer):
-                if final_answer not in invalid_str:
-                    break
-    return final_answer
+    
+    # Fallback: try to find #### format (for backward compatibility)
+    solution = re.search(r"#### (\-?[0-9\.\,]+)", solution_str)
+    if solution is not None:
+        answer = solution.group(1)
+        return _normalize_number(answer)
+    
+    # Last resort: find the last number in the text
+    numbers = re.findall(r"(\-?[0-9\.\,]+)", solution_str)
+    if numbers:
+        # Filter out invalid strings
+        invalid_strs = ["", ".", "0."]
+        for num in reversed(numbers):
+            normalized = _normalize_number(num)
+            if normalized not in invalid_strs and len(normalized) > 0:
+                return normalized
+    
+    return None
 
 
-def compute_score(solution_str, ground_truth, method="strict", format_score=0.0, score=1.0):
-    """The scoring function for GSM8k.
-
-    Reference: Trung, Luong, et al. "Reft: Reasoning with reinforced fine-tuning." Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers). 2024.
+def compute_score(solution_str: str, ground_truth: str, method="boxed", format_score=0.0, score=1.0):
+    """The scoring function for GSM8k using boxed format.
 
     Args:
         solution_str: the solution text
-        ground_truth: the ground truth
-        method: the method to extract the solution, choices are 'strict' and 'flexible'
-        format_score: the score for the format
+        ground_truth: the ground truth answer
+        method: the method to extract the solution (kept for compatibility, always uses boxed)
+        format_score: the score for partial credit (format correct but answer wrong)
         score: the score for the correct answer
     """
-    answer = extract_solution(solution_str=solution_str, method=method)
-    if answer is None:
-        return 0
+    # Extract answer using boxed format
+    extracted_answer = extract_boxed_answer(solution_str)
+    
+    if extracted_answer is None:
+        # No answer found at all
+        return {"score": 0.0, "acc": 0.0}
+    
+    # Normalize ground truth
+    normalized_gt = _normalize_number(str(ground_truth))
+    
+    # Check if answers match
+    if extracted_answer == normalized_gt:
+        return {"score": score, "acc": 1.0}
     else:
-        if answer == ground_truth:
-            return score
-        else:
-            return format_score
+        # Answer found but incorrect - give partial credit for format
+        return {"score": format_score, "acc": 0.0}
