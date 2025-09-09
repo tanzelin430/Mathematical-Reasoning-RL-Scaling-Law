@@ -37,13 +37,14 @@ export WANDB_MODE=offline
 # =================== Data Configuration ===================
 # Prepare difficulty-ordered math dataset
 OUTPUT_DATA_DIR="../../data/math_curriculum"
-mkdir -p ${OUTPUT_DATA_DIR}
 
-echo "Preparing curriculum math dataset..."
-python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_dificulty_full.py \
-    --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
-    --output_dir="${OUTPUT_DATA_DIR}" \
-    --test_size=500
+# mkdir -p ${OUTPUT_DATA_DIR}
+
+# echo "Preparing curriculum math dataset..."
+# python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_difficulty_full.py \
+#     --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
+#     --output_dir="${OUTPUT_DATA_DIR}" \
+#     --test_size=500
 
 # Check if data preparation was successful
 if [ $? -ne 0 ]; then
@@ -129,13 +130,13 @@ rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # S
 
 # Sampling parameters
 temperature=1.0
-top_p=1.0
-top_k=-1
+# top_p=1.0
+# top_k=-1
 
 #validation parameters
 val_temperature=0.7
-val_top_p=1.0
-val_top_k=-1
+# val_top_p=1.0
+# val_top_k=-1
 
 # Model parallelism settings
 gen_tp=1

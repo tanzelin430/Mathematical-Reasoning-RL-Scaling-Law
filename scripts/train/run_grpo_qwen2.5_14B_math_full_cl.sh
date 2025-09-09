@@ -40,7 +40,7 @@ OUTPUT_DATA_DIR="../../data/math_curriculum"
 mkdir -p ${OUTPUT_DATA_DIR}
 
 echo "Preparing curriculum math dataset..."
-python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_dificulty_full.py \
+python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_difficulty_full.py \
     --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
     --output_dir="${OUTPUT_DATA_DIR}" \
     --test_size=500
