@@ -15,7 +15,7 @@ Basic Info: Python 3.12 Cuda 12.4 torch 2.6.0
 git clone https://github.com/your-repo/Agentic-RL-Scaling-Law.git
 cd Agentic-RL-Scaling-Law
 pip install -r requirements.txt
-pip install -e verl[gpu,test,math,vllm,code]
+pip install -e .[gpu,test,math,vllm,code]
 
 # Prepare data
 python src/data/pre_verl.py
