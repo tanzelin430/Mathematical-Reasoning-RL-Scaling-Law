@@ -14,6 +14,7 @@
 
 import re
 from typing import Optional
+from math_verify import parse, verify
 
 
 def _last_boxed_only_string(string: str) -> Optional[str]:
@@ -62,10 +63,52 @@ def _remove_boxed(s: str) -> str:
 
 
 def _normalize_number(num_str: str) -> str:
-    """Normalize a number string by removing commas and dollar signs."""
+    """Normalize a number string by removing commas, dollar signs, and other common units."""
     if num_str is None:
         return None
-    return num_str.replace(",", "").replace("$", "").strip()
+    
+    # Start with the input string
+    result = num_str.strip()
+    
+    # Handle LaTeX formatting (similar to naive_dapo.py)
+    # Remove LaTeX text commands: \text{...} -> content
+    result = re.sub(r'\\text\{([^}]*)\}', r'\1', result)
+    
+    # Remove LaTeX textbf commands: \textbf{...} -> content  
+    result = re.sub(r'\\textbf\{([^}]*)\}', r'\1', result)
+    
+    # Handle LaTeX escaped characters
+    result = result.replace('\\$', '$').replace('\\%', '%')
+    
+    # Remove dollar signs and percent signs
+    result = result.replace("$", "").replace("%", "")
+    
+    # Remove commas in numbers
+    result = result.replace(",", "")
+    
+    # Remove common unit words at the end (similar to naive_dapo.py approach)
+    for unit in ["dollars", "dollar", "cents", "cent", "percent", "percentage", 
+                 "points", "point", "units", "unit", "degrees", "degree",
+                 "feet", "foot", "inches", "inch", "meters", "meter", "miles", "mile",
+                 "cm", "mm", "kg", "pounds", "pound", "hours", "hour",
+                 "minutes", "minute", "seconds", "second", "days", "day"]:
+        # Remove unit words at the end with optional 's' and whitespace
+        pattern = rf'\s*{unit}s?\s*$'
+        result = re.sub(pattern, '', result, flags=re.IGNORECASE)
+    
+    # Clean up any remaining whitespace
+    result = result.strip()
+    
+    # Handle decimal numbers - if it's a valid float that's also an integer, convert to int string
+    try:
+        if '.' in result:
+            float_val = float(result)
+            if float_val.is_integer():
+                result = str(int(float_val))
+    except ValueError:
+        pass
+        
+    return result
 
 
 def extract_boxed_answer(solution_str: str) -> Optional[str]:
@@ -129,5 +172,14 @@ def compute_score(solution_str: str, ground_truth: str, method="boxed", format_s
     if extracted_answer == normalized_gt:
         return {"score": score, "acc": 1.0}
     else:
+        # If our parser says it's wrong, try Math-Verify as fallback
+        try:
+            gold_parsed = parse(str(ground_truth))
+            answer_parsed = parse(str(solution_str))
+            if verify(gold_parsed, answer_parsed):
+                return {"score": score, "acc": 1.0}
+        except:
+            pass
+        
         # Answer found but incorrect - give partial credit for format
         return {"score": format_score, "acc": 0.0}

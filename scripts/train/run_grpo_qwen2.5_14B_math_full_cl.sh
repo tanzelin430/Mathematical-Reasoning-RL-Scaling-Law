@@ -10,7 +10,7 @@ set -x
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
-export WANDB_DIR=~/Agentic-RL-Scaling-Law/wandb_${AUTHOR_NAME}
+export WANDB_DIR=/mnt/shared-storage-user/ma4agi-gpu/wandb_tanzl
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
@@ -37,13 +37,13 @@ export WANDB_MODE=offline
 # =================== Data Configuration ===================
 # Prepare difficulty-ordered math dataset
 OUTPUT_DATA_DIR="../../data/math_curriculum"
-mkdir -p ${OUTPUT_DATA_DIR}
+# mkdir -p ${OUTPUT_DATA_DIR}
 
-echo "Preparing curriculum math dataset..."
-python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_difficulty_full.py \
-    --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
-    --output_dir="${OUTPUT_DATA_DIR}" \
-    --test_size=500
+# echo "Preparing curriculum math dataset..."
+# python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_difficulty_full.py \
+#     --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
+#     --output_dir="${OUTPUT_DATA_DIR}" \
+#     --test_size=500
 
 # Check if data preparation was successful
 if [ $? -ne 0 ]; then
@@ -86,7 +86,7 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 WANDB_PROJECT=agentic_rl_scaling_law
 
 DOMAIN_NAME="math_curriculum_full"
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL_run0
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -138,7 +138,7 @@ val_top_p=1.0
 val_top_k=-1
 
 # Model parallelism settings
-gen_tp=2
+gen_tp=1
 sp_size=1
 
 # Memory optimization
@@ -267,7 +267,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=1 \
     trainer.save_freq=10 \
     trainer.total_epochs=${EPOCHS} \
-    trainer.max_actor_ckpt_to_keep=10 \
+    trainer.max_actor_ckpt_to_keep=5 \
     trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \

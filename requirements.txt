@@ -14,4 +14,5 @@ hydra-core==1.3.2
 omegaconf==2.3.0
 tensorboard==2.16.2
 scikit-learn>=1.3.0
+math-verify[antlr4_9_3]
 daytona_sdk

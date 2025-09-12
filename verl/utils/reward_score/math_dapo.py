@@ -15,6 +15,7 @@
 
 import re
 from typing import Optional
+from math_verify import parse, verify as math_verify_verify
 
 
 def last_boxed_only_string(string: str) -> Optional[str]:
@@ -257,6 +258,15 @@ def compute_score(
     # Verify the solution
     correct, pred = verify(solution_str, ground_truth, True, pause_tokens_index)
 
+    # If our parser says it's wrong, try Math-Verify as fallback
+    if not correct:
+        try:
+            gold_parsed = parse(ground_truth)
+            answer_parsed = parse(solution_str)
+            correct = math_verify_verify(gold_parsed, answer_parsed)
+        except:
+            pass
+    
     reward = 1.0 if correct else 0
     acc = correct
     return {

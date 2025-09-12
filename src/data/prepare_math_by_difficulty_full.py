@@ -15,39 +15,38 @@ import pandas as pd
 
 
 def unify_math_data(row: pd.Series, idx: int, split: str) -> Dict[str, Any]:
-    """Apply VeRL-like format to math data (aligned with sample_math_by_difficulty.py)."""
+    #yifanL change the math format
+    # Based on Reasoning360: math domain doesn't use system prompt, just adds instruction
     prompt = row.get("prompt", [])
-
+    
     # Ensure prompt ends with the boxed instruction if not already present
     if prompt and len(prompt) > 0:
-        prompt_list = prompt.tolist() if hasattr(prompt, "tolist") else prompt
-        if (
-            prompt_list
-            and isinstance(prompt_list[0], dict)
-            and prompt_list[0].get("role") == "user"
-        ):
-            content = prompt_list[0].get("content", "")
-            if "\\boxed{" not in content:
-                prompt_list[0][
-                    "content"
-                ] = content + " Please output the final answer within \\boxed{}."
-                prompt = np.array(prompt_list) if hasattr(prompt, "tolist") else prompt_list
-
-    extra_info: Dict[str, Any] = {"split": split, "index": idx}
-
+        prompt_list = prompt.tolist() if hasattr(prompt, 'tolist') else prompt
+        if prompt_list and isinstance(prompt_list[0], dict) and prompt_list[0].get('role') == 'user':
+            content = prompt_list[0].get('content', '')
+            # Add boxed instruction if not present
+            if '\\boxed{' not in content:
+                prompt_list[0]['content'] = content + " Please output the final answer within \\boxed{}."
+                prompt = np.array(prompt_list) if hasattr(prompt, 'tolist') else prompt_list
+    
+    # Include pass rates in extra_info
+    extra_info = {"split": split, "index": idx}
+    
+    # Add pass rates if available
     if pd.notna(row.get("qwen2.5_7b_pass_rate")):
-        extra_info["qwen2.5_7b_pass_rate"] = float(row["qwen2.5_7b_pass_rate"])  # type: ignore[index]
+        extra_info["qwen2.5_7b_pass_rate"] = float(row["qwen2.5_7b_pass_rate"])
     if pd.notna(row.get("qwen3_30b_pass_rate")):
-        extra_info["qwen3_30b_pass_rate"] = float(row["qwen3_30b_pass_rate"])  # type: ignore[index]
-
+        extra_info["qwen3_30b_pass_rate"] = float(row["qwen3_30b_pass_rate"])
+    
+    math_prefix = "You are a knowledgeable math assistant. Answer the following questions and think step by step. "
+    prompt[0]['content'] = math_prefix + prompt[0]['content']
     return {
-        "data_source": row.get("data_source", "math_unknown"),
-        "prompt": prompt,
-        "ability": row.get("ability", "math"),
-        "reward_model": row.get("reward_model", {}),
-        "extra_info": extra_info,
-    }
-
+            "data_source": row.get("data_source", "math_unknown"),
+            "prompt": prompt,
+            "ability": row.get("ability", "math"),
+            "reward_model": row.get("reward_model", {}),
+            "extra_info": extra_info
+        }
 
 def categorize_difficulty(pass_rate: Any) -> str:
     if pd.isna(pass_rate):

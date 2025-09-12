@@ -23,6 +23,7 @@ from sympy.parsing import sympy_parser
 import os
 from .prime_math import math_normalize
 from .prime_math.grader import math_equal
+from math_verify import parse, verify
 
 
 class timeout:
@@ -527,6 +528,15 @@ def compute_score(solution_str: str,
         #     reward = -0.5
         # else:  # Both format and answer are wrong
         #     reward = -1.0
+        # If our parser says it's wrong, try Math-Verify as fallback
+        if not correct:
+            try:
+                gold_parsed = parse(str(ground_truth))
+                answer_parsed = parse(str(solution_str))
+                correct = verify(gold_parsed, answer_parsed)
+            except:
+                pass
+
         reward = 1.0 if correct else 0.
         acc = correct
 

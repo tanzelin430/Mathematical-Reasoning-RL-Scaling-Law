@@ -10,7 +10,7 @@ set -x
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
-export WANDB_DIR=~/Agentic-RL-Scaling-Law/wandb_${AUTHOR_NAME}
+export WANDB_DIR=/mnt/shared-storage-user/ma4agi-gpu/wandb_tanzl
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
@@ -87,7 +87,7 @@ BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 WANDB_PROJECT=agentic_rl_scaling_law
 
 DOMAIN_NAME="math_curriculum_full"
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL_run0
 
 # =================== GRPO Training Parameters ===================
 # Algorithm settings - GRPO specific
@@ -122,8 +122,8 @@ max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 921
 
 # Token limit multipliers based on VeRL official example
 # For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=10  # Actor should be ~2x max sequence length
-rollout_seq_multiplier=12
+actor_seq_multiplier=12  # Actor should be ~2x max sequence length
+rollout_seq_multiplier=14
 # Calculate token limits for GRPO (no critic needed)
 actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
 rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
@@ -245,10 +245,6 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.gpu_memory_utilization=${gpu_memory_utilization} \
     actor_rollout_ref.rollout.tensor_model_parallel_size=${gen_tp} \
     actor_rollout_ref.rollout.temperature=${temperature} \
-    actor_rollout_ref.rollout.top_p=${top_p} \
-    actor_rollout_ref.rollout.top_k=${top_k} \
-    actor_rollout_ref.rollout.val_kwargs.top_k=${val_top_k} \
-    actor_rollout_ref.rollout.val_kwargs.top_p=${val_top_p} \
     actor_rollout_ref.rollout.val_kwargs.temperature=${val_temperature} \
     actor_rollout_ref.rollout.val_kwargs.n=1 \
     actor_rollout_ref.rollout.val_kwargs.do_sample=True \
