@@ -10,7 +10,7 @@ set -x
 # GPU Configuration
 TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
 AUTHOR_NAME="tanzl"
-export WANDB_DIR=/mnt/shared-storage-user/ma4agi-gpu/wandb_tanzl
+export WANDB_DIR=/home/yinzhenfei/Agentic-RL-Scaling-Law/wandb_tanzl/wandb
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
@@ -80,7 +80,7 @@ CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 mkdir -p ${CHECKPOINT_DIR}      
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-7B
+MODEL_NAME=Qwen2.5-7B-Instruct
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================

@@ -80,7 +80,7 @@ CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
 mkdir -p ${CHECKPOINT_DIR}      
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-0.5B
+MODEL_NAME=Qwen2.5-3B-Instruct
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
