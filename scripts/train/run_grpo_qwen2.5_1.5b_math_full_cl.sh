@@ -267,7 +267,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.test_freq=1 \
     trainer.save_freq=10 \
     trainer.total_epochs=${EPOCHS} \
-    trainer.max_actor_ckpt_to_keep=10 \
+    trainer.max_actor_ckpt_to_keep=1 \
     trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
     # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
