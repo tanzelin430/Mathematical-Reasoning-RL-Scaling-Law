@@ -115,9 +115,10 @@ def main() -> None:
         help="Directory to save sampled datasets"
     )
     parser.add_argument(
-        "N",
+        "--max_samples",
         type=int,
-        help="Number of splits (final size will be original_size / N)"
+        default=51200,
+        help="Maximum number of samples to use from the dataset"
     )
     parser.add_argument(
         "--pass_rate_col",
@@ -133,24 +134,22 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.N <= 0:
-        raise ValueError("N must be positive")
-
     input_path = Path(args.input_file)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading dataset: {input_path}")
     df = pd.read_parquet(input_path)
+    
+    # Limit to first max_samples rows
+    df = df.head(args.max_samples)
     original_size = len(df)
-    target_size = original_size // args.N
     
-    print(f"Original dataset size: {original_size}")
-    print(f"Target size (1/{args.N}): {target_size}")
+    print(f"Using first {original_size} samples from dataset")
     
-    if target_size == 0:
-        raise ValueError(f"Dataset too small for {args.N} splits")
-
+    # Define N values to generate
+    n_values = [2, 4, 5, 10, 20, 25, 50, 100]
+    
     # Extract difficulty information from extra_info
     print("Extracting difficulty information...")
     pass_rates = []
@@ -167,24 +166,42 @@ def main() -> None:
     print("\nOriginal difficulty distribution:")
     print(df["difficulty"].value_counts())
     
-    # Perform stratified sampling
-    print(f"\nSampling {target_size} samples with preserved difficulty distribution...")
-    sampled_df = stratified_sample(df, target_size, args.seed)
+    # Generate samples for each N value
+    for n in n_values:
+        target_size = original_size // n
+        
+        print(f"\n{'='*50}")
+        print(f"Processing N={n}, target size: {target_size}")
+        print(f"{'='*50}")
+        
+        if target_size == 0:
+            print(f"Warning: Dataset too small for N={n} splits, skipping...")
+            continue
+        
+        # Perform stratified sampling
+        print(f"Sampling {target_size} samples with preserved difficulty distribution...")
+        sampled_df = stratified_sample(df, target_size, args.seed)
+        
+        # Remove temporary columns before saving
+        sampled_df_clean = sampled_df.drop(columns=["pass_rate", "difficulty"])
+        
+        # Save result
+        output_file = output_dir / f"math__sampled_1_{n}_{len(sampled_df_clean)}.parquet"
+        sampled_df_clean.to_parquet(output_file, engine="pyarrow")
+        
+        print(f"Saved sampled dataset to: {output_file}")
+        print(f"Final size: {len(sampled_df_clean)} samples")
+        
+        # Print usage example
+        abs_path = output_file.resolve()
+        print(f"For training usage:")
+        print(f'data.train_files="[\'${abs_path}\']"')
     
-    # Remove temporary columns before saving
-    sampled_df = sampled_df.drop(columns=["pass_rate", "difficulty"])
-    
-    # Save result
-    output_file = output_dir / f"math__sampled_1_{args.N}_{len(sampled_df)}.parquet"
-    sampled_df.to_parquet(output_file, engine="pyarrow")
-    
-    print(f"\nSaved sampled dataset to: {output_file}")
-    print(f"Final size: {len(sampled_df)} samples")
-    
-    # Print usage example
-    abs_path = output_file.resolve()
-    print(f"\nFor training usage:")
-    print(f'data.train_files="[\'${abs_path}\']"')
+    print(f"\n{'='*50}")
+    print("All sampling completed!")
+    print(f"Generated datasets for N values: {n_values}")
+    print(f"Output directory: {output_dir}")
+    print(f"{'='*50}")
 
 
 if __name__ == "__main__":
