@@ -31,6 +31,8 @@ WARMUP_CLIPPING_FACTOR = 1/64 # warmup clipping: Important even for LLM RL
 # WARMUP_CLIPPING_FACTOR = 1
 # WARMUP_CLIPPING_FACTOR = 0
 
+PLOT_BASIC_CURVES = False
+
 HOLDOUT=True
 if HOLDOUT:
     # Test metrics to process (from the CSV columns)
@@ -112,7 +114,7 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
     df['Improve'] = data_proc.calc_improve(df, 'R', curve_column)
     # Calculate std
     R_std = df.groupby([curve_column, 'step'])['R'].std().to_frame('R_std')
-    ErrRate_std = df.groupby([curve_column, 'step'])['ErrRate'].std().to_frame('R_err_rate_std')
+    ErrRate_std = df.groupby([curve_column, 'step'])['ErrRate'].std().to_frame('ErrRate_std')
     Improve_std = df.groupby([curve_column, 'step'])['Improve'].std().to_frame('Improve_std')
 
     # Merge multi rollout in same step
@@ -155,7 +157,7 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
         x_inv_weight_power=0.3
     )
     
-    df_R_smooth = data_proc.apply_warmup_clipping(df_R_smooth, curve_column='N', warmup_frac=WARMUP_CLIPPING_FACTOR)
+    df_R_smooth = data_proc.apply_warmup_clipping(df_R_smooth, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR)
     
     # =============================================================================
     # FIGURE 1A: REWARD CURVES (C vs R)
@@ -209,6 +211,7 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
         y_column="ErrRate",
         df_smooth=df_ErrRate_smooth,
         y_smooth_column="ErrRate_smooth",
+        y_std_column='ErrRate_std',
         # xlabel="Compute C (FLOPs, log)",
         # ylabel=f"1-R({display_name})",
         title=f"{display_name}",
@@ -255,8 +258,73 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
         title=f"{display_name}",
         ax=axes["improve-rate"]
     )
-    return 
+    
+def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_column: str, output_dir, axes: dict[str, plt.Axes]):
+    
+    assert(plot_x_column == "C") # only support 'C'
+    
+    # Format metric names
+    folder_name, display_name = format_metric_name(metric_name)
+    
+    # Create metric-specific output directory
+    metric_output_dir = Path(output_dir) / folder_name
+    metric_output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # =============================================================================
+    # PHASE 1: DATA PREPROCESSING
+    # =============================================================================
+    
+    df = df.rename(columns={metric_name: 'R'})
+    # # Calculate error rate
+    # df['ErrRate'] = 1 - df['R']
+    # df['Improve'] = data_proc.calc_improve(df, 'R', curve_column)
+    # # Calculate std
+    # R_std = df.groupby([curve_column, 'step'])['R'].std().to_frame('R_std')
+    # ErrRate_std = df.groupby([curve_column, 'step'])['ErrRate'].std().to_frame('ErrRate_std')
+    # Improve_std = df.groupby([curve_column, 'step'])['Improve'].std().to_frame('Improve_std')
 
+    # Merge multi rollout in same step
+    df = data_proc.merge_duplicate_steps(df, group_columns=[curve_column, 'step'], mode='mean')
+
+    # df = df.merge(R_std, on=[curve_column, 'step'])
+    # df = df.merge(ErrRate_std, on=[curve_column, 'step'])
+    # df = df.merge(Improve_std, on=[curve_column, 'step'])
+
+    df.sort_values(plot_x_column, inplace=True)
+
+    # Validate phi parameter estimation
+    ax, stats, kappa_hat = plot.plot_phi_over_steps(df, sample_size_per_step=SAMPLE_SIZE_PER_STEP, tail_fraction=0.25)
+    plt.tight_layout()
+    plt.savefig(metric_output_dir / "phi.pdf", dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print("Global kappa (tail median):", kappa_hat)
+    print("Expected phi_global:", phi_global if phi_global is not None else "N/A")
+    print(stats.head())
+
+    # runs_raw_dfs = data_proc.sort_dfs(runs_raw_dfs)
+
+    # monotonic smoothing
+    df_R_smooth = data_proc.smooth_df(
+        df, 
+        curve_column=curve_column,
+        col_x=plot_x_column, 
+        col_y='R', 
+        col_y_out='R_smooth',
+        # monotonic=True,
+        monotonic=False,
+        increasing=None, # auto determine
+        # strict=True,
+        strict=False,
+        s_factor=1, 
+        k_spline=5,
+        rolling_window=200, 
+        min_se=1e-6, 
+        x_inv_weight_power=0.3
+    )
+    
+    df_R_smooth = data_proc.apply_warmup_clipping(df_R_smooth, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR)
+    
     # =============================================================================
     # PHASE 3: INTRINSIC TABLE
     # =============================================================================
@@ -272,17 +340,17 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
         mode="loglinear"
     )
 
-    # Visualize the R->I mapping relationship
-    plot.vplot_empirical_f_of_R(
-        df=df_R_smooth if BUILD_I_ON_SMOOTHED else df,
-        I_of_R=I_of_R,
-        use_smooth=BUILD_I_ON_SMOOTHED,
-        label_by="N",        # or "runid" / None
-        legend_max=12
-    )
-    plt.tight_layout()
-    plt.savefig(metric_output_dir / "f_of_R_empirical.pdf", dpi=300, bbox_inches='tight')
-    plt.close()
+    # # Visualize the R->I mapping relationship
+    # plot.vplot_empirical_f_of_R(
+    #     df=df_R_smooth if BUILD_I_ON_SMOOTHED else df,
+    #     I_of_R=I_of_R,
+    #     use_smooth=BUILD_I_ON_SMOOTHED,
+    #     label_by="N",        # or "runid" / None
+    #     legend_max=12
+    # )
+    # plt.tight_layout()
+    # plt.savefig(metric_output_dir / "f_of_R_empirical.pdf", dpi=300, bbox_inches='tight')
+    # plt.close()
     # =============================================================================
     # FIGURE 1B: INTRINSIC PERFORMANCE CURVES (C vs I(R))
     # =============================================================================
@@ -320,11 +388,12 @@ def process_single_metric(df, plot_x_column: str, metric_name, curve_column: str
         # xlabel="Compute C (FLOPs, log)",
         # ylabel=f"Intrinsic I(R) (log)",
         title=f"{display_name}",
-        ax=axes["ip-c"]
+        ax=axes["ip"]
     )
     # plt.tight_layout()
     # plt.savefig(metric_output_dir / "figure_1b.png", dpi=300, bbox_inches='tight')
     # plt.close()
+    return
     
     # =============================================================================
     # PHASE 4: JOINT FITTING OF SCALING LAW PARAMETERS
@@ -476,18 +545,68 @@ def main():
     #     print("Raw data statistics:")
     #     data_proc.print_data_statistics(df_merged)
     
-    
-    # keys = ["score-norm", "ip-c", "err-rate", "fit-score-norm", "fit-ip-c"]
-    keys = ["score-norm", "err-rate", "improve-rate"]
+    # ===========================
+    # Plot Basic Curves
+    # ===========================
+    if PLOT_BASIC_CURVES:
+        # keys = ["score-norm", "ip-c", "err-rate", "fit-score-norm", "fit-ip-c"]
+        keys = ["score-norm", "err-rate", "improve-rate"]
 
-    xlabels = {
-        "T": "Tokens (log)",
-        "C": "Compute C (FLOPs, log)",
-        "E": "Data Size (log)"
-    }
+        xlabels = {
+            "T": "Tokens (log)",
+            "C": "Compute C (FLOPs, log)",
+            "E": "Data Size (log)"
+        }
 
-    for x_column, xlabel in xlabels.items():
-        # Create fig and ax_list lists
+        for x_column, xlabel in xlabels.items():
+            # Create fig and ax_list lists
+            fig_axes = {key: plt.subplots(
+                (total_metrics+FIGURE_COLUMNS-1) // FIGURE_COLUMNS, FIGURE_COLUMNS, 
+                figsize=FIGURE_SIZE,
+                constrained_layout=True
+            ) for key in keys}
+
+            for i, metric_name in enumerate(TEST_METRICS):
+                if len(TEST_METRICS) > FIGURE_COLUMNS:
+                    row = i // FIGURE_COLUMNS
+                    col = i % FIGURE_COLUMNS
+                    axes = {key: fig_axes[key][1][row, col] for key in keys}
+                else:
+                    axes = {key: fig_axes[key][1] for key in keys}
+                process_single_metric(df.copy(), plot_x_column=x_column, metric_name=metric_name, curve_column='N', output_dir=OUTPUT_BASE_DIR, axes=axes)
+            
+            fig_axes['score-norm'][0].supxlabel(xlabel)
+            fig_axes['score-norm'][0].supylabel("Return")
+
+            fig_axes['err-rate'][0].supxlabel(xlabel)
+            fig_axes['err-rate'][0].supylabel("Error Rate (log)")
+
+            fig_axes['improve-rate'][0].supxlabel(xlabel)
+            fig_axes['improve-rate'][0].supylabel("Improve Rate")
+
+            # fig_axes['fit-ip-c'][0].supxlabel("Compute C (FLOPs, log)")
+            # fig_axes['fit-ip-c'][0].supylabel("Fitted Intrinsic Performance (log)")
+
+            # fig_axes['fit-score-norm'][0].supxlabel("Compute C (FLOPs, log)")
+            # fig_axes['fit-score-norm'][0].supylabel("Fitted Return")
+            # Save files
+            # [fig_axes[key][0].layout() for key in keys]
+            [fig_axes[key][0].savefig(OUTPUT_BASE_DIR / (FIGURE_PREFIX+"_"+x_column+"_"+key+".pdf"), dpi=300, bbox_inches='tight') for key in keys]
+            print(f"\n saved {x_column} figures")
+
+        print(f"\n Basic curves - {FIGURE_PREFIX} complete! Check {OUTPUT_BASE_DIR} for results")
+    # ===========================
+    # Plot Intrinsic Curves
+    # ===========================
+    else: 
+        keys = ["ip", "fit-score-norm", "fit-ip"]
+
+        xlabels = {
+            # "T": "Tokens (log)",
+            "C": "Compute C (FLOPs, log)",
+            # "E": "Data Size (log)"
+        }
+
         fig_axes = {key: plt.subplots(
             (total_metrics+FIGURE_COLUMNS-1) // FIGURE_COLUMNS, FIGURE_COLUMNS, 
             figsize=FIGURE_SIZE,
@@ -501,28 +620,21 @@ def main():
                 axes = {key: fig_axes[key][1][row, col] for key in keys}
             else:
                 axes = {key: fig_axes[key][1] for key in keys}
-            process_single_metric(df.copy(), plot_x_column=x_column, metric_name=metric_name, curve_column='N', output_dir=OUTPUT_BASE_DIR, axes=axes)
-        
-        fig_axes['score-norm'][0].supxlabel(xlabel)
-        fig_axes['score-norm'][0].supylabel("Return")
+            process_single_metric_intrinsic(df.copy(), plot_x_column="C", metric_name=metric_name, curve_column='N', output_dir=OUTPUT_BASE_DIR / "intrinsic", axes=axes)
 
-        fig_axes['err-rate'][0].supxlabel(xlabel)
-        fig_axes['err-rate'][0].supylabel("Error Rate (log)")
-
-        fig_axes['improve-rate'][0].supxlabel(xlabel)
-        fig_axes['improve-rate'][0].supylabel("Improve Rate")
-
-        # fig_axes['fit-ip-c'][0].supxlabel("Compute C (FLOPs, log)")
-        # fig_axes['fit-ip-c'][0].supylabel("Fitted Intrinsic Performance (log)")
+        fig_axes['ip'][0].supxlabel("Compute C (FLOPs, log)")
+        fig_axes['ip'][0].supylabel("Intrinsic Performance (log)")
 
         # fig_axes['fit-score-norm'][0].supxlabel("Compute C (FLOPs, log)")
         # fig_axes['fit-score-norm'][0].supylabel("Fitted Return")
-        # Save files
-        # [fig_axes[key][0].layout() for key in keys]
-        [fig_axes[key][0].savefig(OUTPUT_BASE_DIR / (FIGURE_PREFIX+"_"+x_column+"_"+key+".pdf"), dpi=300, bbox_inches='tight') for key in keys]
-        print(f"\n saved {x_column} figures")
 
-    print(f"\n {FIGURE_PREFIX} complete! Check {OUTPUT_BASE_DIR} for results")
+        # fig_axes['fit-ip'][0].supxlabel("Compute C (FLOPs, log)")
+        # fig_axes['fit-ip'][0].supylabel("Fitted Intrinsic Performance (log)")
+
+        [fig_axes[key][0].savefig(OUTPUT_BASE_DIR / "intrinsic" / (FIGURE_PREFIX+"_"+key+".pdf"), dpi=300, bbox_inches='tight') for key in keys]
+        # print(f"\n saved intrinsic figures")
+
+        print(f"\n Intrinsic curves - {FIGURE_PREFIX} complete! Check {OUTPUT_BASE_DIR / 'intrinsic'} for results")
 
 if __name__ == "__main__":
     main()
