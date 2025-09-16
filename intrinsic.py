@@ -94,7 +94,7 @@ def build_intrinsic_table(df: pd.DataFrame, column_R: str = "R_smooth") -> pd.Da
         _df = _df.sort_values("R_level").reset_index(drop=True)
         return _df
     
-    out = remove_duplicated_I_raw(out)
+    # out = remove_duplicated_I_raw(out)
 
     return out
 

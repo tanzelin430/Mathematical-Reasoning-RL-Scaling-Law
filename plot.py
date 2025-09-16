@@ -7,6 +7,7 @@ This module provides functions for:
 - Empirical frontier visualization
 """
 
+from turtle import color
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -148,6 +149,8 @@ def plot_generic_curve(
 
 def plot_ip_c_1b(
     intrinsic_points,
+    y_column: str,
+    y_smooth_column: str=None,
     xlabel: str=None,
     ylabel: str=None,
     title: str=None,
@@ -167,9 +170,10 @@ def plot_ip_c_1b(
         g = g.sort_values("C")
 
         # Draw line using pre-computed I_map values
-        (ln,) = ax.plot(g["C"], g["I_map_smooth"], alpha=0.8, color=COLOR_MAPPING[current_N])
+        if y_smooth_column is not None:
+            (ln,) = ax.plot(g["C"], g[y_smooth_column], alpha=0.5, color=COLOR_MAPPING[current_N])
         # test
-        ax.scatter(g["C"], g["I_map"], alpha=0.3, s=2, marker="o", edgecolor="none", color=COLOR_MAPPING[current_N])
+        ax.scatter(g["C"], g[y_column], alpha=0.5, s=2, marker="o", edgecolor="none", color=COLOR_MAPPING[current_N])
         
     # Reference line y=x
     xs = np.geomspace(max(1e-12, intrinsic_points["C"].min()),
@@ -373,8 +377,8 @@ def vplot_empirical_f_of_R(
     I_env = I_of_R['I_raw' ].to_numpy(float)
     # Ensure non-decreasing
     I_env = np.maximum.accumulate(np.maximum(I_env, 1e-300))
-    ax.plot(R_env, I_env, color='k', linewidth=2.5, label='envelope  I_of_R')
-    # ax.scatter(R_env, I_env, s=2, marker="o", edgecolor="none")
+    # ax.plot(R_env, I_env, alpha=0.5, color='k', linewidth=2.5, label='envelope  I_of_R')
+    ax.scatter(R_env, I_env, s=2, marker="o", edgecolor="k", color='k')
 
     # 3) Axes/title/legend
     ax.set_xlabel("Return R (critic_rewards_mean)")

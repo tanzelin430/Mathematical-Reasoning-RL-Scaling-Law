@@ -304,6 +304,7 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
 
     # runs_raw_dfs = data_proc.sort_dfs(runs_raw_dfs)
 
+    df = data_proc.apply_warmup_clipping(df, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR)
     # monotonic smoothing
     df_R_smooth = data_proc.smooth_df(
         df, 
@@ -340,17 +341,18 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
         mode="loglinear"
     )
 
-    # # Visualize the R->I mapping relationship
-    # plot.vplot_empirical_f_of_R(
-    #     df=df_R_smooth if BUILD_I_ON_SMOOTHED else df,
-    #     I_of_R=I_of_R,
-    #     use_smooth=BUILD_I_ON_SMOOTHED,
-    #     label_by="N",        # or "runid" / None
-    #     legend_max=12
-    # )
-    # plt.tight_layout()
-    # plt.savefig(metric_output_dir / "f_of_R_empirical.pdf", dpi=300, bbox_inches='tight')
-    # plt.close()
+    # Visualize the R->I mapping relationship
+    plot.vplot_empirical_f_of_R(
+        df=df_R_smooth if BUILD_I_ON_SMOOTHED else df,
+        I_of_R=I_of_R,
+        use_smooth=BUILD_I_ON_SMOOTHED,
+        label_by="N",        # or "runid" / None
+        legend_max=12,
+        alpha_runs=0.1
+    )
+    plt.tight_layout()
+    plt.savefig(metric_output_dir / "f_of_R_empirical.pdf", dpi=300, bbox_inches='tight')
+    plt.close()
     # =============================================================================
     # FIGURE 1B: INTRINSIC PERFORMANCE CURVES (C vs I(R))
     # =============================================================================
@@ -365,26 +367,46 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
     # Validate the mapping (sanity check)
     # assert np.all(intrinsic_points["I_map"] <= intrinsic_points["C"] + 1e-9), f"I > C violation: max(I-C) = {(intrinsic_points['I_map'] - intrinsic_points['C']).max():.2e}"
 
+    # # Optional: Smooth the I_map curve
+    # df_Imap = data_proc.smooth_df(
+    #     df_Imap,
+    #     curve_column=curve_column,
+    #     col_x=plot_x_column,
+    #     col_y="I_map",
+    #     col_y_out="I_map_smooth",
+    #     monotonic=True,
+    #     increasing=None, # auto determine
+    #     strict=True,
+    #     s_factor=0.3, 
+    #     k_spline=3,
+    #     rolling_window=50, 
+    #     min_se=1e-4, 
+    #     x_inv_weight_power=10
+    # )
+
     # Optional: Smooth the I_map curve
-    df_Imap = data_proc.smooth_df(
-        df_Imap,
-        curve_column=curve_column,
-        col_x=plot_x_column,
-        col_y="I_map",
-        col_y_out="I_map_smooth",
-        monotonic=True,
-        increasing=None, # auto determine
-        strict=True,
-        s_factor=0.3, 
-        k_spline=3,
-        rolling_window=50, 
-        min_se=1e-4, 
-        x_inv_weight_power=10
-    )
+    # df_Imap = data_proc.smooth_df(
+    #     df_Imap,
+    #     curve_column=curve_column,
+    #     col_x=plot_x_column,
+    #     col_y="I_map",
+    #     col_y_out="I_map_smooth",
+    #     monotonic=True,
+    #     increasing=None, # auto determine
+    #     strict=True,
+    #     s_factor=0.1, 
+    #     k_spline=3,
+    #     rolling_window=200, 
+    #     min_se=1e-6, 
+    #     x_inv_weight_power=0.3
+    # )
     # df_Imap = pd.concat(_dfs, ignore_index=True)
     # Generate Figure 1b - intrinsic performance curves
     ax = plot.plot_ip_c_1b(
         df_Imap,
+        y_column="I_map",
+        # y_smooth_column="I_map",
+        # y_smooth_column="I_map_smooth",
         # xlabel="Compute C (FLOPs, log)",
         # ylabel=f"Intrinsic I(R) (log)",
         title=f"{display_name}",
@@ -393,7 +415,6 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
     # plt.tight_layout()
     # plt.savefig(metric_output_dir / "figure_1b.png", dpi=300, bbox_inches='tight')
     # plt.close()
-    return
     
     # =============================================================================
     # PHASE 4: JOINT FITTING OF SCALING LAW PARAMETERS
@@ -464,7 +485,7 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
         # xlabel="Compute C (FLOPs, log)",
         # ylabel=f"Intrinsic I (log)",
         title=f"{display_name}",
-        ax=axes["fit-ip-c"]
+        ax=axes["fit-ip"]
     )
     plt.tight_layout()
     # plt.savefig(metric_output_dir / "figure_2b.png", dpi=300, bbox_inches='tight')
@@ -579,7 +600,7 @@ def main():
             fig_axes['score-norm'][0].supylabel("Return")
 
             fig_axes['err-rate'][0].supxlabel(xlabel)
-            fig_axes['err-rate'][0].supylabel("Error Rate (log)")
+            fig_axes['err-rate'][0].supylabel("Error Rate")
 
             fig_axes['improve-rate'][0].supxlabel(xlabel)
             fig_axes['improve-rate'][0].supylabel("Improve Rate")

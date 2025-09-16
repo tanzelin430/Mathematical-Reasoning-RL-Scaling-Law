@@ -125,7 +125,7 @@ def fit_smooth_monotonic(
     # Apply monotonic constraint if requested
     if monotonic:
         _f = isotonic_regression_pav(x, yhat, increasing=increasing, sample_weight=w)
-        y_predict = _f.predict(x)
+        y_predict = _f.predict
         yhat = _f.predict(x)
         # Attention: strict monotonic for smoother "Intrinsic - Compute" plot
         if strict:
