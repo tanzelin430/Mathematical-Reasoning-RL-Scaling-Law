@@ -1,0 +1,21 @@
+[project]
+name = "llm-rl-scaling-law-analysis"
+version = "0.1.0"
+description = "Analysis of scaling laws for LLM reinforcement learning"
+requires-python = ">=3.10.13"
+dependencies = [
+    "pandas",
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "scikit-learn",
+    "cma",
+    "pyyaml",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

@@ -1,0 +1,13 @@
+/*.log
+/*.json
+/outputs/
+/results/
+/data/
+/csv/
+/archive/
+/dev/
+/CLAUDE.md
+/.claude
+/wandb/
+*.egg-info/
+__pycache__/
