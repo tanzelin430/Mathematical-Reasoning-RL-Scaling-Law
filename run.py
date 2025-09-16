@@ -31,7 +31,7 @@ WARMUP_CLIPPING_FACTOR = 1/64 # warmup clipping: Important even for LLM RL
 # WARMUP_CLIPPING_FACTOR = 1
 # WARMUP_CLIPPING_FACTOR = 0
 
-PLOT_BASIC_CURVES = False
+PLOT_BASIC_CURVES = False # True for Intrinsic Curves
 
 HOLDOUT=True
 if HOLDOUT:
@@ -429,18 +429,18 @@ def process_single_metric_intrinsic(df, plot_x_column: str, metric_name, curve_c
         I_column="I_map",
         fit_fR=True,
         seed=0,
-        n_trials=2,             # 3 rounds of iteration
+        n_trials=3,             # 3 rounds of iteration
         # max_iters=10,
         max_iters=160,
         popsize=20, 
-        sigma0=1, 
+        sigma0=0.5, 
         early_stop_tol=1e-12,       # Early stopping threshold
         w_eq=1,
-        w_env=100,
+        w_env=10,
         # Boundary parameters
         alpha_range=(0.1, 3.0),
         beta_min=0.1,
-        soft_log_margin_percentage=5.0
+        soft_log_margin_percentage=10.0
     )
     intrinsic_func, f_R_logI = fit_result['intrinsic'], fit_result['f_R_logI']
 
