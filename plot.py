@@ -7,13 +7,13 @@ This module provides functions for:
 - Empirical frontier visualization
 """
 
-from turtle import color
+import math
+import data_proc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import math
-import data_proc
+from matplotlib.ticker import LogLocator  # 添加这行
 
 __all__ = [
     # Figure plotting
@@ -23,7 +23,10 @@ __all__ = [
     'human_format_N',
     
     # Empirical frontier visualization
-    'vplot_empirical_f_of_R', 'plot_phi_over_steps'
+    'vplot_empirical_f_of_R', 'plot_phi_over_steps',
+    
+    # Multi-subplot layout utilities
+    'create_multi_subplot_axes', 'set_figure_labels', 'apply_tight_layout', 'apply_global_legend_layout'
 ]
 
 # =============================================================================
@@ -101,8 +104,10 @@ def plot_generic_curve(
     df_smooth=None,  # smoothed data for curves, if None use df
     y_smooth_column: str = None,  # column for smooth curves, if None use y_column
     y_std_column: str = None,
-    xlabel: str = None,
-    ylabel: str = None,
+    x_scale: str = None,
+    y_scale: str = None,
+    x_label: str = None,
+    y_label: str = None,
     title: str = None,
     ax=None
 ):
@@ -137,11 +142,24 @@ def plot_generic_curve(
                 y_std = g[y_std_column].to_numpy()
                 ax.fill_between(x, y - y_std, y + y_std, alpha=0.2, color=COLOR_MAPPING[curve_id])
 
-    ax.set_xscale("log")
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
+    if x_scale:
+        ax.set_xscale(x_scale)
+        if x_scale == "log":
+            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples
+            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+            # Minor ticks for intermediate values
+            ax.xaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
+    if y_scale:
+        ax.set_yscale(y_scale)
+        if y_scale == "log":
+            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples  
+            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+            # Minor ticks for intermediate values
+            ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
+    if x_label:
+        ax.set_xlabel(x_label)
+    if y_label:
+        ax.set_ylabel(y_label)
     if title:
         ax.set_title(title)
     ax.legend(handles, labels, loc='best', fontsize=8)
@@ -505,3 +523,65 @@ def plot_phi_over_steps(
         ax.legend(fontsize=8, ncol=2)
 
     return ax, stats, global_phi
+
+
+# ============================================================================
+# Multi-Subplot Layout Utilities
+# ============================================================================
+
+def create_multi_subplot_axes(keys, total_metrics, figure_columns, figure_size):
+    """Create and return fig_axes dictionary with axes getter function"""
+    fig_axes = {key: plt.subplots(
+        (total_metrics + figure_columns - 1) // figure_columns, figure_columns, 
+        figsize=figure_size, constrained_layout=False
+    ) for key in keys}
+    
+    def get_axes_for_metric(metric_index):
+        if total_metrics > figure_columns:
+            row, col = metric_index // figure_columns, metric_index % figure_columns
+            return {key: fig_axes[key][1][row, col] for key in keys}
+        else:
+            return {key: fig_axes[key][1] for key in keys}
+    
+    return fig_axes, get_axes_for_metric
+
+
+def set_figure_labels(fig_axes, xlabel, y_labels):
+    """Set supxlabel and supylabel for multi-subplot figures"""
+    for key, ylabel in y_labels.items():
+        if key in fig_axes:
+            fig_axes[key][0].supxlabel(xlabel)
+            fig_axes[key][0].supylabel(ylabel)
+
+
+def apply_tight_layout(fig_axes, keep_legends=True):
+    """Apply tight layout without global legend for multi-subplot figures"""
+    # Optionally hide subplot legends to avoid clutter
+    if not keep_legends:
+        [legend.set_visible(False) for fig, _ in fig_axes.values() for ax in fig.get_axes() if (legend := ax.get_legend())]
+    
+    # Optimize layout to reduce left margin
+    for fig, _ in fig_axes.values():
+        for ax in fig.get_axes():
+            # Use compact decimal format instead of scientific notation (0.7 instead of 7x10-1)
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.3g}'))
+            ax.tick_params(axis='y', labelsize=8)  # Smaller y-axis labels
+    
+    # Auto-adjust layout with reduced left margin
+    [fig.tight_layout() for fig, _ in fig_axes.values()]
+    [fig.subplots_adjust(left=0.15) for fig, _ in fig_axes.values()]
+
+
+def apply_global_legend_layout(fig_axes, unique_N, top=0.91):
+    """Apply consistent global legend layout to multi-subplot figures"""
+    # Hide all subplot legends
+    [legend.set_visible(False) for fig, _ in fig_axes.values() for ax in fig.get_axes() if (legend := ax.get_legend())]
+    # Auto-adjust layout first, then add global legend
+    [fig.tight_layout() for fig, _ in fig_axes.values()]
+    
+    # create global legend
+    handles, labels, _ = _get_legends(unique_N)
+    [fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=len(labels)) for fig, _ in fig_axes.values()]
+    
+    # Adjust only the top to make room for legend
+    [fig.subplots_adjust(top=top) for fig, _ in fig_axes.values()]

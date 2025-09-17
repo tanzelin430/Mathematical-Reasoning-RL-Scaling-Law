@@ -183,7 +183,7 @@ def apply_warmup_clipping_single_curve(df, warmup_frac: float = 1.0/64.0):
     return df_clipped
 
 
-def calc_improve(df, y_column: str, curve_column: str, debug=True):
+def calc_improve(df, y_column: str, curve_column: str, debug=False):
     """Calculate improvement relative to step=0 for each N group"""
     # Calculate improvement rate relative to step=0 for each N
     def _calc_improve(group):
@@ -234,8 +234,11 @@ def smooth_df_single_curve(
     min_se: float = 1e-3,
     x_inv_weight_power: float = 0.2,
 ):
-    x = df[col_x]
-    y = df[col_y]
+    # Sort by x column first to ensure x is increasing
+    df_sorted = df.sort_values(col_x).reset_index(drop=True)
+    
+    x = df_sorted[col_x]
+    y = df_sorted[col_y]
     w = fit_utils.get_weight(
         x, y, 
         rolling_window=rolling_window, 
@@ -250,9 +253,8 @@ def smooth_df_single_curve(
         s_factor=s_factor, 
         w=w, 
         k_spline=k_spline)
-    df_out = df#.copy()
-    df_out[col_y_out] = y_smooth
-    return df_out
+    df_sorted[col_y_out] = y_smooth
+    return df_sorted
 
 def smooth_df(
     df,
