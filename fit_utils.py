@@ -93,14 +93,18 @@ def fit_spline(
 ):
 
     if len(x) < 3:
-        return y
+        return y, None
 
     # Spline smoothing on log(x)
-    # x = np.log(np.maximum(x.to_numpy(float), 1e-300))
-    x = np.log(np.maximum(x, 1e-300))
+    x_log = np.log(np.maximum(x, 1e-300))
+    
+    # Check that x is increasing (should be sorted in smooth_df_single_curve)
+    if not np.all(np.diff(x_log) >= 0):
+        raise ValueError("x must be sorted in increasing order before calling fit_spline")
+    
     s_val = s_factor * len(x)
-    spl = UnivariateSpline(x, y, w=w, s=s_val, k=k_spline)
-    yhat = spl(x)
+    spl = UnivariateSpline(x_log, y, w=w, s=s_val, k=k_spline)
+    yhat = spl(x_log)
 
     return yhat, spl
 

@@ -4,12 +4,12 @@
 from typing import List
 import numpy as np
 import pandas as pd
-
+import config
 import fit_utils
 
 __all__ = [
     # Data processing
-    'validate_data', 'normalize_data', 'merge_duplicate_steps', 'split_df', 
+    'validate_data', 'rename_columns', 'merge_duplicate_steps', 'split_df', 
     'aggregate_runs_by_N', 'estimate_phi_from_runs', 'apply_warmup_clipping',
     'smooth_df_single_curve', 'smooth_df', 'sort_dfs',
     # Data inspection
@@ -20,11 +20,43 @@ __all__ = [
 # DATA PROCESSING
 # =============================================================================
 
-def validate_data(df, metric_columns=[]) -> pd.DataFrame:
-    if metric_columns is None or len(metric_columns) == 0:
-        raise ValueError("provide metric_columns to validate")
+def load_and_preprocess(
+    csv_files: list[str],
+):
+    global phi_global
+    # ===========================
+    # Data Prepare
+    # ===========================
+
+    df_runs_list = [pd.read_csv(csv) for csv in csv_files]
+    df = pd.concat(df_runs_list, ignore_index=True)
+    # print (df.columns)
+    
+    # Sort, Inspect, Validate and Normalize data
+    df = df.sort_values(['model_size','runid','step']).reset_index(drop=True)
+    # data_proc.inspect_data(df)
+    validate_data(df, eval_columns=config.TEST_EVALS.keys())
+    df = rename_columns(df)
+    
+    df['E'] = df['step'] * float(config.SAMPLE_SIZE_PER_STEP)
+
+    # Estimate global efficiency parameter phi
+    phi_global, phi_by_N, phi_stats_df = estimate_phi_from_runs(
+        df, 
+        sample_size_per_step=config.SAMPLE_SIZE_PER_STEP, 
+        tail_fraction=0.5
+    )
+    # print(f"phi (global tail median) = {phi_global}")
+    
+    # Recalculate C using the estimated phi_global
+    df['C'] = df['N'] * df['E'] * phi_global
+    return df
+
+def validate_data(df, eval_columns=[]) -> pd.DataFrame:
+    if eval_columns is None or len(eval_columns) == 0:
+        raise ValueError("provide eval_columns to validate")
     required_cols = ['model_params','runid','step','tokens', 'cumulative_flops']
-    required_cols.extend(metric_columns)
+    required_cols.extend(eval_columns)
     # Check which cols are missing
     missing_col = [col for col in required_cols if col not in df.columns]
     if missing_col:
@@ -37,7 +69,7 @@ def validate_data(df, metric_columns=[]) -> pd.DataFrame:
     
     return df
 
-def normalize_data(df) -> pd.DataFrame:
+def rename_columns(df) -> pd.DataFrame:
     """Normalize column names and data types to standard format"""
     rename_map = {
         'model_params':'N',
@@ -73,7 +105,8 @@ def merge_duplicate_steps(df, group_columns: list, mode: str = 'mean') -> pd.Dat
     # Check duplicate situations within each group
     duplicates = df.duplicated(subset=group_columns).sum()
     if duplicates > 0:
-        print(f"Found {duplicates} duplicate rows for columns {group_columns}, using strategy: {mode}")
+        if config.DEBUG:
+            print(f"Found {duplicates} duplicate rows for columns {group_columns}, using strategy: {mode}")
         
         if mode == 'mean':
             # Average points with same group values
@@ -183,23 +216,22 @@ def apply_warmup_clipping_single_curve(df, warmup_frac: float = 1.0/64.0):
     return df_clipped
 
 
-def calc_improve(df, y_column: str, curve_column: str, debug=True):
+def calc_delta_y(df, y_column: str, base_step: int, curve_column: str, debug=config.DEBUG):
     """Calculate improvement relative to step=0 for each N group"""
     # Calculate improvement rate relative to step=0 for each N
-    def _calc_improve(group):
-        BASE_STEP = 1
+    def _calc_delta_reward(group):
         group_df = df.loc[group.index]
-        step_0_rows = group_df[group_df['step'] == BASE_STEP]
+        step_0_rows = group_df[group_df['step'] == base_step]
         if len(step_0_rows) == 0:
             raise ValueError(f"No step=0 found for {curve_column}={group_df[curve_column].iloc[0]}")
         baseline_y = step_0_rows[y_column].iloc[0]
         return group - baseline_y
     
-    improve_column = df.groupby(curve_column)[y_column].transform(_calc_improve)
+    improve_column = df.groupby(curve_column)[y_column].transform(_calc_delta_reward)
     
     # Print some sample data after calculation  
-    if debug:
-        print("\n=== AFTER Improve calculation ===")
+    if config.DEBUG:
+        print("\n=== AFTER Delta calculation ===")
         sample_steps = [0, 1, 20, 50, 100]
         for N in sorted(df[curve_column].unique())[:2]:  # Show first 2 N values
             print(f"\nN = {N}:")
@@ -208,7 +240,7 @@ def calc_improve(df, y_column: str, curve_column: str, debug=True):
                 if mask.any():
                     y_val = df.loc[mask, y_column].iloc[0]
                     improve_val = improve_column.loc[mask].iloc[0]
-                    print(f"  step={step}: {y_column}={y_val:.4f}, Improve={improve_val:.4f} ({y_column}-{y_column}_step0={improve_val:.4f})")
+                    print(f"  step={step}: {y_column}={y_val:.4f}, Delta={improve_val:.4f} ({y_column}-{y_column}_step0={improve_val:.4f})")
     
     return improve_column
 
@@ -234,8 +266,11 @@ def smooth_df_single_curve(
     min_se: float = 1e-3,
     x_inv_weight_power: float = 0.2,
 ):
-    x = df[col_x]
-    y = df[col_y]
+    # Sort by x column first to ensure x is increasing
+    df_sorted = df.sort_values(col_x).reset_index(drop=True)
+    
+    x = df_sorted[col_x]
+    y = df_sorted[col_y]
     w = fit_utils.get_weight(
         x, y, 
         rolling_window=rolling_window, 
@@ -250,9 +285,8 @@ def smooth_df_single_curve(
         s_factor=s_factor, 
         w=w, 
         k_spline=k_spline)
-    df_out = df#.copy()
-    df_out[col_y_out] = y_smooth
-    return df_out
+    df_sorted[col_y_out] = y_smooth
+    return df_sorted
 
 def smooth_df(
     df,

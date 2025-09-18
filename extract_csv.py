@@ -74,11 +74,11 @@ class ComputeExtractorExperiment:
                 
                 # Extract all test scores
                 for pattern in test_score_patterns:
-                    # Extract the metric name (everything after val/test_score/ and before /unknown)
-                    metric_name = pattern.replace('/unknown', '')#.replace('val/test_score/', '')
+                    # Extract the eval name (everything after val/test_score/ and before /unknown)
+                    eval_name = pattern.replace('/unknown', '')#.replace('val/test_score/', '')
                     score_match = re.search(f'{re.escape(pattern)}:([\d\.\-]+)', line)
                     if score_match:
-                        scores_dict[metric_name] = float(score_match.group(1))
+                        scores_dict[eval_name] = float(score_match.group(1))
                 
                 # Extract overall_pass1
                 overall_match = re.search(f'{re.escape(overall_pattern)}:([\d\.\-]+)', line)
@@ -202,7 +202,7 @@ class ComputeExtractorExperiment:
             return None
         
         # print(f"  Merged to {len(merged_df)} steps with both tokens and test scores")
-        # print(f"  Available metrics: {[col for col in merged_df.columns if col not in ['step', 'tokens']]}")
+        # print(f"  Available evals: {[col for col in merged_df.columns if col not in ['step', 'tokens']]}")
         
         # Calculate FLOPs: 6 * N * tokens
         merged_df['step_flops'] = 6 * model_params * merged_df['tokens']
@@ -227,17 +227,17 @@ class ComputeExtractorExperiment:
             # Fallback to overall_pass1 if math__math is not available
             merged_df['critic_rewards_mean'] = merged_df.get('overall_pass1', 0.0)
         
-        # Reorder columns: metadata first, then test metrics, then compute data
+        # Reorder columns: metadata first, then test evals, then compute data
         metadata_cols = ['model_size', 'model_params', 'data_sample_size', 'experiment_name', 
                         'experiment_id', 'runid', 'slice_factor', 'step']
         compute_cols = ['tokens', 'cumulative_tokens', 'step_flops', 'cumulative_flops', 'critic_rewards_mean', 'holdout_score']
         
-        # Get all test metric columns (exclude step and tokens)
-        test_metric_cols = [col for col in merged_df.columns 
+        # Get all test eval columns (exclude step and tokens)
+        test_eval_cols = [col for col in merged_df.columns 
                            if col not in metadata_cols + compute_cols + ['step', 'tokens']]
         
         # Reorder columns
-        result_df = merged_df[metadata_cols + test_metric_cols + compute_cols].copy()
+        result_df = merged_df[metadata_cols + test_eval_cols + compute_cols].copy()
         
         return result_df
     
@@ -339,21 +339,32 @@ class ComputeExtractorExperiment:
         return self
 
 if __name__ == "__main__":
-    (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run0')
-     .inspect()
-     .save('csv/scaling_law_data_experiment1_instruct_run0.csv'))
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run0')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment1_instruct_run0.csv'))
     
-    (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run1')
-     .inspect()
-     .save('csv/scaling_law_data_experiment1_instruct_run1.csv'))
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run1')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment1_instruct_run1.csv'))
+
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run2')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment1_instruct_run2.csv'))
+    
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/Experiment1_Base_run0')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment1_base_run0.csv'))
+
 
     (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run2')
+     .run(experiment_root_dir='data/experiment2-base')
      .inspect()
-     .save('csv/scaling_law_data_experiment1_instruct_run2.csv'))
-    
+     .save('csv/scaling_law_data_experiment2_base.csv'))
+
     # # Process experiment2-base data
     # (ComputeExtractorExperiment()
     #  .run(experiment_root_dir='data/experiment2-base')
