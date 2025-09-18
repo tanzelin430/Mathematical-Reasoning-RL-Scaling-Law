@@ -3,13 +3,7 @@
 ## Quick start
 ```bash
 $ uv run python extract_csv.py
-$ uv run python run.py
-```
 
-Key switch:
-- `PLOT_BASIC_CURVES: bool` : 
-  - True for plotting basic <Reward/ErrRate - Dataset Metric - Compute/Datasize/Token> figures
-  - False for Intrinsic Performance computations
-- `HOLDOUT: bool`:
-  - True for holdout only test set
-  - False for multi-dataset eval plotting
+# plot a single figure, with 4 dimention control (x, eval, metric, curve)
+$ uv run python run_plot_single.py
+```
