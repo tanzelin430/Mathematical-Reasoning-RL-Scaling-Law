@@ -96,19 +96,22 @@ def _get_legends(_Ns: list[float]):
     labels = [f"N={human_format_N(n, mode='eng', sig=3, sci_coeff=True)}" for n in sort_Ns]
     return handles, labels, sort_Ns
 
-def plot_generic_curve(
+
+def plot_basic(
     df,    # raw data to overlay as scatter points
     curve_column: str,
     x_column: str,
     y_column: str,  # column for raw scatter points
-    df_smooth=None,  # smoothed data for curves, if None use df
-    y_smooth_column: str = None,  # column for smooth curves, if None use y_column
-    y_std_column: str = None,
     x_scale: str = None,
     y_scale: str = None,
     x_label: str = None,
     y_label: str = None,
     title: str = None,
+    use_scatter: bool = True,
+    use_line: bool = True,
+    scatter_alpha: float = 0.3,
+    scatter_s: int = 8,
+    line_alpha: float = 0.5,
     ax=None
 ):
     """Generic plotting function that can handle both score and error rate plots"""
@@ -124,23 +127,12 @@ def plot_generic_curve(
         curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
         x = g[x_column].to_numpy()
         y = g[y_column].to_numpy()
-        # Plot as scatter points with lighter color
-        ax.scatter(x, y, alpha=0.3, s=8, color=COLOR_MAPPING[curve_id], edgecolors='none')
-    
-    # Plot smooth curves
-    if y_smooth_column is not None:
-        if df_smooth is None:
-            raise ValueError("df_smooth is required when y_smooth_column is not None")
-        for g in data_proc.split_df(df_smooth, by_column=curve_column):
-            curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-            x = g[x_column].to_numpy()
-            y = g[y_smooth_column].to_numpy()
-            # Line
-            (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
-            # Plot std span
-            if y_std_column and y_std_column in g.columns:
-                y_std = g[y_std_column].to_numpy()
-                ax.fill_between(x, y - y_std, y + y_std, alpha=0.2, color=COLOR_MAPPING[curve_id])
+        # Scatter
+        if use_scatter:
+            ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, color=COLOR_MAPPING[curve_id], edgecolors='none')
+        # Line
+        if use_line:
+            ax.plot(x, y, alpha=line_alpha, color=COLOR_MAPPING[curve_id])
 
     if x_scale:
         ax.set_xscale(x_scale)
@@ -165,150 +157,81 @@ def plot_generic_curve(
     ax.legend(handles, labels, loc='best', fontsize=8)
     return ax
 
-def plot_ip_c_1b(
-    intrinsic_points,
-    y_column: str,
-    y_smooth_column: str=None,
-    xlabel: str=None,
-    ylabel: str=None,
-    title: str=None,
-    ax=None,
+
+def plot_generic_curve(
+    df,    # raw data to overlay as scatter points
+    curve_column: str,
+    x_column: str,
+    y_column: str,  # column for raw scatter points
+    df_smooth=None,  # smoothed data for curves, if None use df
+    y_smooth_column: str = None,  # column for smooth curves, if None use y_column
+    y_width_column: str = None, # e.g. std
+    width_on_smooth: bool = False,
+    x_scale: str = None,
+    y_scale: str = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    ax=None
 ):
+    """Generic plotting function that can handle both score and error rate plots"""
     if ax is None:
         fig, ax = plt.subplots(figsize=(6,4), dpi=140)
     
     # set legend
-    unique_Ns = sorted(intrinsic_points['N'].unique())
+    unique_Ns = sorted(df[curve_column].unique())
     handles, labels, _ = _get_legends(unique_Ns)
 
-    # Group by runid and plot each run
-    for g in data_proc.split_df(intrinsic_points, by_column='N'):
-    # TODO for g in intrinsic_points.groupby('N'):
-        current_N = g['N'].iloc[0]
-        g = g.sort_values("C")
-
-        # Draw line using pre-computed I_map values
-        if y_smooth_column is not None:
-            (ln,) = ax.plot(g["C"], g[y_smooth_column], alpha=0.5, color=COLOR_MAPPING[current_N])
-        # test
-        ax.scatter(g["C"], g[y_column], alpha=0.5, s=2, marker="o", edgecolor="none", color=COLOR_MAPPING[current_N])
-        
-    # Reference line y=x
-    xs = np.geomspace(max(1e-12, intrinsic_points["C"].min()),
-                      intrinsic_points["C"].max(), 200)
-    ax.plot(xs, xs, linestyle="--", alpha=0.1, label="y = x")
-    # Add reference line to legend
-    handles.append(Line2D([0], [0], color='black', linestyle='--', linewidth=1))
-    labels.append("y = x")
-    
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
-    if title:
-        ax.set_title(title)
-    ax.legend(handles, labels, loc="best", fontsize=8)
-    return ax
-
-def plot_fit_score_c_2a(
-    df,
-    pred_return_curves,
-    xlabel: str=None,
-    ylabel: str=None,
-    title: str=None,
-    ax=None,
-):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
-
-    dfs = data_proc.split_df(df, by_column='N')
-    # set legend
-    unique_Ns = sorted(set(g['N'].iloc[0] for g in dfs if 'N' in g.columns))
-    handles, labels, _ = _get_legends(unique_Ns)
-
-    # # Background: gray original/monotonized curves (not in legend)
-    # for g in dfs:
-    #     x = g["C"].to_numpy()
-    #     y = (g["R_smooth"] if "R_smooth" in g.columns else g["R"]).to_numpy()
-    #     ax.plot(x, y, alpha=0.25, color="gray")
-    
     # Plot raw data as scatter points
-    for g in dfs:
-        current_N = g['N'].iloc[0] if 'N' in g.columns else None
-        x = g["C"].to_numpy()
-        y = g["R"].to_numpy()  # Use raw R values, not monotone
+    for g in data_proc.split_df(df, by_column=curve_column):
+        curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
+        x = g[x_column].to_numpy()
+        y = g[y_column].to_numpy()
         # Plot as scatter points with lighter color
-        ax.scatter(x, y, alpha=0.3, s=8, color=COLOR_MAPPING[current_N], edgecolors='none')
+        ax.scatter(x, y, alpha=0.3, s=8, color=COLOR_MAPPING[curve_id], edgecolors='none')
+        # Plot width span
+        if y_width_column and y_width_column in g.columns and not width_on_smooth:
+            y_width = g[y_width_column].to_numpy()
+            ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
     
-    
-    # Prediction curves: group by N and add to legend, use consistent colors
-    for N, sub in pred_return_curves.groupby("N"):
-        # ax.plot(sub["C"], sub["R_pred"], linewidth=2, color=COLOR_MAPPING[N])
-        ax.scatter(sub["C"], sub["R_pred"], s=2, alpha=0.8, marker="x", edgecolor="none", color=COLOR_MAPPING[N])
+    # Plot smooth curves
+    if y_smooth_column is not None:
+        if df_smooth is None:
+            raise ValueError("df_smooth is required when y_smooth_column is not None")
+        for g in data_proc.split_df(df_smooth, by_column=curve_column):
+            curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
+            x = g[x_column].to_numpy()
+            y = g[y_smooth_column].to_numpy()
+            # Line
+            (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
+            # Plot width span
+            if y_width_column and y_width_column in g.columns and width_on_smooth:
+                y_width = g[y_width_column].to_numpy()
+                ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
 
-    ax.set_xscale("log")
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
+    if x_scale:
+        ax.set_xscale(x_scale)
+        if x_scale == "log":
+            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples
+            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+            # Minor ticks for intermediate values
+            ax.xaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
+    if y_scale:
+        ax.set_yscale(y_scale)
+        if y_scale == "log":
+            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples  
+            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+            # Minor ticks for intermediate values
+            ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
+    if x_label:
+        ax.set_xlabel(x_label)
+    if y_label:
+        ax.set_ylabel(y_label)
     if title:
         ax.set_title(title)
-    ax.legend(handles, labels, loc="best", fontsize=8)
+    ax.legend(handles, labels, loc='best', fontsize=8)
     return ax
 
-def plot_fit_ip_2b(
-    intrinsic_points,
-    pred_intrinsic_curves,
-    tangent_points,
-    xlabel: str=None,
-    ylabel: str=None,
-    title: str=None,
-    ax=None,
-):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
-
-    # set legend
-    unique_Ns = sorted(pred_intrinsic_curves["N"].unique())
-    handles, labels, _ = _get_legends(unique_Ns)
-
-    # y=x
-    xs = np.geomspace(max(1e-12, pred_intrinsic_curves["C"].min()), pred_intrinsic_curves["C"].max(), 200)
-    ax.plot(xs, xs, linestyle="--", label="y = x")
-
-    # Fitted curves grouped by N in legend, use consistent colors
-    for N, sub in pred_intrinsic_curves.groupby("N"):
-        ax.plot(sub["C"], sub["I_pred"], color=COLOR_MAPPING[N])
-    # Tangent points
-    if len(tangent_points):
-        ax.scatter(tangent_points["C_tan"], tangent_points["I_tan"], s=24, marker="o", edgecolor="none", label="tangent")
-
-    # Group by runid and plot each run
-    for g in data_proc.split_df(intrinsic_points, by_column='N'):
-    # TODO for g in intrinsic_points.groupby('N'):
-        current_N = g['N'].iloc[0]
-        g = g.sort_values("C")
-
-        # Draw line using pre-computed I_map values
-        # (ln,) = ax.plot(g["C"], g["I_map"], alpha=0.8, color=COLOR_MAPPING[current_N])
-        # test
-        ax.scatter(g["C"], g["I_map"], s=2, alpha=0.3, marker="o", edgecolor="none", color=COLOR_MAPPING[current_N])
-        
-    ax.set_xscale("log"); ax.set_yscale("log")
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
-    if title:
-        ax.set_title(title)
-    ax.legend(handles, labels, loc="best", fontsize=8)
-    return ax
-
-# =============================================================================
-# EMPIRICAL FRONTIER VISUALIZATION
-# =============================================================================
 
 def vplot_empirical_f_of_R(
     df,
@@ -524,26 +447,25 @@ def plot_phi_over_steps(
 
     return ax, stats, global_phi
 
-
 # ============================================================================
 # Multi-Subplot Layout Utilities
 # ============================================================================
 
-def create_multi_subplot_axes(keys, total_metrics, figure_columns, figure_size):
+def create_multi_subplot_axes(keys, total_evals, figure_columns, figure_size):
     """Create and return fig_axes dictionary with axes getter function"""
     fig_axes = {key: plt.subplots(
-        (total_metrics + figure_columns - 1) // figure_columns, figure_columns, 
+        (total_evals + figure_columns - 1) // figure_columns, figure_columns, 
         figsize=figure_size, constrained_layout=False
     ) for key in keys}
     
-    def get_axes_for_metric(metric_index):
-        if total_metrics > figure_columns:
-            row, col = metric_index // figure_columns, metric_index % figure_columns
+    def get_axes_for_eval(eval_index):
+        if total_evals > figure_columns:
+            row, col = eval_index // figure_columns, eval_index % figure_columns
             return {key: fig_axes[key][1][row, col] for key in keys}
         else:
             return {key: fig_axes[key][1] for key in keys}
     
-    return fig_axes, get_axes_for_metric
+    return fig_axes, get_axes_for_eval
 
 
 def set_figure_labels(fig_axes, xlabel, y_labels):
