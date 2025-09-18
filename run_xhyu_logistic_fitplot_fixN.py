@@ -28,7 +28,7 @@ SCRIPT_DIR = Path(__file__).parent
 OUTPUT_BASE_DIR = SCRIPT_DIR / "outputs"  # Base output directory for PNG plots
 SAMPLE_SIZE_PER_STEP = 512
 BUILD_I_ON_SMOOTHED = True
-WARMUP_CLIPPING_NUM = 20
+WARMUP_CLIPPING_NUM = 5
 
 
 PLOT_BASIC_CURVES = False # True for Intrinsic Curves
@@ -62,6 +62,17 @@ else:
     FIGURE_COLUMNS = 2 # note: if total > figure_columns, [row, col] -> [i]
     FIGURE_SIZE=(10, 10)
 
+
+# Y="Reward"
+Y="ErrRate"
+
+# X="logE"
+# X="C"
+# X="E"
+X="T"
+
+X_SCALE = "log"
+Y_SCALE = None
 
 total_evals = len(TEST_EVALS)
 phi_global = 1.0
@@ -162,7 +173,7 @@ def main():
     # 对相同横坐标（同一 model_size 与 step → 同一 E）聚合：只显示三个纵坐标（不同 run）的平均值
     df_mean = (
         df.groupby(['model_size', 'step'], as_index=False)
-          .agg(N=('N', 'first'), C=('C', 'first'), E=('E', 'first'), ErrRate=('ErrRate', 'mean'), ImprovementRate=('ImprovementRate', 'mean'))
+          .agg(N=('N', 'first'), C=('C', 'first'), E=('E', 'first'), T=('T', 'mean'), ErrRate=('ErrRate', 'mean'), ImprovementRate=('ImprovementRate', 'mean'))
     )
     # 颜色映射
     color_map = {
@@ -413,259 +424,45 @@ def main():
         for i, n_val in enumerate(unique_N_list):
             print(f"  N = {n_val:.2e}: E0(N) = {E0_fit_list[i]:.6f}")
         
-        # ===========================
-        # 绘制E0 vs N的scatter图
-        # ===========================
-        plt.figure(figsize=(10, 6))
-        
-        # 创建子图
-        plt.subplot(1, 2, 1)
-        # E0 vs N scatter图 - 对数尺度
-        plt.scatter(unique_N_list, E0_fit_list, color='red', s=80, alpha=0.8, 
-                   marker='o', edgecolor='black', linewidth=1, zorder=5)
-        
-        # 添加数值标签
-        for i, (n_val, e0_val) in enumerate(zip(unique_N_list, E0_fit_list)):
-            plt.annotate(f'{e0_val:.3f}', 
-                        (n_val, e0_val), 
-                        textcoords="offset points", 
-                        xytext=(0,10), 
-                        ha='center', 
-                        fontsize=9)
-        
-        plt.xscale('log')
-        plt.xlabel('Model Size N (parameters)')
-        plt.ylabel('E0 parameter')
-        plt.title('E0 vs Model Size N (Log Scale)')
-        plt.grid(True, alpha=0.3)
-        
-        # 线性尺度的E0 vs N图
-        plt.subplot(1, 2, 2)
-        plt.scatter([n/1e9 for n in unique_N_list], E0_fit_list, color='blue', s=80, alpha=0.8,
-                   marker='s', edgecolor='black', linewidth=1, zorder=5)
-        
-        # 添加数值标签
-        for i, (n_val, e0_val) in enumerate(zip(unique_N_list, E0_fit_list)):
-            plt.annotate(f'{e0_val:.3f}', 
-                        (n_val/1e9, e0_val), 
-                        textcoords="offset points", 
-                        xytext=(0,10), 
-                        ha='center', 
-                        fontsize=9)
-        
-        plt.xlabel('Model Size N (Billions of parameters)')
-        plt.ylabel('E0 parameter')
-        plt.title('E0 vs Model Size N (Linear Scale)')
-        plt.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        out_path_e0_scatter = OUTPUT_BASE_DIR / f"{FIGURE_PREFIX}_E0_vs_N_scatter.pdf"
-        plt.savefig(out_path_e0_scatter, dpi=300, bbox_inches='tight')
-        print(f"\nE0 vs N scatter图已保存到 {out_path_e0_scatter}")
-        
-        # 分析E0(N)的趋势
-        print(f"\n=== E0(N)关系分析 ====")
-        
-        # 计算E0的统计信息
-        E0_min = min(E0_fit_list)
-        E0_max = max(E0_fit_list)
-        E0_mean = np.mean(E0_fit_list)
-        E0_std = np.std(E0_fit_list)
-        
-        print(f"E0范围: [{E0_min:.6f}, {E0_max:.6f}]")
-        print(f"E0均值: {E0_mean:.6f} ± {E0_std:.6f}")
-        
-        # 简单拟合E0与N的关系
-        # 尝试线性关系: E0 = a_e0 * N + b_e0
-        try:
-            coeffs_linear = np.polyfit(unique_N_list, E0_fit_list, 1)
-            a_e0, b_e0 = coeffs_linear
-            E0_pred_linear = a_e0 * np.array(unique_N_list) + b_e0
-            r2_e0_linear = 1 - np.sum((np.array(E0_fit_list) - E0_pred_linear)**2) / np.sum((np.array(E0_fit_list) - E0_mean)**2)
-            print(f"\n线性拟合 E0(N) = a*N + b:")
-            print(f"  a = {a_e0:.2e}")
-            print(f"  b = {b_e0:.6f}")
-            print(f"  R² = {r2_e0_linear:.4f}")
-        except:
-            print("线性拟合失败")
-        
-        # 尝试对数关系: E0 = a_e0 * log(N) + b_e0
-        try:
-            coeffs_log = np.polyfit(np.log(unique_N_list), E0_fit_list, 1)
-            a_e0_log, b_e0_log = coeffs_log
-            E0_pred_log = a_e0_log * np.log(unique_N_list) + b_e0_log
-            r2_e0_log = 1 - np.sum((np.array(E0_fit_list) - E0_pred_log)**2) / np.sum((np.array(E0_fit_list) - E0_mean)**2)
-            print(f"\n对数拟合 E0(N) = a*log(N) + b:")
-            print(f"  a = {a_e0_log:.6f}")
-            print(f"  b = {b_e0_log:.6f}")
-            print(f"  R² = {r2_e0_log:.4f}")
-        except:
-            print("对数拟合失败")
-        
-        # 尝试Logistic函数拟合 E0(N)
-        # 对于递减的趋势，使用反向Logistic: E0(N) = L_e0 - A_e0 / (1 + exp(-r_e0 * (N - N0_e0)))
-        # 或者简化为: E0(N) = A_e0 / (1 + exp(r_e0 * (N - N0_e0))) + B_e0
-        def logistic_e0_func(N, A_e0, r_e0, N0_e0, B_e0):
-            """
-            Logistic函数拟合E0(N)
-            E0(N) = A_e0 / (1 + exp(r_e0 * (N - N0_e0))) + B_e0
-            """
-            return A_e0 / (1 + np.exp(r_e0 * (N - N0_e0))) + B_e0
-        
-        try:
-            # 初始参数估计
-            A_e0_init = max(E0_fit_list) - min(E0_fit_list)  # 振幅
-            r_e0_init = 1e-9  # 增长率（正值表示递减）
-            N0_e0_init = np.median(unique_N_list)  # 拐点
-            B_e0_init = min(E0_fit_list)  # 下渐近线
-            
-            print(f"\nLogistic拟合 E0(N) = A/(1 + exp(r*(N-N0))) + B:")
-            print(f"初始参数估计: A={A_e0_init:.6f}, r={r_e0_init:.2e}, N0={N0_e0_init:.2e}, B={B_e0_init:.6f}")
-            
-            popt_e0_logistic, pcov_e0_logistic = curve_fit(
-                logistic_e0_func, 
-                unique_N_list, 
-                E0_fit_list,
-                p0=[A_e0_init, r_e0_init, N0_e0_init, B_e0_init],
-                bounds=([0, 0, 0, -0.5], [1, 1e-6, 1e12, 0.5]),  # 同样限制B的范围
-                maxfev=50000,   # 增加迭代次数
-                ftol=1e-12,     # 设置收敛精度
-                xtol=1e-12,
-                gtol=1e-12
-            )
-            
-            A_e0_fit, r_e0_fit, N0_e0_fit, B_e0_fit = popt_e0_logistic
-            E0_pred_logistic = logistic_e0_func(unique_N_list, *popt_e0_logistic)
-            r2_e0_logistic = 1 - np.sum((np.array(E0_fit_list) - E0_pred_logistic)**2) / np.sum((np.array(E0_fit_list) - E0_mean)**2)
-            
-            print(f"  A = {A_e0_fit:.6f} (振幅)")
-            print(f"  r = {r_e0_fit:.2e} (增长率)")
-            print(f"  N0 = {N0_e0_fit:.2e} (拐点位置)")
-            print(f"  B = {B_e0_fit:.6f} (下渐近线)")
-            print(f"  R² = {r2_e0_logistic:.4f}")
-            
-            # 在E0 vs N图中添加Logistic拟合线
-            # 重新绘制E0 vs N图，加上Logistic拟合线
-            plt.figure(figsize=(12, 8))
-            
-            # 子图1: 对数尺度 + 所有拟合线
-            plt.subplot(2, 2, 1)
-            plt.scatter(unique_N_list, E0_fit_list, color='red', s=80, alpha=0.8, 
-                       marker='o', edgecolor='black', linewidth=1, zorder=5, label='Actual E0 values')
-            
-            # 绘制拟合线
-            N_smooth = np.logspace(np.log10(min(unique_N_list)), np.log10(max(unique_N_list)), 200)
-            
-            # Logistic拟合线
-            E0_smooth_logistic = logistic_e0_func(N_smooth, *popt_e0_logistic)
-            plt.plot(N_smooth, E0_smooth_logistic, 'b-', linewidth=2, label=f'Logistic (R²={r2_e0_logistic:.3f})')
-            
-            # 线性拟合线
-            if 'r2_e0_linear' in locals():
-                E0_smooth_linear = a_e0 * N_smooth + b_e0
-                plt.plot(N_smooth, E0_smooth_linear, 'g--', linewidth=2, label=f'Linear (R²={r2_e0_linear:.3f})')
-            
-            # 对数拟合线
-            if 'r2_e0_log' in locals():
-                E0_smooth_log = a_e0_log * np.log(N_smooth) + b_e0_log
-                plt.plot(N_smooth, E0_smooth_log, 'm:', linewidth=2, label=f'Logarithmic (R²={r2_e0_log:.3f})')
-            
-            plt.xscale('log')
-            plt.xlabel('Model Size N (parameters)')
-            plt.ylabel('E0 parameter')
-            plt.title('E0(N) Fitting Comparison - Log Scale')
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-            
-            # 子图2: 线性尺度
-            plt.subplot(2, 2, 2)
-            plt.scatter([n/1e9 for n in unique_N_list], E0_fit_list, color='blue', s=80, alpha=0.8,
-                       marker='s', edgecolor='black', linewidth=1, zorder=5, label='Actual E0 values')
-            
-            N_smooth_linear = np.linspace(min(unique_N_list), max(unique_N_list), 200)
-            
-            # Logistic拟合线
-            E0_smooth_logistic_linear = logistic_e0_func(N_smooth_linear, *popt_e0_logistic)
-            plt.plot([n/1e9 for n in N_smooth_linear], E0_smooth_logistic_linear, 'b-', linewidth=2, label=f'Logistic (R²={r2_e0_logistic:.3f})')
-            
-            plt.xlabel('Model Size N (Billions of parameters)')
-            plt.ylabel('E0 parameter')
-            plt.title('E0(N) Fitting Comparison - Linear Scale')
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-            
-            # 子图3: 残差分析
-            plt.subplot(2, 2, 3)
-            residuals_logistic = np.array(E0_fit_list) - E0_pred_logistic
-            plt.scatter(unique_N_list, residuals_logistic, color='red', alpha=0.8)
-            plt.axhline(y=0, color='black', linestyle='--')
-            plt.xscale('log')
-            plt.xlabel('Model Size N (parameters)')
-            plt.ylabel('Logistic Fit Residuals')
-            plt.title('Logistic Fit Residual Analysis')
-            plt.grid(True, alpha=0.3)
-            
-            # 子图4: 拟合质量比较
-            plt.subplot(2, 2, 4)
-            methods = []
-            r2_values = []
-            
-            if 'r2_e0_linear' in locals():
-                methods.append('Linear')
-                r2_values.append(r2_e0_linear)
-            if 'r2_e0_log' in locals():
-                methods.append('Logarithmic')
-                r2_values.append(r2_e0_log)
-            methods.append('Logistic')
-            r2_values.append(r2_e0_logistic)
-            
-            bars = plt.bar(methods, r2_values, color=['green', 'magenta', 'blue'][:len(methods)], alpha=0.7)
-            plt.ylabel('R² Value')
-            plt.title('E0(N) Fitting Quality Comparison')
-            plt.ylim(0, 1)
-            
-            # 在柱状图上添加数值标签
-            for bar, r2 in zip(bars, r2_values):
-                height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                        f'{r2:.3f}', ha='center', va='bottom')
-            
-            plt.grid(True, alpha=0.3)
-            
-            plt.tight_layout()
-            out_path_e0_analysis = OUTPUT_BASE_DIR / f"{FIGURE_PREFIX}_E0_analysis_comprehensive.pdf"
-            plt.savefig(out_path_e0_analysis, dpi=300, bbox_inches='tight')
-            print(f"\nE0(N)综合分析图已保存到 {out_path_e0_analysis}")
-            
-            # 比较不同拟合方法的质量
-            print(f"\n=== E0(N)拟合质量比较 ====")
-            if 'r2_e0_linear' in locals():
-                print(f"线性拟合 R²: {r2_e0_linear:.4f}")
-            if 'r2_e0_log' in locals():
-                print(f"对数拟合 R²: {r2_e0_log:.4f}")
-            print(f"Logistic拟合 R²: {r2_e0_logistic:.4f}")
-            
-            best_r2 = max([r2 for r2 in [r2_e0_linear if 'r2_e0_linear' in locals() else 0, 
-                          r2_e0_log if 'r2_e0_log' in locals() else 0, 
-                          r2_e0_logistic]])
-            if best_r2 == r2_e0_logistic:
-                print(f"\n🏆 Logistic函数拟合效果最佳！")
-                print(f"E0(N) = {A_e0_fit:.6f} / (1 + exp({r_e0_fit:.2e} * (N - {N0_e0_fit:.2e}))) + {B_e0_fit:.6f}")
-            
-        except Exception as e:
-            print(f"Logistic拟合失败: {e}")
-            
         # 绘图
         model0_stats = []
         plt.figure(figsize=(7, 5))
         
         # 先画散点
         for ms in unique_model_sizes:
+
+            # HERE: only keep 14B
+            if ms not in ['14b', '14B']:
+                continue
+
             subdf = df_mean[df_mean['model_size'] == ms].sort_values('E')
             E_vals = subdf['E'].to_numpy(dtype=float)
+            C_vals = subdf['C'].to_numpy(dtype=float)
+            T_vals = subdf['T'].to_numpy(dtype=float)
             ErrRate_vals = np.clip(subdf['ErrRate'].to_numpy(dtype=float), 1e-12, None)
-            x = np.log10(E_vals)
-            y = np.log10(ErrRate_vals)
+            # x = np.log10(E_vals)
+            if X == "logE":
+                x = np.log10(E_vals)
+            if X == "E":
+                print("-------------E_vals", E_vals)
+                x = E_vals
+            if X == "C":
+                x = C_vals
+            if X == "T":
+                x = T_vals
+
+            # TODO log(ErrRate)
+            if Y == "log(ErrRate)":
+                y = np.log10(ErrRate_vals)
+            # TODO ErrRate
+            if Y == "ErrRate":
+                y = ErrRate_vals
+            # TODO Reward
+            if Y == "Reward":
+                y = 1 - ErrRate_vals
+            # # TODO DeltaReward
+            # y = 1 - ErrRate_vals - (1 - ErrRate_vals[0])
+
             y0 = y[0]  # 起始点，用于相对显示
             plt.scatter(
                 # x, y - y0, label=f"{ms}",
@@ -675,37 +472,82 @@ def main():
         
         # 画拟合线
         for ms in unique_model_sizes:
+
+            # HERE: only keep 14B
+            if ms not in ['14b', '14B']:
+                continue
+
             subdf = df_mean[df_mean['model_size'] == ms]
             if len(subdf) < 2:
                 continue
             E_vals = subdf['E'].to_numpy(dtype=float)
+            C_vals = subdf['C'].to_numpy(dtype=float)
             ErrRate_vals = np.clip(subdf['ErrRate'].to_numpy(dtype=float), 1e-12, None)
             x = np.log10(E_vals)
-            y = np.log10(ErrRate_vals)
-            y0 = y[0]
+
+            # log(ErrRate)
+            # y = np.log10(ErrRate_vals)
+            # ErrRate
+            # y = ErrRate_vals
+
+            # Reward
+
+            # y0 = y[0]
             
             N_val = float(subdf['N'].iloc[0])
             k_logistic = logistic_k(N_val, L_fit, r_fit, N0_k_fit)  # 使用Logistic拟合的k(N)关系
             
-            # 计算E0值（使用Logistic函数）
-            E0_local = logistic_e0(N_val, L_fit, r_e0_fit, N0_e0_fit)
+            # # 计算E0值（使用Logistic函数）
+            # E0_local = logistic_e0(N_val, L_fit, r_e0_fit, N0_e0_fit)
             
-            # 计算该模型大小的R²
-            y_pred = global_model(popt, np.array([N_val] * len(x)), x)
-            ss_res = np.sum((y - y_pred) ** 2)
-            ss_tot = np.sum((y - np.mean(y)) ** 2)
-            r2_local = 1.0 - ss_res / ss_tot if ss_tot > 0 else np.nan
+            # # 计算该模型大小的R²
+            # y_pred = global_model(popt, np.array([N_val] * len(x)), x)
+            # ss_res = np.sum((y - y_pred) ** 2)
+            # ss_tot = np.sum((y - np.mean(y)) ** 2)
+            # r2_local = 1.0 - ss_res / ss_tot if ss_tot > 0 else np.nan
             
-            model0_stats.append({
-                'N': N_val, 'k': k_logistic, 'E0': E0_local, 'r2_log': r2_local,
-                'E_min': E_vals.min(), 'E_max': E_vals.max(), 'y0': y0
-            })
-            print(f"N={N_val:.3g}: k={k_logistic:.6f} (Logistic), E0={E0_local:.6f} (Logistic), R2(log10 ErrRate)={r2_local:.4f}")
+            # model0_stats.append({
+            #     'N': N_val, 'k': k_logistic, 'E0': E0_local, 'r2_log': r2_local,
+            #     'E_min': E_vals.min(), 'E_max': E_vals.max(), 'y0': y0
+            # })
+            # print(f"N={N_val:.3g}: k={k_logistic:.6f} (Logistic), E0={E0_local:.6f} (Logistic), R2(log10 ErrRate)={r2_local:.4f}")
             
             # 画拟合线
             E_grid = np.logspace(np.log10(E_vals.min()), np.log10(E_vals.max()), 200)
-            x_grid = np.log10(E_grid)
-            y_grid = global_model(popt, np.array([N_val] * len(x_grid)), x_grid)
+            # x_grid = np.log10(E_grid)
+
+
+            if X == "logE":
+                x_grid = np.log10(E_vals)
+                log10_E_grid = x_grid  # 已经是log10(E)
+            if X == "E":
+                print("-------------E_grid", E_grid)
+                # x_grid = E_grid
+                # log10_E_grid = np.log10(E_grid)  # ✅ 修复：转换为log10(E)给模型
+                x_grid = E_vals
+                log10_E_grid = np.log10(E_vals)  # ✅ 修复：转换为log10(E)给模型
+            if X == "C":
+                # x_grid = E_grid * N_val * phi_global
+                # log10_E_grid = np.log10(E_grid)  # ✅ 修复：转换为log10(E)给模型
+                x_grid = E_vals * N_val * phi_global
+                log10_E_grid = np.log10(E_vals)  # ✅ 修复：转换为log10(E)给模型
+            if X == "T":
+                x_grid = T_vals
+                log10_E_grid = np.log10(E_vals)  # ✅ 修复：转换为log10(E)给模型
+            
+            _y_grid = global_model(popt, np.array([N_val] * len(x_grid)), log10_E_grid)
+            # TODO log(ErrRate)
+            if Y == "log(ErrRate)":
+                y_grid = _y_grid
+            # TODO ErrRate
+            if Y == "ErrRate":
+                y_grid = 10**_y_grid
+            # TODO Reward
+            if Y == "Reward":
+                y_grid = 1 - 10**_y_grid
+            # # TODO DeltaReward
+            # y_grid = 1 - 10**_y_grid - (1 - ErrRate_vals[0])
+            
             # plt.plot(x_grid, y_grid - y0, color=color_map[ms], linewidth=2, linestyle='--')
             plt.plot(x_grid, y_grid, color=color_map[ms], linewidth=2, linestyle='--')
         
@@ -714,15 +556,34 @@ def main():
     #     model0_stats = []
 
     # 线性坐标：x=log10(E), y=Δlog10(ErrRate)
-    plt.xlabel(r"$\log_{10}E$")
-    plt.ylabel(r"$\log_{10}ErrRate$")
+    if X == "logE":
+        plt.xlabel(r"$\log_{10}E$")
+    if X == "E":
+        plt.xlabel(r"Data Size")
+    if X == "C":
+        plt.xlabel(r"Compute")
+    if X == "T":
+        plt.xlabel(r"Tokens")
+
+    if Y == "log(ErrRate)":
+        plt.ylabel(r"Err Rate (log)")
+    if Y == "ErrRate":
+        plt.ylabel(r"Err Rate")
+    if Y == "Reward":
+        plt.ylabel(r"Reward")
+    if Y == "DeltaReward":
+        plt.ylabel(r"DeltaReward")
+    
+    if X_SCALE:
+        plt.xscale(X_SCALE)
+    if Y_SCALE:
+        plt.yscale(Y_SCALE)
     
     # 更新标题显示完整的双 Logistic 公式（抽象形式）
     title_text = (r"Dual-Logistic Model: $\log_{10}ErrRate = -k(N) \cdot \log_{10}E + E_0(N)$" + "\n" +
                  r"$k(N) = \frac{L}{1 + \exp(-r \cdot (N - N_{0k}))}$" + "\n" +
                  r"$E_0(N) = \frac{L}{1 + \exp(r_{e0} \cdot (N - N_{0e0}))}$")
-    plt.title(title_text, fontsize=11, pad=20)
-    
+    # plt.title(title_text, fontsize=11, pad=20)
     # 在图上添加拟合参数信息
     info_text = (
         f"Fitting Results:\n"
@@ -737,10 +598,10 @@ def main():
         f"  N₀e0 = {N0_e0_fit:.2e}"
     )
     
-    # 在图的右上角添加信息框
-    plt.text(0.98, 0.98, info_text, transform=plt.gca().transAxes, 
-             fontsize=8, verticalalignment='top', horizontalalignment='right',
-             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    # # 在图的右上角添加信息框
+    # plt.text(0.98, 0.98, info_text, transform=plt.gca().transAxes, 
+    #          fontsize=8, verticalalignment='top', horizontalalignment='right',
+    #          bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
     
     plt.legend(title="Model Size", loc="lower left")
     plt.tight_layout()

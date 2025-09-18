@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Scaling Law Pipeline - Multi-Metric Analysis
-Processes multiple test metrics from Experiment1 data and generates scaling law plots for each metric
+Scaling Law Pipeline - Multi-Eval Analysis
+Processes multiple test evals from Experiment1 data and generates scaling law plots for each eval
 """
 
 import os
@@ -35,16 +35,16 @@ PLOT_BASIC_CURVES = False # True for Intrinsic Curves
 
 HOLDOUT=True
 if HOLDOUT:
-    # Test metrics to process (from the CSV columns)
-    TEST_METRICS = [
+    # Test evals to process (from the CSV columns)
+    TEST_EVALS = [
         'holdout_score',
     ]
     FIGURE_PREFIX = 'holdout'
     FIGURE_COLUMNS = 1 # note: if total > figure_columns, [row, col] -> [i]
     FIGURE_SIZE=(5, 5)
 else:
-    # Test metrics to process (from the CSV columns)
-    TEST_METRICS = [
+    # Test evals to process (from the CSV columns)
+    TEST_EVALS = [
         'overall_pass1', 
         'val/test_score/openai/gsm8k',
         'val/test_score/codegen__humaneval',
@@ -63,7 +63,7 @@ else:
     FIGURE_SIZE=(10, 10)
 
 
-total_metrics = len(TEST_METRICS)
+total_evals = len(TEST_EVALS)
 phi_global = 1.0
 
 DEBUG = False  # Set to False to disable data statistics printing
@@ -80,10 +80,10 @@ def main():
     csv_exp1_run1 = SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run1.csv" 
     csv_exp1_run2 = SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run2.csv" 
 
-    print("=== Multi-Metric Scaling Law Analysis ===")
+    print("=== Multi-Eval Scaling Law Analysis ===")
     print(f"Processing CSV: {csv_exp1_run0} and {csv_exp1_run1}")
     print(f"Output directory: {OUTPUT_BASE_DIR}")
-    print(f"Metrics to process: {len(TEST_METRICS)}")
+    print(f"Evals to process: {len(TEST_EVALS)}")
     
     # Load data
     if not csv_exp1_run0.exists():
@@ -104,8 +104,8 @@ def main():
     # Sort, Inspect, Validate and Normalize data
     df = df.sort_values(['model_size','runid','step']).reset_index(drop=True)
     # data_proc.inspect_data(df)
-    data_proc.validate_data(df, metric_columns=TEST_METRICS)
-    df = data_proc.normalize_data(df)
+    data_proc.validate_data(df, eval_columns=TEST_EVALS)
+    df = data_proc.rename_columns(df)
     # 丢掉每个 (model_size, runid) 的前 WARMUP_CLIPPING_NUM 个点
     if WARMUP_CLIPPING_NUM and WARMUP_CLIPPING_NUM > 0:
         df = (
@@ -122,7 +122,7 @@ def main():
         sample_size_per_step=SAMPLE_SIZE_PER_STEP, 
         tail_fraction=0.5
     )
-    print(f"phi (global tail median) = {phi_global}")
+    # print(f"phi (global tail median) = {phi_global}")
     
     # Recalculate C using the estimated phi_global
     df['C'] = df['N'] * df['E'] * phi_global
@@ -138,10 +138,10 @@ def main():
     # ===========================
     import matplotlib.pyplot as plt
 
-    # 只处理第一个metric
-    metric_name = TEST_METRICS[0]
+    # 只处理第一个eval
+    eval_name = TEST_EVALS[0]
     # 计算Error Rate
-    df['ErrRate'] = 1 - df[metric_name]
+    df['ErrRate'] = 1 - df[eval_name]
     # 对相同横坐标（同一 model_size 与 step → 同一 C）聚合：只显示三个纵坐标（不同 run）的平均值
     df_mean = (
         df.groupby(['model_size', 'step'], as_index=False)
