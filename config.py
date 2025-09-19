@@ -14,8 +14,8 @@ OUTPUT_BASE_DIR = SCRIPT_DIR / "outputs"  # Base output directory for PNG plots
 SAMPLE_SIZE_PER_STEP = 512
 BUILD_I_ON_SMOOTHED = True
 # warmup clipping: Important even for LLM RL
-WARMUP_CLIPPING_FACTOR_FOR_RAW = 15/100  # on raw data
-WARMUP_CLIPPING_FACTOR_FOR_SMOOTH = 0/100  # on smoothed data, [based on clipped raw]
+WARMUP_CLIPPING_FACTOR_FOR_RAW = 0/100  # on raw data
+WARMUP_CLIPPING_FACTOR_FOR_SMOOTH = 0/100  # only affects smoothed lines, not fitting lines, [based on clipped raw]
 
 # HOLDOUT=True,
 # Test evals to process (from the CSV columns)
@@ -58,3 +58,29 @@ DEFAULT_X_LABELS = {
 }
 
 DEBUG = False
+
+CSV_INSTRUCT_RUNS = [
+        SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
+        SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run1.csv" ,
+        SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run2.csv" ,
+    ]
+
+CSV_BASE_RUNS = [
+    SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_base.csv" ,
+    SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_base_run0.csv" ,
+]
+
+CSV_LLAMA_BASE_RUNS = [
+    SCRIPT_DIR / "csv" / "scaling_law_data_experiment-llama-base.csv" ,
+]
+
+CSV_LLAMA_INSTRUCT_RUNS = [
+    SCRIPT_DIR / "csv" / "scaling_law_data_experiment-llama-instruct.csv" ,
+]
+
+CSV_MAP = {
+    "base": CSV_BASE_RUNS,
+    "instruct": CSV_INSTRUCT_RUNS,
+    "llama-base": CSV_LLAMA_BASE_RUNS,
+    "llama-instruct": CSV_LLAMA_INSTRUCT_RUNS,
+}

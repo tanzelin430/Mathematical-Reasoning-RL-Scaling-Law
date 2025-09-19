@@ -8,6 +8,7 @@ This module provides functions for:
 """
 
 import math
+from typing import Callable
 import data_proc
 import numpy as np
 import pandas as pd
@@ -37,8 +38,10 @@ COLOR_MAPPING = {
     # for model size
     0.5e9: '#1f77b4',
     1.5e9: '#ff7f0e',
+    1e9: '#1f77b4', # use same
     3e9: '#d62728',
     7e9: '#2ca02c',
+    8e9: '#2ca02c', # use same
     14e9: '#9467bd',
     # for data dup factor
     0: '#1f77b4',
@@ -90,50 +93,59 @@ def human_format_N(N: float, mode: str = "eng", sig: int = 3, sci_coeff: bool = 
 # FIGURE PLOTTING
 # =============================================================================
 
-def _get_legends(_Ns: list[float]):
-    sort_Ns = sorted(_Ns)
-    handles = [Line2D([0], [0], color=COLOR_MAPPING[n], linewidth=2) for n in sort_Ns]
-    labels = [f"N={human_format_N(n, mode='eng', sig=3, sci_coeff=True)}" for n in sort_Ns]
-    return handles, labels, sort_Ns
-
+# lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}"
+def _get_legends(_curves: list[float], legend_lambda = None):
+    if legend_lambda is None:
+        legend_lambda = lambda x: x
+    sort_curves = sorted(_curves)
+    handles = [Line2D([0], [0], color=COLOR_MAPPING[n], linewidth=2) for n in sort_curves]
+    labels = [legend_lambda(n) for n in sort_curves]
+    return handles, labels, sort_curves
 
 def plot_basic(
-    df,    # raw data to overlay as scatter points
-    curve_column: str,
-    x_column: str,
-    y_column: str,  # column for raw scatter points
+    x: np.ndarray,
+    y: np.ndarray,
+    use_scatter: bool = False,
+    use_line: bool = False,
+    scatter_alpha: float = 0.3,
+    scatter_s: int = 8,
+    line_alpha: float = 0.5,
+    fill_width: np.ndarray = None,
+    fill_width_alpha: float = 0.2,
+    color: str = 'k',
+    ax: plt.Axes = None
+):
+    if not use_scatter and not use_line and fill_width is None:
+        raise ValueError("At least one of use_scatter, use_line, or y_fill_width must be True or not None")
+    """Generic plotting function that can handle both score and error rate plots"""
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
+    # Scatter
+    if use_scatter:
+        ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, color=color, edgecolors='none')
+    # Line
+    if use_line:
+        ax.plot(x, y, alpha=line_alpha, color=color)
+    if fill_width is not None:
+        ax.fill_between(x, y - fill_width, y + fill_width, alpha=fill_width_alpha, color=color)
+    
+    return ax
+
+def plot_basic_settings(
+    ax: plt.Axes, 
+    # x_scale=None, y_scale=None, x_label=None, y_label=None, title=None, use_legend: bool = False,
+    # legend_handles_labels: tuple = None, legend_loc='best', legend_bbox_to_anchor=None, legend_fontsize=8
     x_scale: str = None,
     y_scale: str = None,
     x_label: str = None,
     y_label: str = None,
     title: str = None,
-    use_scatter: bool = True,
-    use_line: bool = True,
-    scatter_alpha: float = 0.3,
-    scatter_s: int = 8,
-    line_alpha: float = 0.5,
-    ax=None
+    use_legend: bool = False,
+    legend_handles_labels: tuple = None,
+    legend_loc: str = 'best',
+    legend_bbox_to_anchor: tuple = None,
+    legend_fontsize: int = 8,
 ):
-    """Generic plotting function that can handle both score and error rate plots"""
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
-    
-    # set legend
-    unique_Ns = sorted(df[curve_column].unique())
-    handles, labels, _ = _get_legends(unique_Ns)
-
-    # Plot raw data as scatter points
-    for g in data_proc.split_df(df, by_column=curve_column):
-        curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-        x = g[x_column].to_numpy()
-        y = g[y_column].to_numpy()
-        # Scatter
-        if use_scatter:
-            ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, color=COLOR_MAPPING[curve_id], edgecolors='none')
-        # Line
-        if use_line:
-            ax.plot(x, y, alpha=line_alpha, color=COLOR_MAPPING[curve_id])
-
     if x_scale:
         ax.set_xscale(x_scale)
         if x_scale == "log":
@@ -154,11 +166,13 @@ def plot_basic(
         ax.set_ylabel(y_label)
     if title:
         ax.set_title(title)
-    ax.legend(handles, labels, loc='best', fontsize=8)
+    if use_legend:
+        _handles, _labels = ax.get_legend_handles_labels()
+        handles, labels = legend_handles_labels if legend_handles_labels else ([], [])
+        ax.legend(_handles + handles, _labels + labels, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor, fontsize=legend_fontsize)
     return ax
 
-
-def plot_generic_curve(
+def plot_curves(
     df,    # raw data to overlay as scatter points
     curve_column: str,
     x_column: str,
@@ -172,15 +186,95 @@ def plot_generic_curve(
     x_label: str = None,
     y_label: str = None,
     title: str = None,
+    use_scatter: bool = False,
+    use_line: bool = False,
+    smooth_use_scatter: bool = False,
+    smooth_use_line: bool = False,
+    use_legend: bool = False,
+    legend_lambda: Callable = None,
+    legend_loc: str = 'best',
+    legend_bbox_to_anchor: tuple = None,
+    legend_fontsize: int = 8,
+    ax=None
+):
+    """Generic plotting function that can handle both score and error rate plots"""
+    # Plot raw data as scatter points
+    for g in data_proc.split_df(df, by_column=curve_column):
+        curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
+        # always sort by x column
+        g = g.sort_values(x_column)
+        x = g[x_column].to_numpy()
+        y = g[y_column].to_numpy()
+        y_width = g[y_width_column].to_numpy() if y_width_column and not width_on_smooth and y_width_column in g.columns else None
+        
+        ax = plot_basic(x, y, 
+            use_scatter=use_scatter, scatter_alpha=0.3, scatter_s=8, 
+            use_line=use_line, line_alpha=0.5,
+            fill_width=y_width, fill_width_alpha=0.2, color=COLOR_MAPPING[curve_id], ax=ax)
+        
+    # Plot smooth curves
+    if y_smooth_column is not None:
+        if df_smooth is None:
+            raise ValueError("df_smooth is required when y_smooth_column is not None")
+        for g in data_proc.split_df(df_smooth, by_column=curve_column):
+            curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
+            # always sort by x column
+            g = g.sort_values(x_column)
+            x = g[x_column].to_numpy()
+            y = g[y_smooth_column].to_numpy()
+            y_width = g[y_width_column].to_numpy() if y_width_column and width_on_smooth and y_width_column in g.columns else None
+            
+            ax = plot_basic(x, y, 
+                use_scatter=smooth_use_scatter, scatter_alpha=0.3, scatter_s=8, 
+                use_line=smooth_use_line, line_alpha=0.5,
+                fill_width=y_width, fill_width_alpha=0.2, color=COLOR_MAPPING[curve_id], ax=ax)
+            # # Line
+            # (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
+            # # Plot width span
+            # if y_width_column and y_width_column in g.columns and width_on_smooth:
+            #     y_width = g[y_width_column].to_numpy()
+            #     ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
+    
+    # set legend
+    if use_legend:
+        unique_curves = sorted(df[curve_column].unique())
+        if legend_lambda is None:
+            legend_lambda = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}"
+        handles, labels, _ = _get_legends(unique_curves, legend_lambda)
+    else:
+        handles, labels = None, None
+    
+    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, (handles, labels), legend_loc, legend_bbox_to_anchor, legend_fontsize)
+    return ax
+
+def _backup_plot_curves(
+    df,    # raw data to overlay as scatter points
+    curve_column: str,
+    x_column: str,
+    y_column: str,  # column for raw scatter points
+    df_smooth=None,  # smoothed data for curves, if None use df
+    y_smooth_column: str = None,  # column for smooth curves, if None use y_column
+    y_width_column: str = None, # e.g. std
+    width_on_smooth: bool = False,
+    x_scale: str = None,
+    y_scale: str = None,
+    x_label: str = None,
+    y_label: str = None,
+    title: str = None,
+    use_legend: bool = False,
+    legend_lambda: Callable = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}",
+    legend_loc: str = 'best',
+    legend_bbox_to_anchor: tuple = None,
+    legend_fontsize: int = 8,
     ax=None
 ):
     """Generic plotting function that can handle both score and error rate plots"""
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
     
     # set legend
-    unique_Ns = sorted(df[curve_column].unique())
-    handles, labels, _ = _get_legends(unique_Ns)
+    unique_curves = sorted(df[curve_column].unique())
+    handles, labels, _ = _get_legends(unique_curves, legend_lambda)
 
     # Plot raw data as scatter points
     for g in data_proc.split_df(df, by_column=curve_column):
@@ -208,30 +302,8 @@ def plot_generic_curve(
             if y_width_column and y_width_column in g.columns and width_on_smooth:
                 y_width = g[y_width_column].to_numpy()
                 ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
-
-    if x_scale:
-        ax.set_xscale(x_scale)
-        if x_scale == "log":
-            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples
-            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
-            # Minor ticks for intermediate values
-            ax.xaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
-    if y_scale:
-        ax.set_yscale(y_scale)
-        if y_scale == "log":
-            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples  
-            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
-            # Minor ticks for intermediate values
-            ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
-    if x_label:
-        ax.set_xlabel(x_label)
-    if y_label:
-        ax.set_ylabel(y_label)
-    if title:
-        ax.set_title(title)
-    ax.legend(handles, labels, loc='best', fontsize=8)
+    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, handles, labels, legend_loc, legend_bbox_to_anchor, legend_fontsize)
     return ax
-
 
 def vplot_empirical_f_of_R(
     df,

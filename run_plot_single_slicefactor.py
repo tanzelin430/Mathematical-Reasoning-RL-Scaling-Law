@@ -29,11 +29,14 @@ def main():
         plot_y_label=config.DEFAULT_Y_LABELS[metric],
         plot_x_scale="log",
         # plot_y_scale=y_scale,
-        plot_title=eval_name,
+        plot_title=config.TEST_EVALS[eval_name]['plot_str'],
+        plot_use_legend=True,
+        plot_legend_lambda=lambda n: f"Dup factor={n}",
         # delta
         # delta_base_step=1,
         # smooth
         add_smooth=True,
+        use_linear=True,
         # add_std=True,
         calc_delta=False,
         smooth_monotonic=True,
@@ -47,6 +50,7 @@ def main():
         min_se=1e-2,
         x_inv_weight_power=1,
         save_to_dir=config.OUTPUT_BASE_DIR, 
+        save_to_filename_prefix='slicefactor_',
     )
 
 if __name__ == "__main__":
