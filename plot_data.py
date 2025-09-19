@@ -3,6 +3,7 @@
 
 import os
 import sys
+from typing import Callable
 import matplotlib.pyplot as plt
 
 # Add current directory to path for imports
@@ -14,7 +15,7 @@ import config
 from pathlib import Path
 import fit
 
-def plot_generic_curve_allinone(
+def plot_curves_with_smooth(
     # plot params
     df,
     curve_column: str,
@@ -26,6 +27,15 @@ def plot_generic_curve_allinone(
     x_label: str = None,
     y_label: str = None,
     title: str = None,
+    use_scatter: bool = False,
+    use_line: bool = False,
+    smooth_use_scatter: bool = False,
+    smooth_use_line: bool = False,
+    use_legend: bool = False,
+    legend_lambda: Callable = None,
+    legend_loc: str = 'best',
+    legend_bbox_to_anchor: tuple = None,
+    legend_fontsize: int = 8,
     ax=None,
     # smooth params
     add_smooth: bool = False, 
@@ -40,9 +50,7 @@ def plot_generic_curve_allinone(
     min_se: float = 1e-6,
     x_inv_weight_power: float = 0.3,
     smooth_out_column: str = None,
-    # fit params
-    fit_model: fit.FitLogErrRate = None,
-    fit_out_column: str = None,
+    use_linear: bool = False,
 ):
 
     if warmup_frac_raw > 0:
@@ -66,12 +74,13 @@ def plot_generic_curve_allinone(
             k_spline=k_spline,
             rolling_window=rolling_window, 
             min_se=min_se, 
-            x_inv_weight_power=x_inv_weight_power
+            x_inv_weight_power=x_inv_weight_power,
+            use_linear=use_linear
         )
         if warmup_frac_smooth > 0:
             df_R_smooth = data_proc.apply_warmup_clipping(df_R_smooth, curve_column=curve_column, warmup_frac=warmup_frac_smooth)
 
-    ax = plot.plot_generic_curve(
+    ax = plot.plot_curves(
         df,
         curve_column=curve_column,
         x_column=x_column,
@@ -85,6 +94,15 @@ def plot_generic_curve_allinone(
         x_label=x_label,
         y_label=y_label,
         title=title,
+        use_scatter=use_scatter,
+        use_line=use_line,
+        smooth_use_scatter=smooth_use_scatter,
+        smooth_use_line=smooth_use_line,
+        use_legend=use_legend,
+        legend_lambda=legend_lambda,
+        legend_loc=legend_loc,
+        legend_bbox_to_anchor=legend_bbox_to_anchor,
+        legend_fontsize=legend_fontsize,
         ax=ax
     )
 
@@ -100,8 +118,19 @@ def process_single_eval(
     plot_x_scale: str=None,
     plot_y_scale: str=None,
     plot_title: str=None, 
+    plot_use_legend: bool = False,
+    plot_use_scatter: bool = True,
+    plot_use_line: bool = False,
+    plot_smooth_use_scatter: bool = False,
+    plot_smooth_use_line: bool = True,
+    plot_legend_loc: str = 'best',
+    plot_legend_bbox_to_anchor: tuple = None,
+    plot_legend_lambda: Callable = None,
+    plot_legend_fontsize: int = 8,
     ax: plt.Axes=None,
     save_to_dir: str = None,
+    save_to_filename: str = None,
+    save_to_filename_prefix: str = None,
     # smooth
     delta_base_step: int = 0,
     add_smooth=False,
@@ -117,6 +146,7 @@ def process_single_eval(
     rolling_window=200,
     min_se=1e-6,
     x_inv_weight_power=0.3,
+    use_linear=False,
     ):
     
     
@@ -151,7 +181,7 @@ def process_single_eval(
         df = df[df[plot_curve_column].isin(plot_curve_mask)]
     df.sort_values(plot_x_column, inplace=True)
     
-    ax = plot_generic_curve_allinone(
+    ax = plot_curves_with_smooth(
         df,
         curve_column=plot_curve_column,
         x_column=plot_x_column,
@@ -162,6 +192,15 @@ def process_single_eval(
         x_label=plot_x_label,
         y_label=plot_y_label,
         title=plot_title,
+        use_legend=plot_use_legend,
+        use_scatter=plot_use_scatter,
+        use_line=plot_use_line,
+        smooth_use_scatter=plot_smooth_use_scatter,
+        smooth_use_line=plot_smooth_use_line,
+        legend_lambda=plot_legend_lambda,
+        legend_loc=plot_legend_loc,
+        legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
+        legend_fontsize=plot_legend_fontsize,
         ax=ax,
         # smooth
         add_smooth=add_smooth,
@@ -175,18 +214,23 @@ def process_single_eval(
         rolling_window=rolling_window,
         min_se=min_se,
         x_inv_weight_power=x_inv_weight_power,
-        smooth_out_column=plot_metric+"_smooth" if add_smooth else None
+        smooth_out_column=plot_metric+"_smooth" if add_smooth else None,
+        use_linear=use_linear
     )
 
-    if save_to_dir is not None:
+    if save_to_dir is not None or save_to_filename is not None:
         plt.tight_layout()
         # Create eval-specific output directory
         eval_file_str = config.TEST_EVALS[plot_eval_column]['file_str']
         Path(save_to_dir).mkdir(parents=True, exist_ok=True)
         filename = f"{eval_file_str}_{plot_curve_column}_{plot_x_column}_{plot_metric}"
+        if save_to_filename_prefix is not None:
+            filename = save_to_filename_prefix + filename
         if plot_curve_mask is not None:
             filename += f"_{str(plot_curve_mask)}"
         filename += ".pdf"
+        if save_to_filename is not None:
+            filename = save_to_filename
         save_to_path = save_to_dir / filename
         plt.savefig(save_to_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -203,12 +247,22 @@ def process_single_eval_multi_metrics(
     plot_x_scale: str=None,
     plot_y_scale: str=None,
     plot_title: str=None, 
+    plot_use_legend: bool = False,
+    plot_use_scatter: bool = False,
+    plot_use_line: bool = False,
+    plot_smooth_use_scatter: bool = False,
+    plot_smooth_use_line: bool = False,
+    plot_legend_lambda: Callable = None,
+    plot_legend_loc: str = 'best',
+    plot_legend_bbox_to_anchor: tuple = None,
+    plot_legend_fontsize: int = 8,
     plot_reward: bool=False, plot_err_rate: bool=False, plot_delta_reward: bool=False, plot_delta_err_rate: bool=False, 
     ax_reward: plt.Axes=None, ax_err_rate: plt.Axes=None, ax_delta_reward: plt.Axes=None, ax_delta_err_rate: plt.Axes=None, 
     delta_base_step: int = 0,
     warmup_frac_raw: float = 0,
     warmup_frac_smooth: float = 0,
     output_dir: str = None,
+    use_linear=False,
     ):
     
     # # Format eval names
@@ -243,7 +297,7 @@ def process_single_eval_multi_metrics(
     df.sort_values(plot_x_column, inplace=True)
     
     if plot_reward:
-        ax = plot_generic_curve_allinone(
+        ax = plot_curves_with_smooth(
             df,
             curve_column=plot_curve_column,
             x_column=plot_x_column,
@@ -254,6 +308,15 @@ def process_single_eval_multi_metrics(
             x_label=plot_x_label,
             y_label=plot_y_label,
             title=plot_title,
+            use_scatter=plot_use_scatter,
+            use_line=plot_use_line,
+            smooth_use_scatter=plot_smooth_use_scatter,
+            smooth_use_line=plot_smooth_use_line,
+            use_legend=plot_use_legend,
+            legend_lambda=plot_legend_lambda,
+            legend_loc=plot_legend_loc,
+            legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
+            legend_fontsize=plot_legend_fontsize,
             ax=ax_reward,
             # smooth
             add_smooth=True,
@@ -267,7 +330,8 @@ def process_single_eval_multi_metrics(
             rolling_window=200,
             min_se=1e-6,
             x_inv_weight_power=0.3,
-            smooth_out_column="R_smooth"
+            smooth_out_column="R_smooth",
+            use_linear=use_linear
         )
         if ax_reward is None:
             plt.tight_layout()
@@ -275,7 +339,7 @@ def process_single_eval_multi_metrics(
             plt.close()
             print(f"Saved {output_dir / plot_eval_column / plot_x_column}_reward.pdf")
     if plot_err_rate:
-        ax = plot_generic_curve_allinone(
+        ax = plot_curves_with_smooth(
             df,
             curve_column=plot_curve_column,
             x_column=plot_x_column,
@@ -286,6 +350,15 @@ def process_single_eval_multi_metrics(
             x_label=plot_x_label,
             y_label=plot_y_label,
             title=plot_title,
+            use_scatter=plot_use_scatter,
+            use_line=plot_use_line,
+            smooth_use_scatter=plot_smooth_use_scatter,
+            smooth_use_line=plot_smooth_use_line,
+            use_legend=plot_use_legend,
+            legend_lambda=plot_legend_lambda,
+            legend_loc=plot_legend_loc,
+            legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
+            legend_fontsize=plot_legend_fontsize,
             ax=ax_err_rate,
             # smooth
             add_smooth=True,
@@ -299,7 +372,8 @@ def process_single_eval_multi_metrics(
             rolling_window=200,
             min_se=1e-6,
             x_inv_weight_power=0.3,
-            smooth_out_column="ErrRate_smooth"
+            smooth_out_column="ErrRate_smooth",
+            use_linear=use_linear
         )
         if ax_err_rate is None:
             plt.tight_layout()
@@ -307,7 +381,7 @@ def process_single_eval_multi_metrics(
             plt.close()
             print(f"Saved {output_dir / plot_eval_column / plot_x_column}_err_rate.pdf")
     if plot_delta_reward:
-        ax = plot_generic_curve_allinone(
+        ax = plot_curves_with_smooth(
             df,
             curve_column=plot_curve_column,
             x_column=plot_x_column,
@@ -318,6 +392,15 @@ def process_single_eval_multi_metrics(
             x_label=plot_x_label,
             y_label=plot_y_label,
             title=plot_title,
+            use_scatter=plot_use_scatter,
+            use_line=plot_use_line,
+            smooth_use_scatter=plot_smooth_use_scatter,
+            smooth_use_line=plot_smooth_use_line,
+            use_legend=plot_use_legend,
+            legend_lambda=plot_legend_lambda,
+            legend_loc=plot_legend_loc,
+            legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
+            legend_fontsize=plot_legend_fontsize,
             ax=ax_delta_reward,
             # smooth
             add_smooth=True,
@@ -331,7 +414,8 @@ def process_single_eval_multi_metrics(
             rolling_window=200,
             min_se=1e-6,
             x_inv_weight_power=0.3,
-            smooth_out_column="DeltaReward_smooth"
+            smooth_out_column="DeltaReward_smooth",
+            use_linear=use_linear
         )
         if ax_delta_reward is None:
             plt.tight_layout()
@@ -339,7 +423,7 @@ def process_single_eval_multi_metrics(
             plt.close()
             print(f"Saved {output_dir / plot_eval_column / plot_x_column}_delta_reward.pdf")
     if plot_delta_err_rate:
-        ax = plot_generic_curve_allinone(
+        ax = plot_curves_with_smooth(
             df,
             curve_column=plot_curve_column,
             x_column=plot_x_column,
@@ -350,6 +434,15 @@ def process_single_eval_multi_metrics(
             x_label=plot_x_label,
             y_label=plot_y_label,
             title=plot_title,
+            use_scatter=plot_use_scatter,
+            use_line=plot_use_line,
+            smooth_use_scatter=plot_smooth_use_scatter,
+            smooth_use_line=plot_smooth_use_line,
+            use_legend=plot_use_legend,
+            legend_lambda=plot_legend_lambda,
+            legend_loc=plot_legend_loc,
+            legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
+            legend_fontsize=plot_legend_fontsize,
             ax=ax_delta_err_rate,
             # smooth
             add_smooth=True,
@@ -363,10 +456,58 @@ def process_single_eval_multi_metrics(
             rolling_window=200,
             min_se=1e-6,
             x_inv_weight_power=0.3,
-            smooth_out_column="DeltaErrRate_smooth"
+            smooth_out_column="DeltaErrRate_smooth",
+            use_linear=use_linear
         )
         if ax_delta_err_rate is None:
             plt.tight_layout()
             plt.savefig(output_dir / plot_eval_column / f"{plot_x_column}_delta_err_rate.pdf", dpi=300, bbox_inches='tight')
             plt.close()
             print(f"Saved {output_dir / plot_eval_column / plot_x_column}_delta_err_rate.pdf")
+
+def predict_and_plot(
+    df,
+    predict_func, # similar to predicter.predict_errrate_df
+    predict_x_column_list,
+    metric_column, # TODO: useless?
+    plot_curve_column,
+    plot_x_column,
+    plot_on_delta = False,
+    plot_y_lambda = None,
+    plot_delta_base_step = 0,
+    plot_use_line = False,
+    plot_use_scatter = False,
+    plot_x_scale = None,
+    plot_y_scale = None,
+    warmup_frac_raw = 0,
+    ax: plt.Axes=None,
+):
+    # predicter = fit.FitLogErrRate(L=0.06333, r=1.73e-10, N0_k=4.95e9, r_e0=1e-9, N0_e0=3e9)
+    pred_column = metric_column + "_pred"
+    df[pred_column] = predict_func(df, *predict_x_column_list)
+
+    if plot_on_delta: # plot delta instead of raw pred
+        # predict delta
+        delta_pred_column = pred_column + "_delta"
+        df[delta_pred_column] = data_proc.calc_delta_y(df, pred_column, base_step=plot_delta_base_step, curve_column=plot_curve_column)
+        pred_column = delta_pred_column
+    if plot_y_lambda is not None: # plot 1 - pred
+        tmp_pred_column = pred_column + "_lambda"
+        df[tmp_pred_column] = plot_y_lambda(df[pred_column])
+        pred_column = tmp_pred_column
+    # # eval_name = "val/test_score/openai/gsm8k" # must be one of config.TEST_EVALS.keys()
+    # eval_name = "holdout_score"
+    # x_column = "C" # key must be one of 'T', 'C', 'E'
+    # metric = 'ErrRate' # key must be one of 'R', 'ErrRate', 'DeltaReward', 'DeltaErrRate'
+    # curve_column = 'N' # key must be one of 'N', 'data_fator'
+
+    df_fit_plot = data_proc.apply_warmup_clipping(df, curve_column=plot_curve_column, warmup_frac=warmup_frac_raw)
+    ax = plot.plot_curves(
+        df_fit_plot, 
+        curve_column=plot_curve_column, x_column=plot_x_column, y_column=pred_column, 
+        use_line=plot_use_line,
+        use_scatter=plot_use_scatter,
+        x_scale=plot_x_scale, y_scale=plot_y_scale, 
+        ax=ax,
+    )
+    return ax

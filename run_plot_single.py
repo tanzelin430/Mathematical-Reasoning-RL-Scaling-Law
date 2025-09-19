@@ -9,11 +9,9 @@ import plot_data
 import config
 
 def main():
-    df = data_proc.load_and_preprocess([
-        config.SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
-        config.SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run1.csv" ,
-        config.SCRIPT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run2.csv" ,
-    ])
+    model_type = "base"
+
+    df = data_proc.load_and_preprocess(config.CSV_INSTRUCT_RUNS if model_type == "instruct" else config.CSV_BASE_RUNS)
     
     # eval_name = "val/test_score/openai/gsm8k" # must be one of config.TEST_EVALS.keys()
     eval_name = "holdout_score"
@@ -31,7 +29,8 @@ def main():
         plot_y_label=config.DEFAULT_Y_LABELS[metric],
         plot_x_scale="log",
         # plot_y_scale=y_scale,
-        plot_title=eval_name,
+        plot_title=config.TEST_EVALS[eval_name]['plot_str'],
+        plot_use_legend=True,
         # delta
         delta_base_step=1,
         # smooth

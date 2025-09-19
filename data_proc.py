@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import config
 import fit_utils
+from scipy.optimize import curve_fit
 
 __all__ = [
     # Data processing
@@ -251,6 +252,20 @@ def calc_delta_y(df, y_column: str, base_step: int, curve_column: str, debug=con
 def sort_dfs(runs_raw_dfs):
     return [g.sort_values('C').reset_index(drop=True) for g in runs_raw_dfs]
 
+
+def smooth_df_single_curve_linear(
+    df,
+    col_x: str,
+    col_y: str,
+    col_y_out: str,
+):
+    # use curve_fit
+    x = df[col_x]
+    y = df[col_y]
+    popt, pcov = curve_fit(lambda x, a, b: a * x + b, x, y)
+    df[col_y_out] = popt[0] * x + popt[1]
+    return df
+
 def smooth_df_single_curve(
     df,
     col_x: str,
@@ -302,9 +317,14 @@ def smooth_df(
     rolling_window: int = 20,
     min_se: float = 1e-3,
     x_inv_weight_power: float = 0.2,
+    use_linear: bool = False,
 ) -> pd.DataFrame:
-    return pd.concat(
-        [
+    if use_linear:
+        return pd.concat(
+            [smooth_df_single_curve_linear(g, col_x, col_y, col_y_out) for g in split_df(df, by_column=curve_column)],
+            ignore_index=True)
+    else:
+        return pd.concat([
             smooth_df_single_curve(g, col_x, col_y, col_y_out, monotonic, increasing, strict, s_factor, k_spline, rolling_window, min_se, x_inv_weight_power) 
             for g in split_df(df, by_column=curve_column)
         ], 

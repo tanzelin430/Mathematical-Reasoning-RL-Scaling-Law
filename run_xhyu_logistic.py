@@ -284,8 +284,6 @@ def main():
     #     k = a * N + b  # k(N) = a * N + b
     #     return -k * log10_E + E0
     
-    # 使用scipy进行非线性拟合
-    from scipy.optimize import curve_fit
     
     # # 初始参数估计
     # a_init = 3.65e-12  # 基于之前的分析

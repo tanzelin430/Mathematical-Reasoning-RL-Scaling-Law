@@ -16,14 +16,19 @@ class ComputeExtractorExperiment:
         self.model_size_map = {
             "0.5B": 0.5e9,
             "1.5B": 1.5e9,
+            "1B": 1e9,
             "3B": 3e9,
             "7B": 7e9,
+            "8B": 8e9,
             "14B": 14e9,
             "0.5b": 0.5e9,
             "1.5b": 1.5e9,
+            "1b": 1e9,
             "3b": 3e9,
             "7b": 7e9,
+            "8b": 8e9,
             "14b": 14e9,
+            "7b-Instruct": 7e9,
         }
         
     def extract_step_tokens(self, log_file):
@@ -360,13 +365,18 @@ if __name__ == "__main__":
     #  .save('csv/scaling_law_data_experiment1_base_run0.csv'))
 
 
-    (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/experiment2-base')
-     .inspect()
-     .save('csv/scaling_law_data_experiment2_base.csv'))
-
-    # # Process experiment2-base data
     # (ComputeExtractorExperiment()
     #  .run(experiment_root_dir='data/experiment2-base')
     #  .inspect()
     #  .save('csv/scaling_law_data_experiment2_base.csv'))
+
+
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment-llama-base')
+     .inspect()
+     .save('csv/scaling_law_data_experiment-llama-base.csv'))
+
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment-llama-instruct')
+     .inspect()
+     .save('csv/scaling_law_data_experiment-llama-instruct.csv'))
