@@ -1,6 +1,9 @@
 # LLM-RL-Scaling-Law-Analysis
 
 ## Quick start
+
+- view the code briefly before execute, it may contain config info
+
 ```bash
 $ uv run python extract_csv.py
 
@@ -12,6 +15,9 @@ $ uv run python run_plot_multi.py
 
 # to plot multiple figures with fitting lines, same as above (dual logistic with k(N)=log(1-xxx) version)
 $ uv run python run_plot_multi_fit.py
+
+# to plot data duplication curves
+$ uv run python run_plot_single_slicefactor.py
 
 # other run_... scripts are not ready to use, those mainly for testing purpose.
 ```
