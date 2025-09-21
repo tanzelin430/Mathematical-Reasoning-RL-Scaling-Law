@@ -9,26 +9,27 @@ import plot_data
 import config
 
 def main():
-    # model_type = "instruct"
-    model_type = "llama-base"
-    model_type = "llama-instruct"
+    model_type = "instruct"
+    # model_type = "base"
+    # model_type = "llama-base"
+    # model_type = "llama-instruct"
     df = data_proc.load_and_preprocess(config.CSV_MAP[model_type])
     
     # eval_name = "val/test_score/openai/gsm8k" # must be one of config.TEST_EVALS.keys()
     eval_name = "holdout_score"
     curve_column = 'N' # key must be one of 'N', 'data_fator'
-    for x_column in [ "C", "E", "T" ]: # "T", "C", "E"
-        for metric in ["R", "ErrRate"]: # "R", "ErrRate", "DeltaReward", "DeltaErrRate"
+    for x_column in [ "C", "E", "T"]: # "T", "C", "E"
+        for metric in ["ErrRate"]: # "R", "ErrRate", "DeltaReward", "DeltaErrRate"
             plot_data.process_single_eval(
                 df, 
                 plot_x_column=x_column, 
                 plot_eval_column=eval_name, 
                 plot_metric=metric,
                 plot_curve_column=curve_column, 
-                plot_x_label=config.DEFAULT_X_LABELS[x_column],
-                plot_y_label=config.DEFAULT_Y_LABELS[metric],
+                plot_x_label=config.DEFAULT_LABELS[x_column],
+                plot_y_label=config.DEFAULT_LABELS[metric],
                 plot_x_scale="log",
-                # plot_y_scale=y_scale,
+                plot_y_scale="log",
                 plot_title=config.TEST_EVALS[eval_name]['plot_str'],
                 plot_use_legend=True,
                 # delta

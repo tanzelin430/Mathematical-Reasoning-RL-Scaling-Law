@@ -1,0 +1,202 @@
+{
+  "runs": [
+    {
+      "comment": "figure 1a",
+      "data_source": "base",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "C_raw"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "C_raw",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": "Fitted L(N, C) on Base model",
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "output_prefix": "fit_base_"
+    },
+    {
+      "comment": "figure 1b",
+      "data_source": "base",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": "Fitted L(N, D) on Base model",
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "output_prefix": "fit_base_"
+    },
+    {
+      "comment": "figure 2a",
+      "data_source": "instruct",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "C_raw"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "C_raw",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "plot_use_legend": true,
+      "plot_title": "Fitted L(N, C) on Instruct model",
+      "output_prefix": "fit_instruct_"
+    },
+    {
+      "comment": "figure 2b",
+      "data_source": "instruct",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "plot_use_legend": true,
+      "plot_title": "Fitted L(N, D) on Instruct model",
+      "output_prefix": "fit_instruct_"
+    },
+    {
+      "comment": "figure 7a",
+      "data_source": "exp2-base",
+      "plot_curve_column": "DR",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "DR",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 0.5,
+      "line_width": 1.5,
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "plot_use_legend": true,
+      "plot_title": "Data Reuse on Base model (7B)",
+      "plot_curve_mask": [
+        1,
+        2,
+        5,
+        20,
+        25,
+        50,
+        100
+      ],
+      "highlight_curves_predict": [
+        1
+      ],
+      "output_prefix": "fit_exp2-base_"
+    },
+    {
+      "comment": "figure 7b",
+      "data_source": "exp2-instruct",
+      "plot_curve_column": "DR",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clipping_factor_raw": 0.1,
+      "fit": true,
+      "fit_curve_column": "DR",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "line_alpha": 0.5,
+      "line_width": 1.5,
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "s",
+      "plot_use_legend": true,
+      "plot_title": "Data Reuse on Instruct model (7B)",
+      "plot_curve_mask": [
+        1,
+        2,
+        5,
+        20,
+        25,
+        50,
+        100
+      ],
+      "highlight_curves_predict": [
+        1
+      ],
+      "output_prefix": "fit_exp2-instruct_"
+    }
+  ]
+}

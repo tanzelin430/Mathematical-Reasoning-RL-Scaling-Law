@@ -14,7 +14,35 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator  # 添加这行
+from matplotlib.ticker import LogLocator
+import config
+
+# 尝试导入seaborn，如果没有安装则使用matplotlib默认样式
+try:
+    import seaborn as sns
+    # Set seaborn style for better looking plots with grid
+    sns.set_style("whitegrid")
+    plt.rcParams['figure.facecolor'] = 'white'
+    plt.rcParams['axes.facecolor'] = 'white'
+    SEABORN_AVAILABLE = True
+except ImportError:
+    # Fallback: 使用matplotlib实现类似seaborn的网格样式
+    plt.rcParams['figure.facecolor'] = 'white'
+    plt.rcParams['axes.facecolor'] = 'white'
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.color'] = '#b0b0b0'
+    plt.rcParams['grid.linestyle'] = '-'
+    plt.rcParams['grid.linewidth'] = 0.5
+    plt.rcParams['grid.alpha'] = 0.5
+    plt.rcParams['axes.edgecolor'] = '#000000'
+    plt.rcParams['axes.linewidth'] = 0.8
+    SEABORN_AVAILABLE = False
+
+# 全局字体加粗设置
+plt.rcParams['font.weight'] = 'bold'
+plt.rcParams['axes.labelweight'] = 'bold'
+plt.rcParams['axes.titleweight'] = 'bold'
+# 注意: legend.fontweight 不是有效的rcParams参数，图例字体会继承font.weight设置
 
 __all__ = [
     # Figure plotting
@@ -34,27 +62,16 @@ __all__ = [
 # UTILITY FUNCTIONS
 # =============================================================================
 
-COLOR_MAPPING = {
-    # for model size
-    0.5e9: '#1f77b4',
-    1.5e9: '#ff7f0e',
-    1e9: '#1f77b4', # use same
-    3e9: '#d62728',
-    7e9: '#2ca02c',
-    8e9: '#2ca02c', # use same
-    14e9: '#9467bd',
-    # for data dup factor
-    0: '#1f77b4',
-    2: '#ff7f0e',
-    4: '#d62728',
-    5: '#2ca02c',
-    10: '#9467bd',
-    20: '#8c564b',
-    25: '#7ce372', # need a new diff color
-    50: '#e377c2',
-    100: '#7f7f7f'
-}
+# 使用 config 中的颜色映射
+COLOR_MAPPING = config.COLOR_MAPPING
+get_color_for_curve = config.get_color_for_curve
 
+def legend_format(label_name: str, label_value: float) -> str:
+    if label_name == "N":
+        return human_format_N(label_value)
+    else:
+        return f"{label_name}={label_value}"
+        
 def human_format_N(N: float, mode: str = "eng", sig: int = 3, sci_coeff: bool = True) -> str:
     """
     Human-friendly N label:
@@ -70,13 +87,10 @@ def human_format_N(N: float, mode: str = "eng", sig: int = 3, sci_coeff: bool = 
         return "0"
 
     if mode == "eng":
-        units = [("T", 1e12), ("B", 1e9), ("M", 1e6), ("K", 1e3), ("", 1.0)]
-        for u, f in units:
-            if abs(N) >= f:
-                val = N / f
-                s = f"{val:.{sig}g}"  # Significant digit formatting, no excessive rounding
-                return f"{s}{u}"
-        return f"{N:.{sig}g}"
+        # Always use B (Billion) as the unit
+        val = N / 1e9
+        s = f"{val:.{sig}g}"  # Significant digit formatting, no excessive rounding
+        return f"{s}B"
 
     elif mode == "sci":
         exp = int(math.floor(math.log10(abs(N))))
@@ -98,7 +112,7 @@ def _get_legends(_curves: list[float], legend_lambda = None):
     if legend_lambda is None:
         legend_lambda = lambda x: x
     sort_curves = sorted(_curves)
-    handles = [Line2D([0], [0], color=COLOR_MAPPING[n], linewidth=2) for n in sort_curves]
+    handles = [Line2D([0], [0], color=get_color_for_curve(n), linewidth=2) for n in sort_curves]
     labels = [legend_lambda(n) for n in sort_curves]
     return handles, labels, sort_curves
 
@@ -109,7 +123,9 @@ def plot_basic(
     use_line: bool = False,
     scatter_alpha: float = 0.3,
     scatter_s: int = 8,
+    scatter_marker: str = 'o',
     line_alpha: float = 0.5,
+    line_width: float = None,  # Optional linewidth for highlighting
     fill_width: np.ndarray = None,
     fill_width_alpha: float = 0.2,
     color: str = 'k',
@@ -122,10 +138,13 @@ def plot_basic(
         fig, ax = plt.subplots(figsize=(6,4), dpi=300)
     # Scatter
     if use_scatter:
-        ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, color=color, edgecolors='none')
+        ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, marker=scatter_marker, color=color, edgecolors='none')
     # Line
     if use_line:
-        ax.plot(x, y, alpha=line_alpha, color=color)
+        plot_kwargs = {'alpha': line_alpha, 'color': color}
+        if line_width is not None:
+            plot_kwargs['linewidth'] = line_width
+        ax.plot(x, y, **plot_kwargs)
     if fill_width is not None:
         ax.fill_between(x, y - fill_width, y + fill_width, alpha=fill_width_alpha, color=color)
     
@@ -145,6 +164,9 @@ def plot_basic_settings(
     legend_loc: str = 'best',
     legend_bbox_to_anchor: tuple = None,
     legend_fontsize: int = 8,
+    # Auto-scaling margins
+    x_margin: float = None,
+    y_margin: float = None,
 ):
     if x_scale:
         ax.set_xscale(x_scale)
@@ -170,6 +192,12 @@ def plot_basic_settings(
         _handles, _labels = ax.get_legend_handles_labels()
         handles, labels = legend_handles_labels if legend_handles_labels else ([], [])
         ax.legend(_handles + handles, _labels + labels, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor, fontsize=legend_fontsize)
+    
+    # Set margins for auto-scaling
+    if x_margin is not None or y_margin is not None:
+        ax.margins(x=x_margin if x_margin is not None else 0.05, 
+                  y=y_margin if y_margin is not None else 0.05)
+    
     return ax
 
 def plot_curves(
@@ -195,6 +223,16 @@ def plot_curves(
     legend_loc: str = 'best',
     legend_bbox_to_anchor: tuple = None,
     legend_fontsize: int = 8,
+    # Highlight specific curves (backward compatible)
+    highlight_curves: list = None,  # List of curve values to highlight
+    highlight_line_alpha: float = 1.0,  # Alpha for highlighted curves
+    highlight_line_width: float = None,  # Linewidth for highlighted curves
+    # Line and scatter styling
+    line_alpha: float = 1.0,
+    line_width: float = 2.0,
+    scatter_alpha: float = 0.3,
+    scatter_s: float = 8.0,
+    scatter_marker: str = 'o',
     ax=None
 ):
     """Generic plotting function that can handle both score and error rate plots"""
@@ -207,10 +245,15 @@ def plot_curves(
         y = g[y_column].to_numpy()
         y_width = g[y_width_column].to_numpy() if y_width_column and not width_on_smooth and y_width_column in g.columns else None
         
+        # Determine if this curve should be highlighted
+        is_highlighted = highlight_curves is not None and curve_id in highlight_curves
+        final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
+        final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
+        
         ax = plot_basic(x, y, 
-            use_scatter=use_scatter, scatter_alpha=0.3, scatter_s=8, 
-            use_line=use_line, line_alpha=0.5,
-            fill_width=y_width, fill_width_alpha=0.2, color=COLOR_MAPPING[curve_id], ax=ax)
+            use_scatter=use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
+            use_line=use_line, line_alpha=final_line_alpha, line_width=final_line_width,
+            fill_width=y_width, fill_width_alpha=0.2, color=get_color_for_curve(curve_id), ax=ax)
         
     # Plot smooth curves
     if y_smooth_column is not None:
@@ -224,10 +267,15 @@ def plot_curves(
             y = g[y_smooth_column].to_numpy()
             y_width = g[y_width_column].to_numpy() if y_width_column and width_on_smooth and y_width_column in g.columns else None
             
+            # Determine if this curve should be highlighted
+            is_highlighted = highlight_curves is not None and curve_id in highlight_curves
+            final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
+            final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
+            
             ax = plot_basic(x, y, 
-                use_scatter=smooth_use_scatter, scatter_alpha=0.3, scatter_s=8, 
-                use_line=smooth_use_line, line_alpha=0.5,
-                fill_width=y_width, fill_width_alpha=0.2, color=COLOR_MAPPING[curve_id], ax=ax)
+                use_scatter=smooth_use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
+                use_line=smooth_use_line, line_alpha=final_line_alpha, line_width=final_line_width,
+                fill_width=y_width, fill_width_alpha=0.2, color=get_color_for_curve(curve_id), ax=ax)
             # # Line
             # (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
             # # Plot width span
@@ -282,11 +330,11 @@ def _backup_plot_curves(
         x = g[x_column].to_numpy()
         y = g[y_column].to_numpy()
         # Plot as scatter points with lighter color
-        ax.scatter(x, y, alpha=0.3, s=8, color=COLOR_MAPPING[curve_id], edgecolors='none')
+        ax.scatter(x, y, alpha=0.3, s=8, color=get_color_for_curve(curve_id), edgecolors='none')
         # Plot width span
         if y_width_column and y_width_column in g.columns and not width_on_smooth:
             y_width = g[y_width_column].to_numpy()
-            ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
+            ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=get_color_for_curve(curve_id))
     
     # Plot smooth curves
     if y_smooth_column is not None:
@@ -297,11 +345,11 @@ def _backup_plot_curves(
             x = g[x_column].to_numpy()
             y = g[y_smooth_column].to_numpy()
             # Line
-            (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
+            (ln,) = ax.plot(x, y, alpha=0.5, color=get_color_for_curve(curve_id))
             # Plot width span
             if y_width_column and y_width_column in g.columns and width_on_smooth:
                 y_width = g[y_width_column].to_numpy()
-                ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
+                ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=get_color_for_curve(curve_id))
     ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, handles, labels, legend_loc, legend_bbox_to_anchor, legend_fontsize)
     return ax
 
@@ -566,7 +614,7 @@ def apply_tight_layout(fig_axes, keep_legends=True):
     [fig.subplots_adjust(left=0.15) for fig, _ in fig_axes.values()]
 
 
-def apply_global_legend_layout(fig_axes, unique_N, top=0.91):
+def apply_global_legend_layout(fig_axes, unique_N, top=0.91, legend_lambda=None):
     """Apply consistent global legend layout to multi-subplot figures"""
     # Hide all subplot legends
     [legend.set_visible(False) for fig, _ in fig_axes.values() for ax in fig.get_axes() if (legend := ax.get_legend())]
@@ -574,7 +622,7 @@ def apply_global_legend_layout(fig_axes, unique_N, top=0.91):
     [fig.tight_layout() for fig, _ in fig_axes.values()]
     
     # create global legend
-    handles, labels, _ = _get_legends(unique_N)
+    handles, labels, _ = _get_legends(unique_N, legend_lambda)
     [fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=len(labels)) for fig, _ in fig_axes.values()]
     
     # Adjust only the top to make room for legend

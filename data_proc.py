@@ -72,15 +72,7 @@ def validate_data(df, eval_columns=[]) -> pd.DataFrame:
 
 def rename_columns(df) -> pd.DataFrame:
     """Normalize column names and data types to standard format"""
-    rename_map = {
-        'model_params':'N',
-        'cumulative_flops':'C_raw',
-        'runid':'runid',
-        'step':'step',
-        'tokens':'tokens',
-        'cumulative_tokens':'T',
-    }
-    for k,v in list(rename_map.items()):
+    for k, v in list(config.COLUMN_RENAME_MAP.items()):
         if k in df.columns and v != k:
             df[v] = df[k]
 

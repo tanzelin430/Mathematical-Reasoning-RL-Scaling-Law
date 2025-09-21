@@ -209,12 +209,10 @@ class ComputeExtractorExperiment:
         # print(f"  Merged to {len(merged_df)} steps with both tokens and test scores")
         # print(f"  Available evals: {[col for col in merged_df.columns if col not in ['step', 'tokens']]}")
         
-        # Calculate FLOPs: 6 * N * tokens
+        # Calculate FLOPs: 6 * N * tokens (but not cumulative values yet)
         merged_df['step_flops'] = 6 * model_params * merged_df['tokens']
-        merged_df['cumulative_flops'] = merged_df['step_flops'].cumsum()
         
-        # Calculate cumulative tokens
-        merged_df['cumulative_tokens'] = merged_df['tokens'].cumsum()
+        # Note: cumulative values will be calculated later after deduplication
         
         # Add metadata
         merged_df['model_size'] = model_size
@@ -235,16 +233,37 @@ class ComputeExtractorExperiment:
         # Reorder columns: metadata first, then test evals, then compute data
         metadata_cols = ['model_size', 'model_params', 'data_sample_size', 'experiment_name', 
                         'experiment_id', 'runid', 'slice_factor', 'step']
-        compute_cols = ['tokens', 'cumulative_tokens', 'step_flops', 'cumulative_flops', 'critic_rewards_mean', 'holdout_score']
+        compute_cols = ['tokens', 'step_flops', 'critic_rewards_mean', 'holdout_score']
         
         # Get all test eval columns (exclude step and tokens)
         test_eval_cols = [col for col in merged_df.columns 
                            if col not in metadata_cols + compute_cols + ['step', 'tokens']]
         
-        # Reorder columns
+        # Reorder columns (cumulative values will be added later)
         result_df = merged_df[metadata_cols + test_eval_cols + compute_cols].copy()
         
         return result_df
+    
+    def deduplicate_experiments(self, df):
+        """
+        Deduplicate experiments with same runid but overlapping steps.
+        Keeps the last occurrence of each (model_size, runid, step) combination.
+        """
+        print(f"Before deduplication: {len(df)} rows")
+        
+        # Check for duplicates and report them
+        duplicates = df.groupby(['model_size', 'runid', 'step']).size()
+        duplicate_entries = duplicates[duplicates > 1]
+        if len(duplicate_entries) > 0:
+            print(f"Found {len(duplicate_entries)} duplicate (model_size, runid, step) combinations:")
+            for (model_size, runid, step), count in duplicate_entries.items():
+                print(f"  {model_size} {runid} step {step}: {count} occurrences")
+        
+        # Keep the last occurrence (drop_duplicates with keep='last')
+        df_deduped = df.drop_duplicates(subset=['model_size', 'runid', 'step'], keep='last').reset_index(drop=True)
+        print(f"After deduplication: {len(df_deduped)} rows")
+        
+        return df_deduped
     
     def find_all_log_files(self):
         """Find all output.log files in the experiment directory"""
@@ -320,8 +339,18 @@ class ComputeExtractorExperiment:
         # Combine all data
         df = pd.concat(all_data, ignore_index=True)
         
-        # Sort by model size and step
+        # Sort by model size, runid, and step 
         df = df.sort_values(['model_size', 'runid', 'step']).reset_index(drop=True)
+        
+        # Deduplicate: keep the last occurrence of each (model_size, runid, step) combination
+        # This ensures that if there are overlapping steps from multiple experiments with the same runid,
+        # we keep the data from the later experiment (which should be more complete/recent)
+        df = self.deduplicate_experiments(df)
+        
+        # Now calculate cumulative values per model+runid group (after deduplication)
+        print("Calculating cumulative values per (model_size, runid) group...")
+        df['cumulative_tokens'] = df.groupby(['model_size', 'runid'])['tokens'].cumsum()
+        df['cumulative_flops'] = df.groupby(['model_size', 'runid'])['step_flops'].cumsum()
         
         # Summary statistics are now handled in inspect() function
         
@@ -359,24 +388,30 @@ if __name__ == "__main__":
     #  .inspect()
     #  .save('csv/scaling_law_data_experiment1_instruct_run2.csv'))
     
+
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/Experiment1_base')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment1_base.csv'))
+
     # (ComputeExtractorExperiment()
     #  .run(experiment_root_dir='data/Experiment1_Base_run0')
     #  .inspect()
     #  .save('csv/scaling_law_data_experiment1_base_run0.csv'))
 
 
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment2-base')
+     .inspect()
+     .save('csv/scaling_law_data_experiment2_base.csv'))
+
+
     # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/experiment2-base')
+    #  .run(experiment_root_dir='data/experiment-llama-base')
     #  .inspect()
-    #  .save('csv/scaling_law_data_experiment2_base.csv'))
+    #  .save('csv/scaling_law_data_experiment-llama-base.csv'))
 
-
-    (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/experiment-llama-base')
-     .inspect()
-     .save('csv/scaling_law_data_experiment-llama-base.csv'))
-
-    (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/experiment-llama-instruct')
-     .inspect()
-     .save('csv/scaling_law_data_experiment-llama-instruct.csv'))
+    # (ComputeExtractorExperiment()
+    #  .run(experiment_root_dir='data/experiment-llama-instruct')
+    #  .inspect()
+    #  .save('csv/scaling_law_data_experiment-llama-instruct.csv'))
