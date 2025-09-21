@@ -36,6 +36,16 @@ def plot_curves_with_smooth(
     legend_loc: str = 'best',
     legend_bbox_to_anchor: tuple = None,
     legend_fontsize: int = 8,
+    # Highlight specific curves (backward compatible)
+    highlight_curves: list = None,  # List of curve values to highlight
+    highlight_line_alpha: float = 1.0,  # Alpha for highlighted curves
+    highlight_line_width: float = None,  # Linewidth for highlighted curves
+    # Line and scatter styling
+    line_alpha: float = 1.0,
+    line_width: float = 2.0,
+    scatter_alpha: float = 0.3,
+    scatter_size: float = 8.0,
+    scatter_marker: str = 'o',
     ax=None,
     # smooth params
     add_smooth: bool = False, 
@@ -103,6 +113,16 @@ def plot_curves_with_smooth(
         legend_loc=legend_loc,
         legend_bbox_to_anchor=legend_bbox_to_anchor,
         legend_fontsize=legend_fontsize,
+        # Pass highlight parameters
+        highlight_curves=highlight_curves,
+        highlight_line_alpha=highlight_line_alpha,
+        highlight_line_width=highlight_line_width,
+        # Pass line and scatter styling
+        line_alpha=line_alpha,
+        line_width=line_width,
+        scatter_alpha=scatter_alpha,
+        scatter_s=scatter_size,
+        scatter_marker=scatter_marker,
         ax=ax
     )
 
@@ -127,6 +147,16 @@ def process_single_eval(
     plot_legend_bbox_to_anchor: tuple = None,
     plot_legend_lambda: Callable = None,
     plot_legend_fontsize: int = 8,
+    # Highlight specific curves (backward compatible)
+    plot_highlight_curves: list = None,  # List of curve values to highlight
+    plot_highlight_line_alpha: float = 1.0,  # Alpha for highlighted curves
+    plot_highlight_line_width: float = 3.0,  # Linewidth for highlighted curves
+    # Line and scatter styling
+    line_alpha: float = 1.0,
+    line_width: float = 2.0,
+    scatter_alpha: float = 0.3,
+    scatter_size: float = 8.0,
+    scatter_marker: str = 'o',
     ax: plt.Axes=None,
     save_to_dir: str = None,
     save_to_filename: str = None,
@@ -140,7 +170,7 @@ def process_single_eval(
     smooth_strict=False,
     warmup_frac_raw: float=0,
     warmup_frac_smooth: float=0,
-    calc_delta: bool=True, # in case there's no step 0 but don't care of it.
+    calc_delta: bool=False, # in case there's no step 0 but don't care of it.
     s_factor=1,
     k_spline=5,
     rolling_window=200,
@@ -167,14 +197,19 @@ def process_single_eval(
         DeltaReward_std = df.groupby([plot_curve_column, 'step'])['DeltaReward'].std().to_frame('DeltaReward_std')
         DeltaErrRate_std = df.groupby([plot_curve_column, 'step'])['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
     # Merge multi rollout in same step
-    df = data_proc.merge_duplicate_steps(df, group_columns=[plot_curve_column, 'step'], mode='mean')
+    # 注意：需要包含plot_x_column以避免不同x值的数据被错误合并
+    merge_columns = [plot_curve_column, 'step']
+    if plot_x_column not in merge_columns:
+        merge_columns.append(plot_x_column)
+    df = data_proc.merge_duplicate_steps(df, group_columns=merge_columns, mode='mean')
 
     # Add std cols back to df
-    df = df.merge(R_std, on=[plot_curve_column, 'step'])
-    df = df.merge(ErrRate_std, on=[plot_curve_column, 'step'])
+    std_merge_columns = [plot_curve_column, 'step']
+    df = df.merge(R_std, on=std_merge_columns)
+    df = df.merge(ErrRate_std, on=std_merge_columns)
     if calc_delta:
-        df = df.merge(DeltaReward_std, on=[plot_curve_column, 'step'])
-        df = df.merge(DeltaErrRate_std, on=[plot_curve_column, 'step'])
+        df = df.merge(DeltaReward_std, on=std_merge_columns)
+        df = df.merge(DeltaErrRate_std, on=std_merge_columns)
     if plot_curve_mask is not None:
         print("unique values of plot_curve_column:", df[plot_curve_column].unique())
         print("plot_curve_mask:", plot_curve_mask)
@@ -201,6 +236,10 @@ def process_single_eval(
         legend_loc=plot_legend_loc,
         legend_bbox_to_anchor=plot_legend_bbox_to_anchor,
         legend_fontsize=plot_legend_fontsize,
+        # Pass highlight parameters
+        highlight_curves=plot_highlight_curves,
+        highlight_line_alpha=plot_highlight_line_alpha,
+        highlight_line_width=plot_highlight_line_width,
         ax=ax,
         # smooth
         add_smooth=add_smooth,
@@ -227,7 +266,10 @@ def process_single_eval(
         if save_to_filename_prefix is not None:
             filename = save_to_filename_prefix + filename
         if plot_curve_mask is not None:
-            filename += f"_{str(plot_curve_mask)}"
+            # Convert mask values to clean format for filename
+            mask_str = "_".join([str(int(float(val))) if isinstance(val, (int, float)) or hasattr(val, 'item') 
+                                else str(val) for val in plot_curve_mask])
+            filename += f"_{mask_str}"
         filename += ".pdf"
         if save_to_filename is not None:
             filename = save_to_filename
@@ -287,13 +329,18 @@ def process_single_eval_multi_metrics(
     DeltaReward_std = df.groupby([plot_curve_column, 'step'])['DeltaReward'].std().to_frame('DeltaReward_std')
     DeltaErrRate_std = df.groupby([plot_curve_column, 'step'])['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
     # Merge multi rollout in same step
-    df = data_proc.merge_duplicate_steps(df, group_columns=[plot_curve_column, 'step'], mode='mean')
+    # 注意：需要包含plot_x_column以避免不同x值的数据被错误合并
+    merge_columns = [plot_curve_column, 'step']
+    if plot_x_column not in merge_columns:
+        merge_columns.append(plot_x_column)
+    df = data_proc.merge_duplicate_steps(df, group_columns=merge_columns, mode='mean')
 
     # Add std cols back to df
-    df = df.merge(R_std, on=[plot_curve_column, 'step'])
-    df = df.merge(ErrRate_std, on=[plot_curve_column, 'step'])
-    df = df.merge(DeltaReward_std, on=[plot_curve_column, 'step'])
-    df = df.merge(DeltaErrRate_std, on=[plot_curve_column, 'step'])
+    std_merge_columns = [plot_curve_column, 'step']
+    df = df.merge(R_std, on=std_merge_columns)
+    df = df.merge(ErrRate_std, on=std_merge_columns)
+    df = df.merge(DeltaReward_std, on=std_merge_columns)
+    df = df.merge(DeltaErrRate_std, on=std_merge_columns)
     df.sort_values(plot_x_column, inplace=True)
     
     if plot_reward:
@@ -472,6 +519,7 @@ def predict_and_plot(
     metric_column, # TODO: useless?
     plot_curve_column,
     plot_x_column,
+    plot_curve_mask = None,
     plot_on_delta = False,
     plot_y_lambda = None,
     plot_delta_base_step = 0,
@@ -479,13 +527,24 @@ def predict_and_plot(
     plot_use_scatter = False,
     plot_x_scale = None,
     plot_y_scale = None,
+    # Highlight specific curves
+    plot_highlight_curves: list = None,  # List of curve values to highlight
+    plot_highlight_line_alpha: float = 1.0,  # Alpha for highlighted curves
+    plot_highlight_line_width: float = 3.0,  # Linewidth for highlighted curves
+    # Line and scatter styling
+    line_alpha: float = 1.0,
+    line_width: float = 2.0,
+    scatter_alpha: float = 0.3,
+    scatter_size: float = 8.0,
+    scatter_marker: str = 'o',
     warmup_frac_raw = 0,
     ax: plt.Axes=None,
 ):
     # predicter = fit.FitLogErrRate(L=0.06333, r=1.73e-10, N0_k=4.95e9, r_e0=1e-9, N0_e0=3e9)
     pred_column = metric_column + "_pred"
     df[pred_column] = predict_func(df, *predict_x_column_list)
-
+    if plot_curve_mask is not None:
+        df = df[df[plot_curve_column].isin(plot_curve_mask)]
     if plot_on_delta: # plot delta instead of raw pred
         # predict delta
         delta_pred_column = pred_column + "_delta"
@@ -508,6 +567,16 @@ def predict_and_plot(
         use_line=plot_use_line,
         use_scatter=plot_use_scatter,
         x_scale=plot_x_scale, y_scale=plot_y_scale, 
+        # Pass highlight parameters
+        highlight_curves=plot_highlight_curves,
+        highlight_line_alpha=plot_highlight_line_alpha,
+        highlight_line_width=plot_highlight_line_width,
+        # Pass line and scatter styling
+        line_alpha=line_alpha,
+        line_width=line_width,
+        scatter_alpha=scatter_alpha,
+        scatter_s=scatter_size,
+        scatter_marker=scatter_marker,
         ax=ax,
     )
     return ax

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import r2_score
 from scipy.interpolate import UnivariateSpline
 from typing import Union
 
@@ -12,7 +13,10 @@ __all__ = [
     'fit_spline', 'fit_smooth_monotonic',
     
     # Weight calculation
-    'get_weight'
+    'get_weight',
+    
+    # R² calculation
+    'calculate_r2'
 ]
 
 
@@ -178,3 +182,37 @@ def get_weight(
     w = w / np.mean(w)  # normalize
 
     return w
+
+
+def calculate_r2(y_true, y_pred):
+    """
+    Calculate R² value using sklearn.metrics.r2_score.
+    Clean interface that only takes the observed and predicted values.
+    
+    Parameters:
+    -----------
+    y_true : array-like
+        True/observed values
+    y_pred : array-like
+        Predicted values
+        
+    Returns:
+    --------
+    float : R² value
+    """
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    
+    # Remove any NaN values
+    valid_mask = ~np.isnan(y_true) & ~np.isnan(y_pred)
+    if not np.any(valid_mask):
+        return 0.0
+        
+    y_true_clean = y_true[valid_mask]
+    y_pred_clean = y_pred[valid_mask]
+    
+    if len(y_true_clean) == 0:
+        return 0.0
+    
+    # Use sklearn's r2_score - clean and simple!
+    return r2_score(y_true_clean, y_pred_clean)

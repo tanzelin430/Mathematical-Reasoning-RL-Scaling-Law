@@ -303,17 +303,50 @@ def get_x_y_data_from_df(
     x_column_list, 
     y_column, 
     x_transform_list: list[Callable | None]=None, 
-    y_transform: Callable=None
+    y_transform: Callable=None,
+    warmup_frac: float = None
 ) -> Tuple[Tuple[np.ndarray, ...], np.ndarray]:
+    """
+    Extract and preprocess x, y data from dataframe for fitting.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe
+    x_column_list : list
+        List of column names for x variables (curve column should be included here)
+    y_column : str
+        Column name for y variable  
+    x_transform_list : list of callable, optional
+        List of transform functions for each x column
+    y_transform : callable, optional
+        Transform function for y column (e.g., lambda x: 1-x for ErrRate)
+    warmup_frac : float, optional
+        Warmup clipping fraction. If None, no warmup clipping is applied.
+        
+    Returns:
+    --------
+    tuple : (x_data_tuple, y_data_array)
+    """
+    df_fit = df.copy()
+    
+    # Apply warmup clipping if requested
+    if warmup_frac is not None:
+        # Use the first x column as curve_column for grouping
+        curve_column = x_column_list[0] if x_column_list else "N"
+        df_fit = data_proc.apply_warmup_clipping(
+            df_fit, 
+            curve_column=curve_column, 
+            warmup_frac=warmup_frac
+        )
+    
     # 移除step=0的数据（因为E=0会导致log10(E)=-inf）
-    df_fit = df[df['step'] > 0].reset_index(drop=True)
+    df_fit = df_fit[df_fit['step'] > 0].reset_index(drop=True)
     
     # 对相同横坐标聚合：显示三个run的平均值
-    # df_mean = (
-    #     df_fit.groupby(['model_size', 'step'], as_index=False)
-    #           .agg(N=('N', 'first'), C=('C', 'first'), E=('E', 'first'), ErrRate=('ErrRate', 'mean'))
-    # )
-    df_fit = data_proc.merge_duplicate_steps(df_fit, group_columns=['N', 'step'], mode='mean')
+    # Use all x_columns for grouping to ensure proper deduplication
+    group_columns = list(x_column_list) + ['step']
+    df_fit = data_proc.merge_duplicate_steps(df_fit, group_columns=group_columns, mode='mean')
     
     # 准备拟合数据 - 返回tuple避免后续转置
     x_transform_list = [None] * len(x_column_list) if x_transform_list is None else x_transform_list
@@ -332,19 +365,15 @@ def get_x_y_data_from_df(
 
 
 
-def fit_log_errrate(df, eval_name = "holdout_score"):
+def fit_log_errrate(df, eval_name = "holdout_score", x_column_list=["N", "E"]):
     # 准备拟合数据（参考run_xhyu_logistic.py的做法）
-    df['ErrRate'] = 1 - df[eval_name]
-    
-    # clip for fitting
-    df_fit = data_proc.apply_warmup_clipping(df, curve_column="N", warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW)
-
     x_data, y_data = get_x_y_data_from_df(
-        df_fit, 
-        x_column_list=["N", "E"], 
-        y_column="ErrRate",
+        df, 
+        x_column_list=x_column_list, 
+        y_column=eval_name,
         x_transform_list=[None, lambda x: np.log10(x)], 
-        y_transform=lambda x: np.log10(np.clip(x, 1e-12, None))
+        y_transform=lambda x: np.log10(np.clip(1 - x, 1e-12, None)),  # 1-eval_name for ErrRate
+        warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
     )
 
     # log10_E_data = np.log10(E_data)
@@ -388,4 +417,138 @@ def fit_log_errrate(df, eval_name = "holdout_score"):
     predicter = fit_models.FitLogErrRate(L=fitted_params[0], r=fitted_params[1], N0_k=fitted_params[2], 
                                  r_e0=fitted_params[3], N0_e0=fitted_params[4])
 
+    return predicter
+
+
+def fit_log_errrate_simple(df, eval_name="holdout_score", curve_column="N", x_column="E", 
+                          fit_load_path=None, fit_save_path=None, data_source=None):
+    """
+    Simple lookup table fitting: log_errrate = k(curve_column) * log_x_column + E0(curve_column)
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe with columns curve_column, x_column, and eval_name
+    eval_name : str
+        Name of the evaluation column to fit
+    curve_column : str
+        Column to use as curve variable (default: "N")
+    x_column : str
+        Column to use as x variable for fitting (default: "E")
+    fit_load_path : str, optional
+        Path to load pre-fitted model from JSON. If provided, skip fitting and load directly.
+    fit_save_path : str, optional
+        Path to save fitted model to JSON. If provided, save after fitting.
+    data_source : str, optional
+        Data source identifier for JSON metadata (required if fit_save_path is provided)
+        
+    Returns:
+    --------
+    SimpleLinearLookupFit object with fitted lookup tables
+    """
+    from fit_models_simple import SimpleLinearLookupFit
+    from sklearn.linear_model import LinearRegression
+    
+    # Check if we should load from file
+    if fit_load_path is not None:
+        print(f"=== Loading Model from {fit_load_path} ===")
+        predicter = SimpleLinearLookupFit.load_from_json(fit_load_path)
+        return predicter
+    
+    print(f"=== Simple Lookup Table Fitting: log_errrate = k({curve_column}) * log_{x_column} + E0({curve_column}) ===")
+    
+    # Prepare data using get_x_y_data_from_df, but we need the preprocessed df for later use
+    df_temp = df.copy()
+    df_temp['ErrRate'] = 1 - df_temp[eval_name]
+    
+    # Apply preprocessing manually to get df_fit for later use
+    df_fit = data_proc.apply_warmup_clipping(
+        df_temp, 
+        curve_column=curve_column, 
+        warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
+    )
+    df_fit = df_fit[df_fit['step'] > 0].reset_index(drop=True)
+    df_fit = data_proc.merge_duplicate_steps(
+        df_fit, 
+        group_columns=[curve_column, 'step'], 
+        mode='mean'
+    )
+    
+    # Create predicter object
+    predicter = SimpleLinearLookupFit()
+    N_values = sorted(df_fit[curve_column].unique())
+    if curve_column == "N":
+        print(f"Found {curve_column} values: {[f'{N/1e9:.1f}B' for N in N_values]}")
+    else:
+        print(f"Found {curve_column} values: {N_values}")
+    
+    # Fit for each curve_column value
+    fit_results = {}
+    all_r2 = []
+    
+    for N in N_values:
+        # Get data for this curve_column value
+        df_N = df_fit[df_fit[curve_column] == N].copy()
+        
+        if len(df_N) < 2:
+            print(f"Warning: Not enough data points for {curve_column}={N/1e9:.1f}B")
+            continue
+            
+        # Prepare X and y using the selected x_column
+        log_X = np.log10(df_N[x_column].values)
+        log_errrate = np.log10(np.clip(df_N['ErrRate'].values, 1e-12, None))
+        
+        # Remove any infinite values
+        valid_mask = np.isfinite(log_X) & np.isfinite(log_errrate)
+        log_X = log_X[valid_mask]
+        log_errrate = log_errrate[valid_mask]
+        
+        if len(log_X) < 2:
+            print(f"Warning: Not enough valid data points for {curve_column}={N/1e9:.1f}B")
+            continue
+        
+        # Linear regression using sklearn: log_errrate = k * log_X + E0
+        X = log_X.reshape(-1, 1)
+        y = log_errrate
+        
+        reg = LinearRegression()
+        reg.fit(X, y)
+        
+        k = reg.coef_[0]
+        E0 = reg.intercept_
+        r2 = reg.score(X, y)
+        
+        # Store in lookup tables
+        predicter.k_lookup[N] = k
+        predicter.E0_lookup[N] = E0
+        
+        fit_results[N] = {
+            'k': k,
+            'E0': E0,
+            'r2': r2,
+            'n_points': len(log_X)
+        }
+        all_r2.append(r2)
+        
+        if curve_column == "N":
+            print(f"{curve_column}={N/1e9:>4.1f}B: k={k:>8.4f}, E0={E0:>8.4f}, R²={r2:>6.4f}, n={len(log_X):>3d}")
+        else:
+            print(f"{curve_column}={N:>4}: k={k:>8.4f}, E0={E0:>8.4f}, R²={r2:>6.4f}, n={len(log_X):>3d}")
+    
+    overall_r2 = np.mean(all_r2) if all_r2 else 0.0
+    print(f"\nOverall mean R²: {overall_r2:.4f}")
+    
+    # Store the x_column that was used for fitting
+    predicter.fit_x_column = x_column
+    
+    # Save to JSON if requested
+    if fit_save_path is not None:
+        predicter.save_to_json(
+            fit_save_path, 
+            data_source=data_source, 
+            eval_name=eval_name, 
+            curve_column=curve_column,
+            df=df
+        )
+    
     return predicter

@@ -6,7 +6,12 @@
 
 ```bash
 $ uv run python extract_csv.py
-
+```
+```bash
+# now support cmd line interface, with config files available for pipeline
+$ uv run python run_plot_multi_fit.py --config-file example_batch_config.json
+```
+```bash
 # to plot single figure, with 5 dimention control (model type, x, eval, metric, curve)
 $ uv run python run_plot_single.py
 
