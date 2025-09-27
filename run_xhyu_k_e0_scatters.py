@@ -2,8 +2,13 @@
 """
 Scaling Law Pipeline - Multi-Eval Analysis
 Processes multiple test evals from Experiment1 data and generates scaling law plots for each eval
+
+Usage:
+  python run_xhyu_k_e0_scatters.py --model-type base --warmup-clip-num 10
+  python run_xhyu_k_e0_scatters.py --model-type instruct --warmup-clip-num 5
 """
 
+import argparse
 import os
 import sys
 import pandas as pd
@@ -29,7 +34,6 @@ import config
 
 # Use holdout score evaluation
 eval_name = config.DEFAULT_TEST_EVAL
-warmup_clipping_num = 5  # Local setting for this script
 phi_global = 1.0
 
 # =============================================================================
@@ -39,11 +43,29 @@ def main():
     """Main processing function"""
     global phi_global
     
-    # Use base model data
-    # model_type = "base"
-    model_type = "instruct"  # Uncomment to use instruct data
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Multi-Eval Scaling Law Analysis')
+    parser.add_argument('--model-type', type=str, default='base',
+                        choices=['base', 'instruct', 'llama-base', 'llama-instruct', 
+                                'exp2-base', 'exp2-instruct', 'grpo-base'],
+                        help='Model type to analyze (default: base)')
+    parser.add_argument('--warmup-clip-num', type=int, default=10,
+                        help='Number of warmup steps to clip (default: 10)')
+    args = parser.parse_args()
+    
+    # Use parsed arguments
+    model_type = args.model_type
+    warmup_clip_num = args.warmup_clip_num
+    
+    # Fixed figure sizes
+    figure_width = 6.0
+    figure_height = 4.0
 
     print("=== Multi-Eval Scaling Law Analysis ===")
+    print(f"Configuration:")
+    print(f"  Model type: {model_type}")
+    print(f"  Warmup clip num: {warmup_clip_num}")
+    print()
     print(f"Loading {model_type} model data...")
     
     # Load and preprocess data using the unified function
@@ -77,11 +99,11 @@ def main():
     # 计算完 ImprovementRate 后，丢弃 step=0 的数据（因为 E=0 会导致 log10(E) = -inf）
     df = df[df['step'] > 0].reset_index(drop=True)
     
-    # 丢掉每个 (model_size, runid) 的前 warmup_clipping_num 个点
-    if warmup_clipping_num and warmup_clipping_num > 0:
+    # 丢掉每个 (model_size, runid) 的前 warmup_clip_num 个点
+    if warmup_clip_num and warmup_clip_num > 0:
         df = (
             df.groupby(['model_size', 'runid'], as_index=False, group_keys=False)
-              .apply(lambda g: g.iloc[warmup_clipping_num:])
+              .apply(lambda g: g.iloc[warmup_clip_num:])
               .reset_index(drop=True)
         )
     
@@ -108,25 +130,33 @@ def main():
         N_val = float(subdf['N'].iloc[0])
         color_map[ms] = config.get_color_for_curve(N_val)
 
-    plt.figure(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(figure_width, figure_height))
     for ms in unique_model_sizes:
         subdf = df_mean[df_mean['model_size'] == ms]
-        plt.scatter(
-            subdf['E'], 
-            subdf['ErrRate'], 
-            # 直接用小写b显示（如1.5b），不区分大小
-            label=f"{ms}",
-            color=color_map[ms], 
-            alpha=0.7, 
-            s=12
+        plot.plot_basic(
+            x=subdf['E'].values,
+            y=subdf['ErrRate'].values,
+            use_scatter=True,
+            scatter_alpha=0.7,
+            scatter_s=12,
+            scatter_marker='o',
+            color=color_map[ms],
+            ax=ax
         )
-    plt.xscale('log')
-    plt.yscale('log')
-
-    plt.xlabel("Training Examples E (log)")
-    plt.ylabel("Error Rate")
-    plt.title("Error Rate vs Training Examples")
-    plt.legend(title="model size", loc="best")
+        # Add manual legend entry
+        ax.scatter([], [], color=color_map[ms], s=12, alpha=0.7, label=f"{ms}")
+    
+    plot.plot_basic_settings(
+        ax=ax,
+        x_scale='log',
+        y_scale='log',
+        x_label="Training Examples E (log)",
+        y_label="Error Rate",
+        title="Error Rate vs Training Examples",
+        use_legend=True,
+        legend_loc="best"
+    )
+    ax.legend(title="model size", loc="best")
     plt.tight_layout()
     plt.savefig(config.OUTPUT_BASE_DIR / f"{config.DEFAULT_FIGURE_PREFIX}_scatter_errrate_vs_E.pdf", dpi=300, bbox_inches='tight')
     print(f"散点图已保存到 {config.OUTPUT_BASE_DIR / f'{config.DEFAULT_FIGURE_PREFIX}_scatter_errrate_vs_E.pdf'}")
@@ -134,24 +164,33 @@ def main():
     # ===========================
     # 新增：ImprovementRate vs Training Examples 散点图
     # ===========================
-    plt.figure(figsize=(7, 5))
+    fig2, ax2 = plt.subplots(figsize=(figure_width, figure_height))
     for ms in unique_model_sizes:
         subdf = df_mean[df_mean['model_size'] == ms]
-        plt.scatter(
-            subdf['E'], 
-            -np.log(subdf['ImprovementRate']), 
-            label=f"{ms}",
-            color=color_map[ms], 
-            alpha=0.7, 
-            s=12
+        plot.plot_basic(
+            x=subdf['E'].values,
+            y=-np.log(subdf['ImprovementRate']).values,
+            use_scatter=True,
+            scatter_alpha=0.7,
+            scatter_s=12,
+            scatter_marker='o',
+            color=color_map[ms],
+            ax=ax2
         )
-    plt.xscale('log')
-    # 注意：y轴不再是log scale，因为我们已经取了-log
-
-    plt.xlabel("Training Examples E (log)")
-    plt.ylabel("-log(Improvement Rate)")
-    plt.title("-log(Improvement Rate) vs Training Examples")
-    plt.legend(title="model size", loc="best")
+        # Add manual legend entry
+        ax2.scatter([], [], color=color_map[ms], s=12, alpha=0.7, label=f"{ms}")
+    
+    plot.plot_basic_settings(
+        ax=ax2,
+        x_scale='log',
+        # 注意：y轴不再是log scale，因为我们已经取了-log
+        x_label="Training Examples E (log)",
+        y_label="-log(Improvement Rate)",
+        title="-log(Improvement Rate) vs Training Examples",
+        use_legend=True,
+        legend_loc="best"
+    )
+    ax2.legend(title="model size", loc="best")
     plt.tight_layout()
     plt.savefig(config.OUTPUT_BASE_DIR / f"{config.DEFAULT_FIGURE_PREFIX}_scatter_improvementrate_vs_E.pdf", dpi=300, bbox_inches='tight')
     print(f"改进率散点图已保存到 {config.OUTPUT_BASE_DIR / f'{config.DEFAULT_FIGURE_PREFIX}_scatter_improvementrate_vs_E.pdf'}")
@@ -240,7 +279,7 @@ def main():
         
         # 绘图
         model0_stats = []
-        plt.figure(figsize=(7, 5))
+        plt.figure(figsize=(figure_width, figure_height))
         
         # 先画散点
         for ms in unique_model_sizes:
@@ -250,11 +289,18 @@ def main():
             x = np.log10(E_vals)
             y = np.log10(ErrRate_vals)
             y0 = y[0]  # 起始点，用于相对显示
-            plt.scatter(
-                # x, y - y0, label=f"{ms}",
-                x, y, label=f"{ms}",
-                color=color_map[ms], alpha=0.6, s=12
+            plot.plot_basic(
+                x=x,
+                y=y,
+                use_scatter=True,
+                scatter_alpha=0.6,
+                scatter_s=12,
+                scatter_marker='o',
+                color=color_map[ms],
+                ax=plt.gca()
             )
+            # Add manual legend entry
+            plt.scatter([], [], color=color_map[ms], s=12, alpha=0.6, label=f"{ms}")
         
         # 画拟合线
         for ms in unique_model_sizes:
@@ -287,17 +333,30 @@ def main():
             x_grid = np.log10(E_grid)
             y_grid = global_model(popt, np.array([N_val] * len(x_grid)), x_grid)
             # plt.plot(x_grid, y_grid - y0, color=color_map[ms], linewidth=2, linestyle='--')
-            plt.plot(x_grid, y_grid, color='black', linewidth=2, linestyle='--')
+            plot.plot_basic(
+                x=x_grid,
+                y=y_grid,
+                use_line=True,
+                line_alpha=1.0,
+                line_width=2,
+                color='black',
+                ax=plt.gca()
+            )
         
     except Exception as e:
         print(f"全局拟合失败: {e}")
         model0_stats = []
 
-    # 线性坐标：x=log10(E), y=Δlog10(ErrRate)
-    plt.xlabel(r"$\log_{10}E$")
-    plt.ylabel(r"$\log_{10}ErrRate$")
-    plt.title(r"Model0 Fitting: $\log_{10}ErrRate = -(a N + b) \log_{10}E + E_0$")
-    plt.legend(title="model size", loc="best")
+    # 使用plot_basic_settings设置坐标轴
+    plot.plot_basic_settings(
+        ax=plt.gca(),
+        x_label=r"$\log_{10}E$",
+        y_label=r"$\log_{10}ErrRate$",
+        title=r"Model0 Fitting: $\log_{10}ErrRate = -(a N + b) \log_{10}E + E_0$",
+        use_legend=True,
+        legend_loc="best"
+    )
+    plt.gca().legend(title="model size", loc="best")
     plt.tight_layout()
     out_path0 = config.OUTPUT_BASE_DIR / f"{config.DEFAULT_FIGURE_PREFIX}_fit_model0.pdf"
     plt.savefig(out_path0, dpi=300, bbox_inches='tight')
@@ -377,26 +436,78 @@ def main():
     N_billions = np.array(N_values) / 1e9
     
     # 绘制k(N)对比图
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(figure_width * 1.67, figure_height))
     
-    # k(N)散点图 - 使用config配色
-    ax1.scatter(N_values, k_E_values, color=config.COLOR_MAPPING['base'], s=100, alpha=0.7, label='L(N,D) fitting')
-    ax1.scatter(N_values, k_C_values, color=config.COLOR_MAPPING['instruct'], s=100, alpha=0.7, label='L(N,C) fitting')
-    ax1.set_xscale('log')
-    ax1.set_xlabel('Model Size N')
-    ax1.set_ylabel('k(N)')
-    ax1.set_title(f'k(N) Comparison: L(N,D) vs L(N,C) Fitting on {model_type.capitalize()}')
-    ax1.legend()
+    # k(N)散点图 - 使用config配色和plot_basic
+    plot.plot_basic(
+        x=np.array(N_values),
+        y=np.array(k_E_values),
+        use_scatter=True,
+        scatter_alpha=0.7,
+        scatter_s=100,
+        scatter_marker='o',
+        color=config.COLOR_MAPPING['base'],
+        ax=ax1
+    )
+    plot.plot_basic(
+        x=np.array(N_values),
+        y=np.array(k_C_values),
+        use_scatter=True,
+        scatter_alpha=0.7,
+        scatter_s=100,
+        scatter_marker='o',
+        color=config.COLOR_MAPPING['instruct'],
+        ax=ax1
+    )
+    # Add manual legend entries
+    ax1.scatter([], [], color=config.COLOR_MAPPING['base'], s=100, alpha=0.7, label='L(N,D) fitting')
+    ax1.scatter([], [], color=config.COLOR_MAPPING['instruct'], s=100, alpha=0.7, label='L(N,C) fitting')
+    
+    plot.plot_basic_settings(
+        ax=ax1,
+        x_scale='log',
+        x_label='Model Size (N)',
+        y_label=' $k(N)$',
+        x_tick_on_data=True,
+        title=f'$k(N)$ Comparison on {model_type.capitalize()} Models',
+        use_legend=True
+    )
     ax1.grid(True, alpha=0.3)
     
-    # E0(N)散点图 - 使用config配色
-    ax2.scatter(N_values, E0_E_values, color=config.COLOR_MAPPING['base'], s=100, alpha=0.7, label='L(N,D) fitting')
-    ax2.scatter(N_values, E0_C_values, color=config.COLOR_MAPPING['instruct'], s=100, alpha=0.7, label='L(N,C) fitting')
-    ax2.set_xscale('log')
-    ax2.set_xlabel('Model Size N')
-    ax2.set_ylabel('E0(N)')
-    ax2.set_title(f'E0(N) Comparison: L(N,D) vs L(N,C) Fitting on {model_type.capitalize()}')
-    ax2.legend()
+    # E0(N)散点图 - 使用config配色和plot_basic
+    plot.plot_basic(
+        x=np.array(N_values),
+        y=np.array(E0_E_values),
+        use_scatter=True,
+        scatter_alpha=0.7,
+        scatter_s=100,
+        scatter_marker='o',
+        color=config.COLOR_MAPPING['base'],
+        ax=ax2
+    )
+    plot.plot_basic(
+        x=np.array(N_values),
+        y=np.array(E0_C_values),
+        use_scatter=True,
+        scatter_alpha=0.7,
+        scatter_s=100,
+        scatter_marker='o',
+        color=config.COLOR_MAPPING['instruct'],
+        ax=ax2
+    )
+    # Add manual legend entries
+    ax2.scatter([], [], color=config.COLOR_MAPPING['base'], s=100, alpha=0.7, label='L(N,D) fitting')
+    ax2.scatter([], [], color=config.COLOR_MAPPING['instruct'], s=100, alpha=0.7, label='L(N,C) fitting')
+    
+    plot.plot_basic_settings(
+        ax=ax2,
+        x_scale='log',
+        x_label='Model Size (N)',
+        y_label=' $E(N)$',
+        x_tick_on_data=True,
+        title=f'$E(N)$ Comparison on {model_type.capitalize()} Models',
+        use_legend=True
+    )
     ax2.grid(True, alpha=0.3)
     
     plt.tight_layout()

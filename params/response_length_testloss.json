@@ -1,0 +1,78 @@
+{
+  "runs": [
+    {
+      "comment": "Response Length - loss - base",
+      "data_source": "base",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "response_length"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_raw": 0,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "response_length",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "fit_plot_k_E0": true,
+      "plot_x_label": "Response Length",
+      "plot_y_label": "Test Loss",
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "x_tick_spacing": 0.1,
+      "x_tick_format": "decimal",
+      "y_tick_spacing": 0.1,
+      "y_tick_format": "auto",
+      "y_grid_spacing": 0.1,
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": "Fitted Test Loss vs Response Length (Base)",
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "fit_base_"
+    },
+    {
+      "comment": "Response Length - loss - instruct",
+      "data_source": "instruct",
+      "plot_curve_column": "N",
+      "plot_x_columns": [
+        "response_length"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_raw": 0,
+      "fit": true,
+      "fit_curve_column": "N",
+      "fit_x_column": "response_length",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "fit_plot_k_E0": true,
+      "plot_x_label": "Response Length",
+      "plot_y_label": "Test Loss",
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "x_tick_spacing": 0.1,
+      "x_tick_format": "decimal",
+      "y_tick_spacing": 0.1,
+      "y_tick_format": "auto",
+      "y_grid_spacing": 0.1,
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": "Fitted Test Loss vs Response Length (Instruct)",
+      "scatter_alpha": 1,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "fit_instruct_"
+    }
+  ]
+}

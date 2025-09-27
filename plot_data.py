@@ -46,6 +46,14 @@ def plot_curves_with_smooth(
     scatter_alpha: float = 0.3,
     scatter_size: float = 8.0,
     scatter_marker: str = 'o',
+    # Axis formatting control
+    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
+    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
+    # Tick and grid spacing
+    x_tick_spacing: float = None,
+    y_tick_spacing: float = None,
+    x_grid_spacing: float = None,
+    y_grid_spacing: float = None,
     ax=None,
     # smooth params
     add_smooth: bool = False, 
@@ -54,6 +62,10 @@ def plot_curves_with_smooth(
     smooth_strict: bool = False,
     warmup_frac_raw: float = 0,
     warmup_frac_smooth: float = 0,
+    warmup_clip_raw: int = None,  # Absolute count clipping for raw data (clips first N points)
+    warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data (clips first N points)
+    ending_clip_raw: int = None,  # Absolute ending clipping for raw data (clips last steps > ending_step)
+    ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data (clips last steps > ending_step)
     s_factor: float = 1,
     k_spline: int = 5,
     rolling_window: int = 200,
@@ -61,10 +73,22 @@ def plot_curves_with_smooth(
     x_inv_weight_power: float = 0.3,
     smooth_out_column: str = None,
     use_linear: bool = False,
+    # Custom color mapping override
+    custom_color_mapping: dict = None,  # Custom color mapping to override config colors
 ):
 
-    if warmup_frac_raw > 0:
-        df = data_proc.apply_warmup_clipping(df, curve_column=curve_column, warmup_frac=warmup_frac_raw)
+    # Apply warmup clipping for raw data
+    if warmup_clip_raw is not None:
+        # Use absolute count clipping (clips first N data points per curve)
+        df = data_proc.apply_clip(df, curve_column=curve_column, warmup_step=warmup_clip_raw)
+    elif warmup_frac_raw > 0:
+        # Use relative clipping
+        df = data_proc.apply_clip(df, curve_column=curve_column, warmup_frac=warmup_frac_raw)
+    
+    # Apply ending clipping for raw data
+    if ending_clip_raw is not None:
+        # Use absolute ending clipping (clips steps > ending_step per curve)
+        df = data_proc.apply_clip(df, curve_column=curve_column, ending_step=ending_clip_raw)
     
     df_R_smooth = None
     if add_smooth:
@@ -87,8 +111,18 @@ def plot_curves_with_smooth(
             x_inv_weight_power=x_inv_weight_power,
             use_linear=use_linear
         )
-        if warmup_frac_smooth > 0:
-            df_R_smooth = data_proc.apply_warmup_clipping(df_R_smooth, curve_column=curve_column, warmup_frac=warmup_frac_smooth)
+        # Apply warmup clipping for smooth data
+        if warmup_clip_smooth is not None:
+            # Use absolute count clipping (clips first N data points per curve)
+            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, warmup_step=warmup_clip_smooth)
+        elif warmup_frac_smooth > 0:
+            # Use relative clipping
+            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, warmup_frac=warmup_frac_smooth)
+        
+        # Apply ending clipping for smooth data
+        if ending_clip_smooth is not None:
+            # Use absolute ending clipping (clips steps > ending_step per curve)
+            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, ending_step=ending_clip_smooth)
 
     ax = plot.plot_curves(
         df,
@@ -117,14 +151,25 @@ def plot_curves_with_smooth(
         highlight_curves=highlight_curves,
         highlight_line_alpha=highlight_line_alpha,
         highlight_line_width=highlight_line_width,
-        # Pass line and scatter styling
+        # Pass line and scatter styling - applies to raw data, smooth, and fitting
         line_alpha=line_alpha,
         line_width=line_width,
         scatter_alpha=scatter_alpha,
         scatter_s=scatter_size,
         scatter_marker=scatter_marker,
+        # Pass axis formatting
+        x_tick_format=x_tick_format,
+        y_tick_format=y_tick_format,
+        # Pass tick and grid spacing
+        x_tick_spacing=x_tick_spacing,
+        y_tick_spacing=y_tick_spacing,
+        x_grid_spacing=x_grid_spacing,
+        y_grid_spacing=y_grid_spacing,
+        # Pass custom color mapping
+        custom_color_mapping=custom_color_mapping,
         ax=ax
     )
+    return ax
 
 def process_single_eval(
     df, 
@@ -157,10 +202,15 @@ def process_single_eval(
     scatter_alpha: float = 0.3,
     scatter_size: float = 8.0,
     scatter_marker: str = 'o',
+    # Axis formatting control
+    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
+    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
+    # Tick and grid spacing
+    x_tick_spacing: float = None,
+    y_tick_spacing: float = None,
+    x_grid_spacing: float = None,
+    y_grid_spacing: float = None,
     ax: plt.Axes=None,
-    save_to_dir: str = None,
-    save_to_filename: str = None,
-    save_to_filename_prefix: str = None,
     # smooth
     delta_base_step: int = 0,
     add_smooth=False,
@@ -170,6 +220,10 @@ def process_single_eval(
     smooth_strict=False,
     warmup_frac_raw: float=0,
     warmup_frac_smooth: float=0,
+    warmup_clip_raw: int = None,  # Absolute count clipping for raw data
+    warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data
+    ending_clip_raw: int = None,  # Absolute ending clipping for raw data
+    ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data
     calc_delta: bool=False, # in case there's no step 0 but don't care of it.
     s_factor=1,
     k_spline=5,
@@ -177,6 +231,8 @@ def process_single_eval(
     min_se=1e-6,
     x_inv_weight_power=0.3,
     use_linear=False,
+    # Custom color mapping override
+    custom_color_mapping: dict = None,  # Custom color mapping to override config colors
     ):
     
     
@@ -240,6 +296,20 @@ def process_single_eval(
         highlight_curves=plot_highlight_curves,
         highlight_line_alpha=plot_highlight_line_alpha,
         highlight_line_width=plot_highlight_line_width,
+        # Pass line and scatter styling - applies to raw data, smooth, and fitting
+        line_alpha=line_alpha,
+        line_width=line_width,
+        scatter_alpha=scatter_alpha,
+        scatter_size=scatter_size,
+        scatter_marker=scatter_marker,
+        # Pass axis formatting
+        x_tick_format=x_tick_format,
+        y_tick_format=y_tick_format,
+        # Pass tick and grid spacing
+        x_tick_spacing=x_tick_spacing,
+        y_tick_spacing=y_tick_spacing,
+        x_grid_spacing=x_grid_spacing,
+        y_grid_spacing=y_grid_spacing,
         ax=ax,
         # smooth
         add_smooth=add_smooth,
@@ -248,35 +318,22 @@ def process_single_eval(
         smooth_strict=smooth_strict,
         warmup_frac_raw=warmup_frac_raw,
         warmup_frac_smooth=warmup_frac_smooth,
+        warmup_clip_raw=warmup_clip_raw,
+        warmup_clip_smooth=warmup_clip_smooth,
+        ending_clip_raw=ending_clip_raw,
+        ending_clip_smooth=ending_clip_smooth,
         s_factor=s_factor,
         k_spline=k_spline,
         rolling_window=rolling_window,
         min_se=min_se,
         x_inv_weight_power=x_inv_weight_power,
         smooth_out_column=plot_metric+"_smooth" if add_smooth else None,
-        use_linear=use_linear
+        use_linear=use_linear,
+        # Pass custom color mapping
+        custom_color_mapping=custom_color_mapping
     )
 
-    if save_to_dir is not None or save_to_filename is not None:
-        plt.tight_layout()
-        # Create eval-specific output directory
-        eval_file_str = config.TEST_EVALS[plot_eval_column]['file_str']
-        Path(save_to_dir).mkdir(parents=True, exist_ok=True)
-        filename = f"{eval_file_str}_{plot_curve_column}_{plot_x_column}_{plot_metric}"
-        if save_to_filename_prefix is not None:
-            filename = save_to_filename_prefix + filename
-        if plot_curve_mask is not None:
-            # Convert mask values to clean format for filename
-            mask_str = "_".join([str(int(float(val))) if isinstance(val, (int, float)) or hasattr(val, 'item') 
-                                else str(val) for val in plot_curve_mask])
-            filename += f"_{mask_str}"
-        filename += ".pdf"
-        if save_to_filename is not None:
-            filename = save_to_filename
-        save_to_path = save_to_dir / filename
-        plt.savefig(save_to_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"Saved {save_to_path}")
+    # Save logic moved to plot_basic_settings - just return ax
     return ax
 
 
@@ -303,6 +360,10 @@ def process_single_eval_multi_metrics(
     delta_base_step: int = 0,
     warmup_frac_raw: float = 0,
     warmup_frac_smooth: float = 0,
+    warmup_clip_raw: int = None,  # Absolute count clipping for raw data
+    warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data
+    ending_clip_raw: int = None,  # Absolute ending clipping for raw data
+    ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data
     output_dir: str = None,
     use_linear=False,
     ):
@@ -372,6 +433,10 @@ def process_single_eval_multi_metrics(
             smooth_strict=False,
             warmup_frac_raw=warmup_frac_raw,
             warmup_frac_smooth=warmup_frac_smooth,
+            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip_smooth=warmup_clip_smooth,
+            ending_clip_raw=ending_clip_raw,
+            ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
             rolling_window=200,
@@ -414,6 +479,10 @@ def process_single_eval_multi_metrics(
             smooth_strict=False,
             warmup_frac_raw=warmup_frac_raw,
             warmup_frac_smooth=warmup_frac_smooth,
+            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip_smooth=warmup_clip_smooth,
+            ending_clip_raw=ending_clip_raw,
+            ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
             rolling_window=200,
@@ -456,6 +525,10 @@ def process_single_eval_multi_metrics(
             smooth_strict=False,
             warmup_frac_raw=warmup_frac_raw,
             warmup_frac_smooth=warmup_frac_smooth,
+            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip_smooth=warmup_clip_smooth,
+            ending_clip_raw=ending_clip_raw,
+            ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
             rolling_window=200,
@@ -498,6 +571,10 @@ def process_single_eval_multi_metrics(
             smooth_strict=False,
             warmup_frac_raw=warmup_frac_raw,
             warmup_frac_smooth=warmup_frac_smooth,
+            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip_smooth=warmup_clip_smooth,
+            ending_clip_raw=ending_clip_raw,
+            ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
             rolling_window=200,
@@ -537,7 +614,20 @@ def predict_and_plot(
     scatter_alpha: float = 0.3,
     scatter_size: float = 8.0,
     scatter_marker: str = 'o',
+    # Axis formatting control
+    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
+    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
+    # Tick control (added for completeness)
+    x_tick_spacing: float = None,  # Spacing for x-axis ticks
+    y_tick_spacing: float = None,  # Spacing for y-axis ticks
+    # Grid control
+    x_grid_spacing: float = None,  # Spacing for x-axis grid lines
+    y_grid_spacing: float = None,  # Spacing for y-axis grid lines
+    # Custom color mapping override
+    custom_color_mapping: dict = None,  # Custom color mapping to override config colors
     warmup_frac_raw = 0,
+    warmup_clip_raw: int = None,  # Absolute count clipping for prediction data
+    ending_clip_raw: int = None,  # Absolute ending clipping for prediction data
     ax: plt.Axes=None,
 ):
     # predicter = fit.FitLogErrRate(L=0.06333, r=1.73e-10, N0_k=4.95e9, r_e0=1e-9, N0_e0=3e9)
@@ -560,7 +650,20 @@ def predict_and_plot(
     # metric = 'ErrRate' # key must be one of 'R', 'ErrRate', 'DeltaReward', 'DeltaErrRate'
     # curve_column = 'N' # key must be one of 'N', 'data_fator'
 
-    df_fit_plot = data_proc.apply_warmup_clipping(df, curve_column=plot_curve_column, warmup_frac=warmup_frac_raw)
+    # Apply warmup clipping for prediction data
+    if warmup_clip_raw is not None:
+        # Use absolute count clipping
+        df_fit_plot = data_proc.apply_clip(df, curve_column=plot_curve_column, warmup_step=warmup_clip_raw)
+    elif warmup_frac_raw > 0:
+        # Use relative clipping
+        df_fit_plot = data_proc.apply_clip(df, curve_column=plot_curve_column, warmup_frac=warmup_frac_raw)
+    else:
+        df_fit_plot = df
+    
+    # Apply ending clipping for prediction data
+    if ending_clip_raw is not None:
+        # Use absolute ending clipping
+        df_fit_plot = data_proc.apply_clip(df_fit_plot, curve_column=plot_curve_column, ending_step=ending_clip_raw)
     ax = plot.plot_curves(
         df_fit_plot, 
         curve_column=plot_curve_column, x_column=plot_x_column, y_column=pred_column, 
@@ -577,6 +680,16 @@ def predict_and_plot(
         scatter_alpha=scatter_alpha,
         scatter_s=scatter_size,
         scatter_marker=scatter_marker,
+        # Pass axis formatting
+        x_tick_format=x_tick_format,
+        y_tick_format=y_tick_format,
+        # Pass tick and grid spacing
+        x_tick_spacing=x_tick_spacing,
+        y_tick_spacing=y_tick_spacing,
+        x_grid_spacing=x_grid_spacing,
+        y_grid_spacing=y_grid_spacing,
+        # Pass custom color mapping
+        custom_color_mapping=custom_color_mapping,
         ax=ax,
     )
     return ax

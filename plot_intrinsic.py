@@ -14,7 +14,7 @@ def plot_ip_c_1b(
     ax=None,
 ):
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
     
     # set legend
     unique_Ns = sorted(intrinsic_points['N'].unique())
@@ -60,7 +60,7 @@ def plot_fit_score_c_2a(
     ax=None,
 ):
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
 
     dfs = data_proc.split_df(df, by_column='N')
     # set legend
@@ -107,7 +107,7 @@ def plot_fit_ip_2b(
     ax=None,
 ):
     if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=140)
+        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
 
     # set legend
     unique_Ns = sorted(pred_intrinsic_curves["N"].unique())

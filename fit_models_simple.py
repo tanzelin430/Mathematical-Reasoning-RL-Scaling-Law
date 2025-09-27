@@ -47,7 +47,7 @@ class SimpleLinearLookupFit:
         df['ErrRate'] = 1 - df[eval_name]
         
         # Apply warmup clipping using existing function
-        df_fit = data_proc.apply_warmup_clipping(
+        df_fit = data_proc.apply_clip(
             df, 
             curve_column="N", 
             warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
@@ -97,7 +97,7 @@ class SimpleLinearLookupFit:
             reg = LinearRegression()
             reg.fit(X, y)
             
-            k = reg.coef_[0]
+            k = -reg.coef_[0]  # Take negative to store positive k (physics convention)
             E0 = reg.intercept_
             r2 = reg.score(X, y)
             
@@ -135,7 +135,7 @@ class SimpleLinearLookupFit:
         E0 = self.E0_lookup[N]
         
         log_E = np.log10(E)
-        log_errrate = k * log_E + E0
+        log_errrate = -k * log_E + E0  # k is stored as positive, so use -k in prediction
         errrate = 10 ** log_errrate
         
         return errrate
@@ -197,7 +197,7 @@ class SimpleLinearLookupFit:
             df_temp['ErrRate'] = 1 - df_temp[eval_name]
             
             # Apply same preprocessing as in fitting
-            df_fit = data_proc.apply_warmup_clipping(
+            df_fit = data_proc.apply_clip(
                 df_temp, 
                 curve_column=curve_column, 
                 warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW

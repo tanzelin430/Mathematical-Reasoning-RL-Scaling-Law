@@ -6,6 +6,7 @@ Processes multiple test evals from Experiment1 data and generates scaling law pl
 
 import data_proc
 import plot_data
+import plot
 import config
 
 def main():
@@ -20,16 +21,12 @@ def main():
     curve_column = 'N' # key must be one of 'N', 'data_fator'
     for x_column in [ "C", "E", "T"]: # "T", "C", "E"
         for metric in ["ErrRate"]: # "R", "ErrRate", "DeltaReward", "DeltaErrRate"
-            plot_data.process_single_eval(
+            ax = plot_data.process_single_eval(
                 df, 
                 plot_x_column=x_column, 
                 plot_eval_column=eval_name, 
                 plot_metric=metric,
                 plot_curve_column=curve_column, 
-                plot_x_label=config.DEFAULT_LABELS[x_column],
-                plot_y_label=config.DEFAULT_LABELS[metric],
-                plot_x_scale="log",
-                plot_y_scale="log",
                 plot_title=config.TEST_EVALS[eval_name]['plot_str'],
                 plot_use_legend=True,
                 # delta
@@ -47,8 +44,24 @@ def main():
                 rolling_window=200,
                 min_se=1e-6,
                 x_inv_weight_power=0.3,
+            )
+            
+            # Apply plot_basic_settings for styling and save
+            plot.plot_basic_settings(
+                ax=ax,
+                x_scale="log",
+                y_scale="log",
+                x_label=config.DEFAULT_LABELS[x_column],
+                y_label=config.DEFAULT_LABELS[metric],
+                title=config.TEST_EVALS[eval_name]['plot_str'],
+                use_legend=True,
+                # Save configuration
                 save_to_dir=config.OUTPUT_BASE_DIR, 
                 save_to_filename_prefix=model_type+'_',
+                plot_eval_column=eval_name,
+                plot_curve_column=curve_column,
+                plot_x_column=x_column,
+                plot_metric=metric,
             )
 
 if __name__ == "__main__":

@@ -334,7 +334,7 @@ def get_x_y_data_from_df(
     if warmup_frac is not None:
         # Use the first x column as curve_column for grouping
         curve_column = x_column_list[0] if x_column_list else "N"
-        df_fit = data_proc.apply_warmup_clipping(
+        df_fit = data_proc.apply_clip(
             df_fit, 
             curve_column=curve_column, 
             warmup_frac=warmup_frac
@@ -421,7 +421,8 @@ def fit_log_errrate(df, eval_name = "holdout_score", x_column_list=["N", "E"]):
 
 
 def fit_log_errrate_simple(df, eval_name="holdout_score", curve_column="N", x_column="E", 
-                          fit_load_path=None, fit_save_path=None, data_source=None):
+                          fit_load_path=None, fit_save_path=None, data_source=None, 
+                          warmup_step=None, ending_step=None):
     """
     Simple lookup table fitting: log_errrate = k(curve_column) * log_x_column + E0(curve_column)
     
@@ -441,6 +442,10 @@ def fit_log_errrate_simple(df, eval_name="holdout_score", curve_column="N", x_co
         Path to save fitted model to JSON. If provided, save after fitting.
     data_source : str, optional
         Data source identifier for JSON metadata (required if fit_save_path is provided)
+    warmup_step : int, optional
+        Warmup clipping by step value (keep steps >= warmup_step)
+    ending_step : int, optional
+        Ending clipping by step value (keep steps <= ending_step)
         
     Returns:
     --------
@@ -458,15 +463,19 @@ def fit_log_errrate_simple(df, eval_name="holdout_score", curve_column="N", x_co
     print(f"=== Simple Lookup Table Fitting: log_errrate = k({curve_column}) * log_{x_column} + E0({curve_column}) ===")
     
     # Prepare data using get_x_y_data_from_df, but we need the preprocessed df for later use
-    df_temp = df.copy()
-    df_temp['ErrRate'] = 1 - df_temp[eval_name]
+    df_fit = df.copy()
+    df_fit['ErrRate'] = 1 - df_fit[eval_name]
     
     # Apply preprocessing manually to get df_fit for later use
-    df_fit = data_proc.apply_warmup_clipping(
-        df_temp, 
-        curve_column=curve_column, 
-        warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
-    )
+    if warmup_step is not None or ending_step is not None:
+        # Use explicit warmup_step and ending_step if provided
+        df_fit = data_proc.apply_clip(
+            df_fit, 
+            curve_column=curve_column, 
+            warmup_step=warmup_step,
+            ending_step=ending_step
+        )
+        
     df_fit = df_fit[df_fit['step'] > 0].reset_index(drop=True)
     df_fit = data_proc.merge_duplicate_steps(
         df_fit, 
@@ -514,7 +523,7 @@ def fit_log_errrate_simple(df, eval_name="holdout_score", curve_column="N", x_co
         reg = LinearRegression()
         reg.fit(X, y)
         
-        k = reg.coef_[0]
+        k = -reg.coef_[0]  # Take negative to store positive k (physics convention)
         E0 = reg.intercept_
         r2 = reg.score(X, y)
         

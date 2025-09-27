@@ -1,0 +1,160 @@
+{
+  "runs": [
+    {
+      "comment": "GRPO Rollout - Base",
+      "data_source": "grpo-base",
+      "plot_curve_column": "rollout_n",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_factor_raw": 0.1,
+      "add_smooth": true,
+      "smooth_monotonic": true,
+      "s_factor": 1,
+      "k_spline": 3,
+      "rolling_window": 200,
+      "min_se": 1e-3,
+      "x_inv_weight_power": 0.2,
+      "fit": false,
+      "fit_curve_column": "rollout_n",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "x_tick_spacing": 0.5,
+      "x_grid_spacing": 0.1,
+      "x_tick_format": "auto",
+      "y_tick_spacing": 0.05,
+      "y_tick_format": "decimal",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": " ",
+      "scatter_alpha": 0.8,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "grpo_base_"
+    },
+    {
+      "comment": "GRPO Rollout - Base",
+      "data_source": "grpo-base",
+      "plot_curve_column": "rollout_n",
+      "plot_x_columns": [
+        "C_raw"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_factor_raw": 0.1,
+      "add_smooth": true,
+      "smooth_monotonic": true,
+      "s_factor": 1,
+      "k_spline": 3,
+      "rolling_window": 200,
+      "min_se": 1e-3,
+      "x_inv_weight_power": 0.2,
+      "fit": false,
+      "fit_curve_column": "rollout_n",
+      "fit_x_column": "C_raw",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "x_grid_spacing": 0.2,
+      "y_tick_spacing": 0.05,
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": " ",
+      "scatter_alpha": 0.8,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "grpo_base_"
+    },
+    {
+      "comment": "GRPO Rollout - Instruct",
+      "data_source": "grpo-instruct",
+      "plot_curve_column": "rollout_n",
+      "plot_x_columns": [
+        "E"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_factor_raw": 0.1,
+      "add_smooth": true,
+      "smooth_monotonic": true,
+      "s_factor": 1,
+      "k_spline": 3,
+      "rolling_window": 200,
+      "min_se": 1e-3,
+      "x_inv_weight_power": 0.2,
+      "fit": false,
+      "fit_curve_column": "rollout_n",
+      "fit_x_column": "E",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "x_tick_spacing": 0.5,
+      "x_grid_spacing": 0.1,
+      "x_tick_format": "auto",
+      "y_tick_spacing": 0.05,
+      "y_tick_format": "decimal",
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": " ",
+      "scatter_alpha": 0.8,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "grpo_instruct_"
+    },
+    {
+      "comment": "GRPO Rollout - Instruct",
+      "data_source": "grpo-instruct",
+      "plot_curve_column": "rollout_n",
+      "plot_x_columns": [
+        "C_raw"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_factor_raw": 0.1,
+      "add_smooth": true,
+      "smooth_monotonic": true,
+      "s_factor": 1,
+      "k_spline": 3,
+      "rolling_window": 200,
+      "min_se": 1e-3,
+      "x_inv_weight_power": 0.2,
+      "fit": false,
+      "fit_curve_column": "rollout_n",
+      "fit_x_column": "C_raw",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "x_grid_spacing": 0.2,
+      "y_tick_spacing": 0.05,
+      "line_alpha": 1,
+      "line_width": 2.0,
+      "plot_use_legend": true,
+      "plot_title": " ",
+      "scatter_alpha": 0.8,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "output_prefix": "grpo_instruct_"
+    }
+  ]
+}

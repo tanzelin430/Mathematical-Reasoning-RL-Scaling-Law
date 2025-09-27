@@ -49,7 +49,7 @@ __all__ = [
     'plot_score_c_1a', 'plot_err_rate_1c', 'plot_ip_c_1b', 'plot_fit_score_c_2a', 'plot_fit_ip_2b',
     
     # Utility functions
-    'human_format_N',
+    'human_format_N', 'setup_axis_formatter', 'setup_y_axis_formatter',
     
     # Empirical frontier visualization
     'vplot_empirical_f_of_R', 'plot_phi_over_steps',
@@ -66,9 +66,102 @@ __all__ = [
 COLOR_MAPPING = config.COLOR_MAPPING
 get_color_for_curve = config.get_color_for_curve
 
+def setup_axis_formatter(ax, axis, format_type='auto'):
+    """
+    Setup axis formatter with simple options.
+    
+    Args:
+        ax: matplotlib axes object
+        axis: 'x' or 'y'
+        format_type: str, one of:
+            - 'auto': Smart default (decimal for 0.01-100, individual 10^n for others) 
+            - 'decimal': Always use decimal format
+            - 'sci': Always use scientific notation  
+            - 'plain': Matplotlib default
+    """
+    from matplotlib.ticker import ScalarFormatter, FuncFormatter
+    import math
+
+    def decimal_formatter(x, pos):
+        if x == 0:
+            return '0'
+        
+        import math
+        abs_x = abs(x)
+        
+        # Calculate the number of significant figures needed (max 4)
+        # Find the order of magnitude
+        order_of_magnitude = math.floor(math.log10(abs_x))
+        
+        # Calculate decimal places needed for up to 4 significant figures
+        max_sig_figs = 4
+        if abs_x >= 1:
+            # For numbers >= 1, decimal places = max_sig_figs - integer_digits
+            integer_digits = len(str(int(abs_x)))
+            decimal_places = max(0, max_sig_figs - integer_digits)
+        else:
+            # For numbers < 1, decimal places = -order_of_magnitude + max_sig_figs - 1
+            decimal_places = -order_of_magnitude + max_sig_figs - 1
+        
+        # Cap decimal places to avoid excessive precision
+        decimal_places = min(decimal_places, 6)
+        
+        # Format the number
+        formatted = f'{x:.{decimal_places}f}'
+        
+        # Remove trailing zeros and decimal point if not needed
+        if '.' in formatted:
+            formatted = formatted.rstrip('0').rstrip('.')
+        
+        return formatted
+
+    def sci_formatter(x, pos):
+            if x == 0:
+                return '0'
+            abs_x = abs(x)
+            exp = int(math.log10(abs_x))
+            coeff = x / (10 ** exp)
+            if abs(coeff - 1.0) < 0.01:
+                return f'$10^{{{exp}}}$'
+            else:
+                return f'${decimal_formatter(coeff, pos)} \\times 10^{{{exp}}}$'
+                # return f'${coeff:.1f} \\times 10^{{{exp}}}$'
+            
+    if format_type == 'plain':
+        return
+        
+    if format_type is None or format_type == 'auto':
+        def smart_formatter(x, pos):
+            if x == 0:
+                return '0'
+            abs_x = abs(x)
+            if 1e-2 <= abs_x <= 1e5:
+                return decimal_formatter(x, pos)
+            else:
+                return sci_formatter(x, pos)
+        _formatter = FuncFormatter(smart_formatter)
+    elif format_type == 'decimal':
+        _formatter = FuncFormatter(decimal_formatter)
+    elif format_type == 'sci':
+        _formatter = FuncFormatter(sci_formatter)
+    if axis == 'y':
+        ax.yaxis.set_major_formatter(_formatter)
+        # ax.yaxis.set_minor_formatter(_formatter)
+    else:
+        ax.xaxis.set_major_formatter(_formatter)
+        # ax.xaxis.set_minor_formatter(_formatter)
+
+def setup_y_axis_formatter(ax, format_type='auto'):
+    """Backward compatibility wrapper"""
+    setup_axis_formatter(ax, 'y', format_type)
+
 def legend_format(label_name: str, label_value: float) -> str:
     if label_name == "N":
         return human_format_N(label_value)
+    elif label_name == "Tau":
+        return f"τ={label_value}"
+    elif label_name == "rollout_n":
+        return f"ρ={label_value.split('rho')[1]}"
     else:
         return f"{label_name}={label_value}"
         
@@ -111,7 +204,17 @@ def human_format_N(N: float, mode: str = "eng", sig: int = 3, sci_coeff: bool = 
 def _get_legends(_curves: list[float], legend_lambda = None):
     if legend_lambda is None:
         legend_lambda = lambda x: x
-    sort_curves = sorted(_curves)
+    def _flat(x):
+        if isinstance(x, str):
+            if x.startswith('rho'):
+                # Handle rollout numbers like 'rho16' -> 16
+                x = x.replace('rho', '')
+                try:
+                    x = int(x)  # Convert to integer directly
+                except ValueError:
+                    x = 1000000  # Fallback for invalid rollout numbers
+        return float(x)
+    sort_curves = sorted(_curves, key=_flat)
     handles = [Line2D([0], [0], color=get_color_for_curve(n), linewidth=2) for n in sort_curves]
     labels = [legend_lambda(n) for n in sort_curves]
     return handles, labels, sort_curves
@@ -167,36 +270,265 @@ def plot_basic_settings(
     # Auto-scaling margins
     x_margin: float = None,
     y_margin: float = None,
+    # Tick control
+    x_tick_spacing: float = None,  # Spacing for x-axis ticks
+    y_tick_spacing: float = None,  # Spacing for y-axis ticks
+    # Grid control (simple spacing-based)
+    x_grid_spacing: float = None,  # Spacing for x-axis grid lines
+    y_grid_spacing: float = None,  # Spacing for y-axis grid lines
+    # Axis formatting control
+    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
+    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
+    # Data-based tick positioning
+    x_tick_on_data: bool = False,  # Use actual data points for x-axis ticks
+    y_tick_on_data: bool = False,  # Use actual data points for y-axis ticks
+    # Custom tick positioning
+    x_tick_subs: list = None,       # Custom x-axis tick positions (direct positions, works in both linear and log scale)
+    y_tick_subs: list = None,       # Custom y-axis tick positions (direct positions, works in both linear and log scale)
+    x_tick_subs_log: list = None,   # Log-scale specific multipliers (e.g., [1,2,5] for 1x,2x,5x per decade, only for log scale)
+    y_tick_subs_log: list = None,   # Log-scale specific multipliers (e.g., [1,2,5] for 1x,2x,5x per decade, only for log scale)
+    # Save configuration - NEW ADDITION
+    save_to_dir: str = None,
+    save_to_filename: str = None,
+    save_to_filename_prefix: str = None,
+    # Additional save configuration for process_single_eval compatibility
+    plot_eval_column: str = None,
+    plot_curve_column: str = None, 
+    plot_x_column: str = None,
+    plot_metric: str = None,
+    plot_curve_mask: list = None,
 ):
+    # Import required ticker classes
+    from matplotlib.ticker import MultipleLocator, LogLocator, FixedLocator
+    import numpy as np
+    
+    def _extract_data_points_from_ax(ax):
+        """Extract x and y data points from all plotted elements in the axes"""
+        all_x_data = []
+        all_y_data = []
+        
+        # Extract from line plots
+        for line in ax.get_lines():
+            x_data = line.get_xdata()
+            y_data = line.get_ydata()
+            if len(x_data) > 0 and len(y_data) > 0:
+                all_x_data.extend(x_data)
+                all_y_data.extend(y_data)
+        
+        # Extract from scatter plots
+        for collection in ax.collections:
+            offsets = collection.get_offsets()
+            if len(offsets) > 0:
+                all_x_data.extend(offsets[:, 0])
+                all_y_data.extend(offsets[:, 1])
+        
+        return np.array(all_x_data), np.array(all_y_data)
+    
+    def _get_ticks_from_data(data_values, max_ticks=10, scale='linear'):
+        """Get tick positions from data values"""
+        if len(data_values) == 0:
+            return []
+        
+        # Remove duplicates and sort
+        unique_values = sorted(set(data_values))
+        
+        # If too many points, select a subset
+        if len(unique_values) > max_ticks:
+            if scale == 'log':
+                # For log scale, try to keep important powers of 10
+                log_values = np.log10(unique_values)
+                indices = np.linspace(0, len(unique_values)-1, max_ticks, dtype=int)
+                unique_values = [unique_values[i] for i in indices]
+            else:
+                # For linear scale, use equal spacing
+                indices = np.linspace(0, len(unique_values)-1, max_ticks, dtype=int)
+                unique_values = [unique_values[i] for i in indices]
+        
+        return unique_values
+    
+    def _apply_custom_ticks(axis, tick_subs, tick_subs_log, scale='linear'):
+        """Apply custom tick positions based on scale type and parameters"""
+        # Validate input: only one type of tick_subs should be provided
+        if tick_subs is not None and tick_subs_log is not None:
+            raise ValueError("Cannot specify both tick_subs and tick_subs_log simultaneously")
+        
+        # Handle tick_subs_log parameter
+        if tick_subs_log is not None:
+            if scale != 'log':
+                raise ValueError("tick_subs_log can only be used with log scale")
+            if len(tick_subs_log) == 0:
+                return
+            
+            # tick_subs_log are multipliers within each decade (e.g., [1, 2, 5])
+            if not all(0 < sub <= 10 for sub in tick_subs_log):
+                raise ValueError("tick_subs_log values must be between 0 and 10")
+            
+            # Convert to subs format for LogLocator (0 < sub <= 1)
+            subs = []
+            for sub in tick_subs_log:
+                if sub == 10:
+                    subs.append(1.0)
+                else:
+                    subs.append(sub / 10.0)
+            
+            axis.set_major_locator(LogLocator(base=10, subs=sorted(set(subs))))
+            return
+        
+        # Handle regular tick_subs parameter (direct positions)
+        if tick_subs is not None:
+            if len(tick_subs) == 0:
+                return
+            # tick_subs are always direct tick positions, regardless of scale
+            axis.set_major_locator(FixedLocator(tick_subs))
+    
     if x_scale:
         ax.set_xscale(x_scale)
-        if x_scale == "log":
-            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples
-            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
-            # Minor ticks for intermediate values
-            ax.xaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
     if y_scale:
         ax.set_yscale(y_scale)
-        if y_scale == "log":
-            # Add more tick marks for log scale - major ticks at 1, 2, 5 multiples  
-            ax.yaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
-            # Minor ticks for intermediate values
-            ax.yaxis.set_minor_locator(LogLocator(base=10, subs=np.arange(2, 10) * 0.1, numticks=12))
+    
+    
+    if x_grid_spacing is not None:
+        if x_scale == 'log':
+            # For log scale, interpret spacing as fraction of decade
+            # 0.1 means 10 ticks per decade (0.1, 0.2, ..., 1.0)
+            if x_grid_spacing > 1:
+                raise ValueError("x_grid_spacing must be less than 1 for log scale")
+            subs = np.arange(x_grid_spacing, 1.0 + x_grid_spacing, x_grid_spacing).tolist()
+            ax.xaxis.set_minor_locator(LogLocator(base=10, subs=subs))
+            ax.grid(True, which='minor', axis='x', alpha=0.5)
+        # Use MultipleLocator for grid spacing - works for both linear and log scales
+        else:
+            ax.xaxis.set_minor_locator(MultipleLocator(x_grid_spacing))
+            ax.grid(True, which='minor', axis='x', alpha=0.5)
+    if y_grid_spacing is not None:
+        if y_scale == 'log':
+            # For log scale, interpret spacing as fraction of decade
+            # 0.1 means 10 ticks per decade (0.1, 0.2, ..., 1.0)
+            if y_grid_spacing > 1:
+                raise ValueError("y_grid_spacing must be less than 1 for log scale")
+            subs = np.arange(y_grid_spacing, 1.0 + y_grid_spacing, y_grid_spacing).tolist()
+            ax.yaxis.set_minor_locator(LogLocator(base=10, subs=subs))
+            ax.grid(True, which='minor', axis='y', alpha=0.5)
+        else:
+            ax.yaxis.set_minor_locator(MultipleLocator(y_grid_spacing))
+            ax.grid(True, which='minor', axis='y', alpha=0.5)
+            
+    # hide minor tick labels
+    ax.tick_params(axis='x', which='minor', left=False, right=False,
+       labelleft=False, labelright=False)
+    # hide minor tick labels
+    ax.tick_params(axis='y', which='minor', left=False, right=False,
+       labelleft=False, labelright=False)
+
     if x_label:
-        ax.set_xlabel(x_label)
+        ax.set_xlabel(x_label, fontweight='bold')
     if y_label:
-        ax.set_ylabel(y_label)
+        ax.set_ylabel(y_label, fontweight='bold')
     if title:
-        ax.set_title(title)
+        ax.set_title(title, fontweight='bold')
     if use_legend:
         _handles, _labels = ax.get_legend_handles_labels()
         handles, labels = legend_handles_labels if legend_handles_labels else ([], [])
-        ax.legend(_handles + handles, _labels + labels, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor, fontsize=legend_fontsize)
+        
+        # Only set legend if we have handles to add, or if there are already handles in the plot
+        total_handles = _handles + handles
+        total_labels = _labels + labels
+        
+        if len(total_handles) > 0:
+            ax.legend(total_handles, total_labels, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor, fontsize=legend_fontsize)
     
     # Set margins for auto-scaling
     if x_margin is not None or y_margin is not None:
         ax.margins(x=x_margin if x_margin is not None else 0.05, 
                   y=y_margin if y_margin is not None else 0.05)
+    
+    # Apply tick positioning first, then formatting
+    # This is important because setting a locator can reset the formatter
+    
+    # Determine tick positioning strategy for each axis
+    # Priority: tick_on_data > (tick_subs or tick_subs_log) > tick_spacing
+    
+    # Handle X-axis ticks
+    if x_tick_on_data:
+        # Extract data points and use them for ticks
+        all_x_data, _ = _extract_data_points_from_ax(ax)
+        if len(all_x_data) > 0:
+            x_ticks = _get_ticks_from_data(all_x_data, max_ticks=10, scale=x_scale)
+            ax.xaxis.set_major_locator(FixedLocator(x_ticks))
+    elif x_tick_subs is not None or x_tick_subs_log is not None:
+        # Use custom tick positions
+        _apply_custom_ticks(ax.xaxis, x_tick_subs, x_tick_subs_log, x_scale)
+    elif x_tick_spacing is not None:
+        # Use spacing-based ticks (existing logic)
+        if x_scale == 'log':
+            if x_tick_spacing > 1:
+                raise ValueError("x_tick_spacing must be less than 1 for log scale")
+            else:
+                subs = np.arange(x_tick_spacing, 1.0 + x_tick_spacing, x_tick_spacing).tolist()
+                ax.xaxis.set_major_locator(LogLocator(base=10, subs=subs))
+        else:
+            ax.xaxis.set_major_locator(MultipleLocator(x_tick_spacing))
+    
+    # Handle Y-axis ticks
+    if y_tick_on_data:
+        # Extract data points and use them for ticks
+        _, all_y_data = _extract_data_points_from_ax(ax)
+        if len(all_y_data) > 0:
+            y_ticks = _get_ticks_from_data(all_y_data, max_ticks=10, scale=y_scale)
+            ax.yaxis.set_major_locator(FixedLocator(y_ticks))
+    elif y_tick_subs is not None or y_tick_subs_log is not None:
+        # Use custom tick positions
+        _apply_custom_ticks(ax.yaxis, y_tick_subs, y_tick_subs_log, y_scale)
+    elif y_tick_spacing is not None:
+        # Use spacing-based ticks (existing logic)
+        if y_scale == 'log':
+            if y_tick_spacing > 1:
+                raise ValueError("y_tick_spacing must be less than 1 for log scale")
+            else:
+                subs = np.arange(y_tick_spacing, 1.0 + y_tick_spacing, y_tick_spacing).tolist()
+                ax.yaxis.set_major_locator(LogLocator(base=10, subs=subs))
+        else:
+            ax.yaxis.set_major_locator(MultipleLocator(y_tick_spacing))
+    
+    # Apply axis formatting AFTER setting tick spacing
+    # This ensures formatting is applied to the custom tick positions
+    setup_axis_formatter(ax, 'x', x_tick_format)
+    setup_axis_formatter(ax, 'y', y_tick_format)
+    
+    # Save configuration - MOVED FROM process_single_eval
+    if save_to_dir is not None or save_to_filename is not None:
+        import matplotlib.pyplot as plt
+        from pathlib import Path
+        import config
+        
+        plt.tight_layout()
+        
+        if plot_eval_column and plot_curve_column and plot_x_column and plot_metric:
+            # Create eval-specific output directory (same logic as process_single_eval)
+            eval_file_str = config.TEST_EVALS[plot_eval_column]['file_str']
+            Path(save_to_dir).mkdir(parents=True, exist_ok=True)
+            filename = f"{eval_file_str}_{plot_curve_column}_{plot_x_column}_{plot_metric}"
+            if save_to_filename_prefix is not None:
+                filename = save_to_filename_prefix + filename
+            # if plot_curve_mask is not None:
+            #     # Convert mask values to clean format for filename
+            #     mask_str = "_".join([str(int(float(val))) if isinstance(val, (int, float)) or hasattr(val, 'item') 
+            #                         else str(val) for val in plot_curve_mask])
+            #     filename += f"_{mask_str}"
+            filename += ".pdf"
+            if save_to_filename is not None:
+                filename = save_to_filename
+            save_to_path = Path(save_to_dir) / filename
+        else:
+            # Simple filename mode
+            if save_to_filename is not None:
+                save_to_path = Path(save_to_dir) / save_to_filename
+            else:
+                save_to_path = Path(save_to_dir) / "plot.pdf"
+        
+        plt.savefig(save_to_path, dpi=300, bbox_inches='tight')
+        print(f"Saved {save_to_path}")
+        # Note: We don't call plt.close() here since the caller might still need the ax
     
     return ax
 
@@ -233,6 +565,16 @@ def plot_curves(
     scatter_alpha: float = 0.3,
     scatter_s: float = 8.0,
     scatter_marker: str = 'o',
+    # Axis formatting control
+    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
+    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
+    # Tick and grid spacing
+    x_tick_spacing: float = None,
+    y_tick_spacing: float = None,
+    x_grid_spacing: float = None,
+    y_grid_spacing: float = None,
+    # Custom color mapping override
+    custom_color_mapping: dict = None,  # Custom color mapping to override config colors
     ax=None
 ):
     """Generic plotting function that can handle both score and error rate plots"""
@@ -250,10 +592,16 @@ def plot_curves(
         final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
         final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
         
+        # Use custom color mapping if provided, otherwise use config color mapping
+        if custom_color_mapping is not None and curve_id in custom_color_mapping:
+            color = custom_color_mapping[curve_id]
+        else:
+            color = get_color_for_curve(curve_id)
+            
         ax = plot_basic(x, y, 
             use_scatter=use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
             use_line=use_line, line_alpha=final_line_alpha, line_width=final_line_width,
-            fill_width=y_width, fill_width_alpha=0.2, color=get_color_for_curve(curve_id), ax=ax)
+            fill_width=y_width, fill_width_alpha=0.2, color=color, ax=ax)
         
     # Plot smooth curves
     if y_smooth_column is not None:
@@ -272,10 +620,16 @@ def plot_curves(
             final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
             final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
             
+            # Use custom color mapping if provided, otherwise use config color mapping
+            if custom_color_mapping is not None and curve_id in custom_color_mapping:
+                color = custom_color_mapping[curve_id]
+            else:
+                color = get_color_for_curve(curve_id)
+                
             ax = plot_basic(x, y, 
                 use_scatter=smooth_use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
                 use_line=smooth_use_line, line_alpha=final_line_alpha, line_width=final_line_width,
-                fill_width=y_width, fill_width_alpha=0.2, color=get_color_for_curve(curve_id), ax=ax)
+                fill_width=y_width, fill_width_alpha=0.2, color=color, ax=ax)
             # # Line
             # (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
             # # Plot width span
@@ -285,14 +639,18 @@ def plot_curves(
     
     # set legend
     if use_legend:
-        unique_curves = sorted(df[curve_column].unique())
+        unique_curves = df[curve_column].unique()
         if legend_lambda is None:
-            legend_lambda = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}"
+            legend_lambda = lambda x: legend_format(curve_column, x)
+            # legend_lambda = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}"
         handles, labels, _ = _get_legends(unique_curves, legend_lambda)
     else:
         handles, labels = None, None
     
-    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, (handles, labels), legend_loc, legend_bbox_to_anchor, legend_fontsize)
+    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, (handles, labels), legend_loc, legend_bbox_to_anchor, legend_fontsize, 
+                            x_tick_format=x_tick_format, y_tick_format=y_tick_format,
+                            x_tick_spacing=x_tick_spacing, y_tick_spacing=y_tick_spacing,
+                            x_grid_spacing=x_grid_spacing, y_grid_spacing=y_grid_spacing)
     return ax
 
 def _backup_plot_curves(
@@ -401,7 +759,7 @@ def vplot_empirical_f_of_R(
         return f"{x:.3g}"
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(7,4.5), dpi=140)
+        fig, ax = plt.subplots(figsize=(7,4.5), dpi=300)
 
     # 1) For each run: plot x=R, y=C
     handles, labels = [], []
@@ -496,7 +854,7 @@ def plot_phi_over_steps(
         Global median of all runs' tails combined (can be used as κ estimate).
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(7,4), dpi=140)
+        fig, ax = plt.subplots(figsize=(7,4), dpi=300)
 
     stats_rows = []
     all_tail_phi = []
@@ -592,11 +950,11 @@ def set_figure_labels(fig_axes, xlabel, y_labels):
     """Set supxlabel and supylabel for multi-subplot figures"""
     for key, ylabel in y_labels.items():
         if key in fig_axes:
-            fig_axes[key][0].supxlabel(xlabel)
-            fig_axes[key][0].supylabel(ylabel)
+            fig_axes[key][0].supxlabel(xlabel, fontweight='bold')
+            fig_axes[key][0].supylabel(ylabel, fontweight='bold')
 
 
-def apply_tight_layout(fig_axes, keep_legends=True):
+def apply_tight_layout(fig_axes, keep_legends=True, y_tick_format='auto'):
     """Apply tight layout without global legend for multi-subplot figures"""
     # Optionally hide subplot legends to avoid clutter
     if not keep_legends:
@@ -605,8 +963,8 @@ def apply_tight_layout(fig_axes, keep_legends=True):
     # Optimize layout to reduce left margin
     for fig, _ in fig_axes.values():
         for ax in fig.get_axes():
-            # Use compact decimal format instead of scientific notation (0.7 instead of 7x10-1)
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.3g}'))
+            # Apply Y-axis formatting
+            setup_y_axis_formatter(ax, y_tick_format)
             ax.tick_params(axis='y', labelsize=8)  # Smaller y-axis labels
     
     # Auto-adjust layout with reduced left margin

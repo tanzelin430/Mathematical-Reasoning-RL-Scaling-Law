@@ -421,14 +421,14 @@ def main():
         # 拟合E: log_ErrRate = k_E * log_E + E0_E
         reg_E = LinearRegression()
         reg_E.fit(log_E.reshape(-1, 1), log_ErrRate)
-        k_E = reg_E.coef_[0]
+        k_E = -reg_E.coef_[0]  # Take negative to store positive k
         E0_E = reg_E.intercept_
         r2_E = reg_E.score(log_E.reshape(-1, 1), log_ErrRate)
         
         # 拟合C: log_ErrRate = k_C * log_C + E0_C
         reg_C = LinearRegression()
         reg_C.fit(log_C.reshape(-1, 1), log_ErrRate)
-        k_C = reg_C.coef_[0]
+        k_C = -reg_C.coef_[0]  # Take negative to store positive k
         E0_C = reg_C.intercept_
         r2_C = reg_C.score(log_C.reshape(-1, 1), log_ErrRate)
         

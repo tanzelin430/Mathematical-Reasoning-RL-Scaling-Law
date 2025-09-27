@@ -65,8 +65,9 @@ class ComputeExtractorExperiment:
             'val/test_score/aimeamc2023/unknown'
         ]
         
-        # Also include overall_pass1
+        # Also include overall_pass1 and response_length/mean
         overall_pattern = 'val/overall_pass1'
+        response_length_pattern = 'response_length/mean'
         
         with open(log_file, 'r') as f:
             for line in f:
@@ -89,6 +90,11 @@ class ComputeExtractorExperiment:
                 overall_match = re.search(f'{re.escape(overall_pattern)}:([\d\.\-]+)', line)
                 if overall_match:
                     scores_dict['overall_pass1'] = float(overall_match.group(1))
+                
+                # Extract response_length/mean
+                response_length_match = re.search(f'{re.escape(response_length_pattern)}:([\d\.\-]+)', line)
+                if response_length_match:
+                    scores_dict['response_length'] = float(response_length_match.group(1))
                 
                 # Only add if we found at least one score
                 if scores_dict:
@@ -113,11 +119,31 @@ class ComputeExtractorExperiment:
         return step_flops
     
     def get_model_size_from_path(self, log_path):
-        """Extract model size from the path structure"""
+        """Extract model size from the path structure or config file"""
         path_parts = Path(log_path).parts
+        
+        # First try to find model size in path parts (existing experiments)
         for part in path_parts:
             if part in self.model_size_map:
                 return part
+        
+        # If not found in path and this is a GRPO experiment,
+        # try to extract from config file
+        if any(part.startswith('GRPO_') for part in path_parts):
+            try:
+                config_path = Path(log_path).parent / 'config.yaml'
+                if config_path.exists():
+                    with open(config_path, 'r') as f:
+                        for line in f:
+                            # Look for model path containing size info
+                            if 'path:' in line and 'model' in line.lower():
+                                # Extract model size from path like /nfs-share/gui-rl/model/Qwen2.5-7B
+                                for size in self.model_size_map.keys():
+                                    if size in line:
+                                        return size
+            except Exception as e:
+                print(f"  ⚠️  Could not read config file for {log_path}: {e}")
+        
         return None
     
     def get_run_id_from_path(self, log_path):
@@ -145,14 +171,37 @@ class ComputeExtractorExperiment:
         # If no run_X directory found, return default slice factor of 0
         return 0
     
+    def get_rollout_n_from_path(self, log_path):
+        """Extract rollout_n from the path structure (for GRPO experiments)"""
+        path_parts = Path(log_path).parts
+        # Check if this is a GRPO experiment (GRPO_N_Base, GRPO_N_Instruct, etc.)
+        grpo_part = None
+        for part in path_parts:
+            if part.startswith('GRPO_'):
+                grpo_part = part
+                break
+        
+        if grpo_part:
+            # Find the rollout number in the path (4, 8, 16, 32, etc.)
+            grpo_index = path_parts.index(grpo_part)
+            if grpo_index + 1 < len(path_parts):
+                try:
+                    rollout_n = int(path_parts[grpo_index + 1])
+                    return rollout_n
+                except ValueError:
+                    pass
+        # If not a GRPO experiment or no rollout_n found, return None
+        return None
+    
     def process_single_experiment(self, log_file):
         """Process a single experiment log file"""
         # print(f"Processing: {log_file}")
         
-        # Extract model size, run ID, and slice factor from path
+        # Extract model size, run ID, slice factor, and rollout_n from path
         model_size = self.get_model_size_from_path(log_file)
         run_id = self.get_run_id_from_path(log_file)
         slice_factor = self.get_slice_factor_from_path(log_file)
+        rollout_n = self.get_rollout_n_from_path(log_file)
         
         if not model_size or not run_id:
             print(f"  ⚠️  Could not extract model_size or run_id from path: {log_file}")
@@ -218,10 +267,17 @@ class ComputeExtractorExperiment:
         merged_df['model_size'] = model_size
         merged_df['model_params'] = model_params
         merged_df['data_sample_size'] = None  # Not available in this dataset
-        merged_df['experiment_name'] = f"Qwen2.5-{model_size}_math_test_grpo_verl"
+        
+        # Generate experiment name based on whether it's a GRPO experiment or not
+        if rollout_n is not None:
+            merged_df['experiment_name'] = f"Qwen2.5-{model_size}_math_grpo_verl_rollout_{rollout_n}"
+        else:
+            merged_df['experiment_name'] = f"Qwen2.5-{model_size}_math_test_grpo_verl"
+        
         merged_df['experiment_id'] = f"{model_size}_{run_id}"
         merged_df['runid'] = run_id
         merged_df['slice_factor'] = slice_factor
+        merged_df['rollout_n'] = 'rho'+str(rollout_n)  # Will be None for non-GRPO experiments
         
         # For backward compatibility, use math__math as the main R value (critic_rewards_mean)
         if 'math__math' in merged_df.columns:
@@ -232,7 +288,7 @@ class ComputeExtractorExperiment:
         
         # Reorder columns: metadata first, then test evals, then compute data
         metadata_cols = ['model_size', 'model_params', 'data_sample_size', 'experiment_name', 
-                        'experiment_id', 'runid', 'slice_factor', 'step']
+                        'experiment_id', 'runid', 'slice_factor', 'rollout_n', 'step']
         compute_cols = ['tokens', 'step_flops', 'critic_rewards_mean', 'holdout_score']
         
         # Get all test eval columns (exclude step and tokens)
@@ -273,7 +329,12 @@ class ComputeExtractorExperiment:
                 continue
             
             model_size = model_size_dir.name
-            if model_size not in self.model_size_map:
+            
+            # For GRPO experiments, the directory names are rollout numbers (4, 8, 16, 32)
+            # not model sizes, so we skip the model size check for these experiments
+            is_grpo_experiment = any(part.startswith('GRPO_') for part in str(self.experiment_root_dir).split('/'))
+            
+            if not is_grpo_experiment and model_size not in self.model_size_map:
                 print(f"⚠️  Unknown model size directory: {model_size}")
                 continue
             
@@ -347,6 +408,14 @@ class ComputeExtractorExperiment:
         # we keep the data from the later experiment (which should be more complete/recent)
         df = self.deduplicate_experiments(df)
         
+        # Handle missing response_length data - forward fill within each experiment
+        if 'response_length' in df.columns:
+            print("Handling missing response_length data...")
+            # Forward fill response_length within each (model_size, runid) group
+            df['response_length'] = df.groupby(['model_size', 'runid'])['response_length'].ffill()
+            # If still NaN (i.e., no response_length data at all for a group), fill with 0
+            df['response_length'] = df['response_length'].fillna(0)
+        
         # Now calculate cumulative values per model+runid group (after deduplication)
         print("Calculating cumulative values per (model_size, runid) group...")
         df['cumulative_tokens'] = df.groupby(['model_size', 'runid'])['tokens'].cumsum()
@@ -373,45 +442,67 @@ class ComputeExtractorExperiment:
         return self
 
 if __name__ == "__main__":
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run0')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment1_instruct_run0.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run0')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_instruct_run0.csv'))
     
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run1')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment1_instruct_run1.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run1')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_instruct_run1.csv'))
 
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run2')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment1_instruct_run2.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_instruct/Experiment1_instruct_run2')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_instruct_run2.csv'))
     
 
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/Experiment1_base')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment1_base.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_Base/Experiment1_Base_run0')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_base_run0.csv'))
 
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/Experiment1_Base_run0')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment1_base_run0.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_Base/Experiment1_Base_run1')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_base_run1.csv'))
+
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/Experiment1_Base/Experiment1_Base_run2')
+     .inspect()
+     .save('csv/scaling_law_data_experiment1_base_run2.csv'))
 
 
     (ComputeExtractorExperiment()
-     .run(experiment_root_dir='data/experiment2-base')
+     .run(experiment_root_dir='data/experiment2_base')
      .inspect()
-     .save('csv/scaling_law_data_experiment2_base.csv'))
+     .save('csv/scaling_law_data_experiment2_base____no_tau0.csv'))
+
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment2_instruct')
+     .inspect()
+     .save('csv/scaling_law_data_experiment2_instruct____no_tau0.csv'))
 
 
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/experiment-llama-base')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment-llama-base.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment-llama-base')
+     .inspect()
+     .save('csv/scaling_law_data_experiment-llama-base.csv'))
 
-    # (ComputeExtractorExperiment()
-    #  .run(experiment_root_dir='data/experiment-llama-instruct')
-    #  .inspect()
-    #  .save('csv/scaling_law_data_experiment-llama-instruct.csv'))
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/experiment-llama-instruct')
+     .inspect()
+     .save('csv/scaling_law_data_experiment-llama-instruct.csv'))
+
+
+    # GRPO experiments (both Base and Instruct):
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/GRPO_N_Base')
+     .inspect()
+     .save('csv/scaling_law_data_grpo_base.csv'))
+
+    (ComputeExtractorExperiment()
+     .run(experiment_root_dir='data/GRPO_N_Instruct')
+     .inspect()
+     .save('csv/scaling_law_data_grpo_instruct.csv'))

@@ -63,14 +63,14 @@ def validate_args(args):
                         f"Must be one of: {list(config.TEST_EVALS.keys())}")
     
     # Validate curve columns
-    valid_curves = ['N', 'DR']
+    valid_curves = list(config.DEFAULT_LABELS.keys())
     if args.plot_curve_column not in valid_curves:
         raise ValueError(f"Invalid plot-curve: {args.plot_curve_column}. "
-                        f"Must be one of: {valid_curves}")
+                        f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
     
     if args.fit and args.fit_curve_column not in valid_curves:
         raise ValueError(f"Invalid fit-curve: {args.fit_curve_column}. "
-                        f"Must be one of: {valid_curves}")
+                        f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
     
     # Validate x columns (after processing) - use config.DEFAULT_LABELS for dynamic validation
     valid_x_columns = list(config.DEFAULT_LABELS.keys())
@@ -78,24 +78,24 @@ def validate_args(args):
         for x_col in args.plot_x_columns:
             if x_col not in valid_x_columns:
                 raise ValueError(f"Invalid plot-x column: {x_col}. "
-                                f"Must be one of: {valid_x_columns}")
+                                f"Must be one of: {valid_x_columns}, or add to config.DEFAULT_LABELS")
     
     if args.fit and args.fit_x_column not in valid_x_columns:
         raise ValueError(f"Invalid fit-x column: {args.fit_x_column}. "
-                        f"Must be one of: {valid_x_columns}")
+                        f"Must be one of: {valid_x_columns}, or add to config.DEFAULT_LABELS")
     
     # Validate metrics - use config.DEFAULT_LABELS for dynamic validation
     valid_metrics = list(config.DEFAULT_LABELS.keys())
     for metric in args.plot_metrics:
         if metric not in valid_metrics:
             raise ValueError(f"Invalid metric: {metric}. "
-                            f"Must be one of: {valid_metrics}")
+                            f"Must be one of: {valid_metrics}, or add to config.DEFAULT_LABELS")
     
     if args.fit:
         for metric in args.fit_metrics:
             if metric not in valid_metrics:
                 raise ValueError(f"Invalid fit metric: {metric}. "
-                                f"Must be one of: {valid_metrics}")
+                                f"Must be one of: {valid_metrics}, or add to config.DEFAULT_LABELS")
 
 
 def create_argument_parser():
@@ -106,11 +106,11 @@ def create_argument_parser():
         epilog="""
 Examples:
   # Basic usage
-  %(prog)s --data-source exp2-instruct --plot-curve DR -x E --eval holdout_score --metric ErrRate
+  %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate
 
   # With fitting
-  %(prog)s --data-source exp2-instruct --plot-curve DR -x E --eval holdout_score --metric ErrRate \\
-           --fit --fit-curve DR --fit-x E --fit-metric ErrRate
+  %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate \\
+           --fit --fit-curve Tau --fit-x E --fit-metric ErrRate
 
   # Multiple metrics and x columns with highlighting
   %(prog)s --data-source exp2-base --plot-curve N -x C,E --eval holdout_score --metric ErrRate,R \\
@@ -127,7 +127,7 @@ Examples:
                        help='Data source to use')
     
     parser.add_argument('--plot-curve', dest='plot_curve_column',
-                       choices=['N', 'DR'],
+                       choices=['N', 'Tau'],
                        help='Column to use for curve grouping in plots')
     
     parser.add_argument('-x', '--plot-x', dest='plot_x_columns',
@@ -147,7 +147,7 @@ Examples:
     fit_group.add_argument('--fit', action='store_true',
                           help='Enable model fitting')
     fit_group.add_argument('--fit-curve', dest='fit_curve_column',
-                          choices=['N', 'DR'],
+                          choices=['N', 'Tau'],
                           help='Column to use for curve grouping in fitting (default: same as --plot-curve)')
     fit_group.add_argument('--fit-x', dest='fit_x_column',
                           choices=list(config.DEFAULT_LABELS.keys()),
@@ -219,12 +219,49 @@ Examples:
     style_group.add_argument('--plot-legend-loc', dest='plot_legend_loc',
                             default='best',
                             help='Legend location (default: best)')
+    style_group.add_argument('--plot-legend-bbox-to-anchor', dest='plot_legend_bbox_to_anchor',
+                            type=str, default=None,
+                            help='Legend bbox_to_anchor as comma-separated values (e.g., "1.05,1" or "1,0,0.5,1")')
     style_group.add_argument('--plot-title', dest='plot_title',
                             help='Fixed title for all plots. If specified, overrides all other title options.')
     style_group.add_argument('--plot-title-template', dest='plot_title_template',
                             help='Title template. Variables: {eval}, {fit_x}, {plot_x}, {metric}. If not specified, auto-generated.')
     style_group.add_argument('--plot-titles', dest='plot_titles',
                             help='JSON object mapping x_column to custom titles, e.g. \'{"C": "Compute Scaling", "E": "Data Scaling"}\'')
+    style_group.add_argument('--plot-x-label', dest='plot_x_label',
+                            help='Custom x-axis label. If not specified, uses config.DEFAULT_LABELS')
+    style_group.add_argument('--plot-y-label', dest='plot_y_label',
+                            help='Custom y-axis label. If not specified, uses config.DEFAULT_LABELS')
+    style_group.add_argument('--x-tick-spacing', dest='x_tick_spacing',
+                            type=float, default=None,
+                            help='X-axis tick spacing (e.g., 0.1, 0.2)')
+    style_group.add_argument('--y-tick-spacing', dest='y_tick_spacing',
+                            type=float, default=None,
+                            help='Y-axis tick spacing (e.g., 0.1, 0.2)')
+    style_group.add_argument('--x-grid-spacing', dest='x_grid_spacing',
+                            type=float, default=None,
+                            help='X-axis grid line spacing')
+    style_group.add_argument('--y-grid-spacing', dest='y_grid_spacing',
+                            type=float, default=None,
+                            help='Y-axis grid line spacing')
+    style_group.add_argument('--x-tick-format', dest='x_tick_format',
+                            choices=['auto', 'decimal', 'sci', 'plain'], default=None,
+                            help='X-axis tick format (default: None/plain)')
+    style_group.add_argument('--y-tick-format', dest='y_tick_format',
+                            choices=['auto', 'decimal', 'sci', 'plain'], default='auto',
+                            help='Y-axis tick format (default: auto)')
+    style_group.add_argument('--x-tick-subs', dest='x_tick_subs',
+                            type=str, default=None,
+                            help='Custom x-axis tick positions (comma-separated list, e.g., "1000,5000,10000")')
+    style_group.add_argument('--y-tick-subs', dest='y_tick_subs',
+                            type=str, default=None,
+                            help='Custom y-axis tick positions (comma-separated list)')
+    style_group.add_argument('--x-tick-subs-log', dest='x_tick_subs_log',
+                            type=str, default=None,
+                            help='Custom x-axis log tick multipliers (comma-separated list, e.g., "1,2,5")')
+    style_group.add_argument('--y-tick-subs-log', dest='y_tick_subs_log',
+                            type=str, default=None,
+                            help='Custom y-axis log tick multipliers (comma-separated list)')
 
     # Smoothing configuration
     smooth_group = parser.add_argument_group('smoothing options')
@@ -246,12 +283,24 @@ Examples:
 
     # Advanced parameters
     advanced_group = parser.add_argument_group('advanced parameters')
-    advanced_group.add_argument('--warmup-clip-frac', dest='warmup_clipping_factor_raw',
+    advanced_group.add_argument('--warmup-clip-frac', dest='warmup_clip_factor_raw',
                                type=float, default=0.0,
                                help='Warmup clipping fraction for raw data (default: 0.1)')
-    advanced_group.add_argument('--warmup-clip-frac-smooth', dest='warmup_clipping_factor_smooth',
+    advanced_group.add_argument('--warmup-clip-frac-smooth', dest='warmup_clip_factor_smooth',
                                type=float, default=0.0,
                                help='Warmup clipping fraction for smooth data (default: 0.0)')
+    advanced_group.add_argument('--warmup-clip', dest='warmup_clip_raw',
+                               type=int, default=None,
+                               help='Warmup clipping by absolute number of data points for raw data (clips first N points per curve, overrides --warmup-clip-frac)')
+    advanced_group.add_argument('--warmup-clip-smooth', dest='warmup_clip_smooth',
+                               type=int, default=None,
+                               help='Warmup clipping by absolute number of data points for smooth data (clips first N points per curve, overrides --warmup-clip-frac-smooth)')
+    advanced_group.add_argument('--ending-clip', dest='ending_clip_raw',
+                               type=int, default=None,
+                               help='Ending clipping by absolute step value for raw data (clips steps > ending_step per curve)')
+    advanced_group.add_argument('--ending-clip-smooth', dest='ending_clip_smooth',
+                               type=int, default=None,
+                               help='Ending clipping by absolute step value for smooth data (clips steps > ending_step per curve)')
     advanced_group.add_argument('--delta-base-step', dest='delta_base_step',
                                type=int, default=1,
                                help='Base step for delta calculation (default: 1)')
@@ -376,6 +425,71 @@ def process_parsed_args(args):
     elif args.smooth_increasing == 'False':
         args.smooth_increasing = False
 
+    # Parse tick_subs parameters
+    def parse_tick_subs(value_str):
+        """Parse comma-separated tick positions supporting scientific notation"""
+        if not value_str:
+            return None
+        values = []
+        for item in value_str.split(','):
+            item = item.strip()
+            try:
+                # Support scientific notation
+                values.append(float(item))
+            except ValueError:
+                raise ValueError(f"Invalid tick position value: {item}")
+        return values
+
+    # Parse x_tick_subs
+    if args.x_tick_subs:
+        if isinstance(args.x_tick_subs, str):
+            args.x_tick_subs = parse_tick_subs(args.x_tick_subs)
+        # else: already a list from config file
+    else:
+        args.x_tick_subs = None
+
+    # Parse y_tick_subs
+    if args.y_tick_subs:
+        if isinstance(args.y_tick_subs, str):
+            args.y_tick_subs = parse_tick_subs(args.y_tick_subs)
+        # else: already a list from config file
+    else:
+        args.y_tick_subs = None
+
+    # Parse x_tick_subs_log
+    if args.x_tick_subs_log:
+        if isinstance(args.x_tick_subs_log, str):
+            args.x_tick_subs_log = parse_tick_subs(args.x_tick_subs_log)
+        # else: already a list from config file
+    else:
+        args.x_tick_subs_log = None
+
+    # Parse y_tick_subs_log
+    if args.y_tick_subs_log:
+        if isinstance(args.y_tick_subs_log, str):
+            args.y_tick_subs_log = parse_tick_subs(args.y_tick_subs_log)
+        # else: already a list from config file
+    else:
+        args.y_tick_subs_log = None
+
+    # Parse plot_legend_bbox_to_anchor
+    if args.plot_legend_bbox_to_anchor:
+        if isinstance(args.plot_legend_bbox_to_anchor, str):
+            try:
+                # Parse comma-separated bbox values
+                bbox_values = [float(x.strip()) for x in args.plot_legend_bbox_to_anchor.split(',')]
+                if len(bbox_values) == 2:
+                    args.plot_legend_bbox_to_anchor = tuple(bbox_values)
+                elif len(bbox_values) == 4:
+                    args.plot_legend_bbox_to_anchor = tuple(bbox_values)
+                else:
+                    raise ValueError("bbox_to_anchor must have 2 or 4 values")
+            except ValueError as e:
+                raise ValueError(f"Invalid bbox_to_anchor format: {e}")
+        # else: already a tuple from config file
+    else:
+        args.plot_legend_bbox_to_anchor = None
+
     # Set default output prefix
     if not args.output_prefix:
         args.output_prefix = f"fit_{args.data_source}_"
@@ -383,10 +497,56 @@ def process_parsed_args(args):
     return args
 
 
+def convert_warmup_clip_to_factor(df, curve_column, warmup_clip_abs):
+    """
+    Convert absolute warmup_clip to relative warmup_clip_factor per curve.
+    
+    Args:
+        df: DataFrame with curves
+        curve_column: Column defining the curves 
+        warmup_clip_abs: Absolute number of steps to clip
+        
+    Returns:
+        Dictionary mapping curve_id to warmup_clip_factor
+    """
+    if warmup_clip_abs is None or warmup_clip_abs <= 0:
+        return None
+        
+    curve_factors = {}
+    for curve_id, group_df in df.groupby(curve_column):
+        n_total = len(group_df)
+        if n_total > 0:
+            warmup_clip_factor = min(warmup_clip_abs / n_total, 1.0)  # Cap at 1.0
+            curve_factors[curve_id] = warmup_clip_factor
+        else:
+            curve_factors[curve_id] = 0.0
+    
+    return curve_factors
+
+
 def run_scaling_analysis(args):
     """Run the scaling law analysis with given arguments"""
     print(f"Loading data for data_source: {args.data_source}")
     df = data_proc.load_and_preprocess(config.CSV_MAP[args.data_source])
+    
+    # Handle absolute vs relative warmup clipping
+    if args.warmup_clip_raw is not None:
+        print(f"Using absolute warmup clipping: warmup_clip_raw={args.warmup_clip_raw} steps")
+        # For fitting, we still need to convert to a reasonable factor
+        curve_factors_raw = convert_warmup_clip_to_factor(df, args.plot_curve_column, args.warmup_clip_raw)
+        if curve_factors_raw:
+            args.warmup_clip_factor_raw = sum(curve_factors_raw.values()) / len(curve_factors_raw)
+        else:
+            args.warmup_clip_factor_raw = 0.0
+    
+    if args.warmup_clip_smooth is not None:
+        print(f"Using absolute warmup clipping: warmup_clip_smooth={args.warmup_clip_smooth} steps")
+        # For fitting, we still need to convert to a reasonable factor
+        curve_factors_smooth = convert_warmup_clip_to_factor(df, args.plot_curve_column, args.warmup_clip_smooth)
+        if curve_factors_smooth:
+            args.warmup_clip_factor_smooth = sum(curve_factors_smooth.values()) / len(curve_factors_smooth)
+        else:
+            args.warmup_clip_factor_smooth = 0.0
 
     # Lambda functions (not CLI configurable)
     plot_legend_lambda = lambda x: plot.legend_format(args.plot_curve_column, x)
@@ -398,12 +558,22 @@ def run_scaling_analysis(args):
     if args.fit:
         print(f"\n=== Fitting for x_column: {args.fit_x_column}, curve_column: {args.fit_curve_column} ===")
         
-        predicter = fit.fit_log_errrate_simple(
-            df, args.eval, args.fit_curve_column, args.fit_x_column,
-            fit_load_path=args.fit_load_path,
-            fit_save_path=args.fit_save_path,
-            data_source=args.data_source
-        )
+        # Temporarily update config for fitting to use our converted warmup factor
+        original_warmup_factor = config.WARMUP_CLIPPING_FACTOR_FOR_RAW
+        config.WARMUP_CLIPPING_FACTOR_FOR_RAW = args.warmup_clip_factor_raw
+        
+        try:
+            predicter = fit.fit_log_errrate_simple(
+                df, args.eval, args.fit_curve_column, args.fit_x_column,
+                fit_load_path=args.fit_load_path,
+                fit_save_path=args.fit_save_path,
+                data_source=args.data_source,
+                warmup_step=args.warmup_clip_raw,
+                ending_step=args.ending_clip_raw
+            )
+        finally:
+            # Restore original config value
+            config.WARMUP_CLIPPING_FACTOR_FOR_RAW = original_warmup_factor
 
     # Plotting phase
     for plot_x_column in args.plot_x_columns:
@@ -420,13 +590,10 @@ def run_scaling_analysis(args):
             print("k_values:", k_values)
             print("E0_values:", E0_values)
             
-            # Plot k(curve_column) and E0(curve_column) scatter plots
-            curve_billions = curve_values / 1e9  # Convert to billions for better readability
-            
             # Plot k(curve_column) - Compact version
             fig1, ax1 = plt.subplots(figsize=(6, 4.5), dpi=300)
             ax1 = plot.plot_basic(
-                x=curve_billions,
+                x=curve_values,
                 y=np.abs(k_values),  # Use absolute value since k is negative
                 use_scatter=True,
                 scatter_s=150,
@@ -436,12 +603,17 @@ def run_scaling_analysis(args):
             ax1 = plot.plot_basic_settings(
                 ax=ax1,
                 x_scale="log",
-                x_label=f"Model Size {args.fit_curve_column} (Billions of Parameters)",
-                y_label=f"k({args.fit_curve_column}) (Data Efficiency Slope for {args.fit_x_column})",
-                title=f"Data Efficiency k({args.fit_curve_column}) vs Model Size (fitted on {args.fit_x_column})",
+                x_label=f"Model Size {args.fit_curve_column}",
+                y_label=f"k({args.fit_curve_column})",
+                title=f"k({args.fit_curve_column}) vs Model Size",
                 use_legend=False,
-                x_margin=0.1, y_margin=0.1
+                x_margin=0.1, y_margin=0.1,
+                x_tick_spacing=args.x_tick_spacing,
+                y_tick_spacing=args.y_tick_spacing,
+                x_grid_spacing=args.x_grid_spacing,
+                y_grid_spacing=args.y_grid_spacing
             )
+            
             
             plt.tight_layout(pad=1.0)
             eval_file_str = config.TEST_EVALS[args.eval]['file_str']
@@ -456,7 +628,7 @@ def run_scaling_analysis(args):
             # Plot E0(curve_column) - Compact version
             fig2, ax2 = plt.subplots(figsize=(6, 4.5), dpi=300)
             ax2 = plot.plot_basic(
-                x=curve_billions,
+                x=curve_values,
                 y=E0_values,
                 use_scatter=True,
                 scatter_s=150,
@@ -468,11 +640,16 @@ def run_scaling_analysis(args):
                 x_scale="log",
                 y_scale=None,
                 x_label=f"{config.DEFAULT_LABELS[args.fit_curve_column]}",
-                y_label=f"E0({args.fit_curve_column}) (Error Offset for {args.fit_x_column})",
-                title=f"Error Offset E0({args.fit_curve_column}) vs Model Size (fitted on {args.fit_x_column})",
+                y_label=f"E0({args.fit_curve_column})",
+                title=f"E({args.fit_curve_column}) vs Model Size",
                 use_legend=False,
-                x_margin=0.1, y_margin=0.1
+                x_margin=0.1, y_margin=0.1,
+                x_tick_spacing=args.x_tick_spacing,
+                y_tick_spacing=args.y_tick_spacing,
+                x_grid_spacing=args.x_grid_spacing,
+                y_grid_spacing=args.y_grid_spacing
             )
+            
             
             plt.tight_layout(pad=1.0)
             
@@ -520,12 +697,24 @@ def run_scaling_analysis(args):
                     scatter_size=args.scatter_size,
                     scatter_marker=args.scatter_marker,
                     
-                    warmup_frac_raw=args.warmup_clipping_factor_raw,
+                    # Axis formatting
+                    x_tick_format=args.x_tick_format,
+                    y_tick_format=args.y_tick_format,
+                    
+                    # Tick and grid spacing
+                    x_tick_spacing=args.x_tick_spacing,
+                    y_tick_spacing=args.y_tick_spacing,
+                    x_grid_spacing=args.x_grid_spacing,
+                    y_grid_spacing=args.y_grid_spacing,
+                    
+                    warmup_frac_raw=args.warmup_clip_factor_raw,
+                    warmup_clip_raw=args.warmup_clip_raw,
+                    ending_clip_raw=args.ending_clip_raw,
                 )
 
             # Process the actual data plot
-            process_plot_x_label = config.DEFAULT_LABELS[plot_x_column]
-            process_plot_y_label = config.DEFAULT_LABELS[plot_metric]
+            process_plot_x_label = args.plot_x_label if args.plot_x_label else config.DEFAULT_LABELS[plot_x_column]
+            process_plot_y_label = args.plot_y_label if args.plot_y_label else config.DEFAULT_LABELS[plot_metric]
             process_plot_highlight_curves = args.highlight_curves_plot
             
             # Generate plot title
@@ -551,15 +740,16 @@ def run_scaling_analysis(args):
                 else:
                     process_plot_title = f"{config.TEST_EVALS[args.eval]['plot_str']} (plotted on {plot_x_column})"
 
-            plot_data.process_single_eval(
+            ax = plot_data.process_single_eval(
                 df,
                 plot_x_column=plot_x_column,
                 plot_eval_column=args.eval,
                 plot_metric=plot_metric,
                 plot_curve_column=args.plot_curve_column,
-                plot_x_label=process_plot_x_label,
-                plot_y_label=process_plot_y_label,
                 plot_curve_mask=args.plot_curve_mask,
+
+                # Title configuration - IMPORTANT: Pass the title here!
+                plot_title=process_plot_title,
 
                 # Highlight configuration
                 plot_highlight_curves=process_plot_highlight_curves,
@@ -568,12 +758,9 @@ def run_scaling_analysis(args):
 
                 # Plotting style
                 plot_use_scatter=args.plot_use_scatter,
-                plot_x_scale=args.plot_x_scale,
-                plot_y_scale=args.plot_y_scale,
-                plot_title=process_plot_title,
                 plot_use_legend=args.plot_use_legend,
                 plot_legend_loc=args.plot_legend_loc,
-                plot_legend_bbox_to_anchor=None,
+                plot_legend_bbox_to_anchor=args.plot_legend_bbox_to_anchor,
                 plot_legend_lambda=plot_legend_lambda,
 
                 # Line and scatter styling
@@ -582,7 +769,7 @@ def run_scaling_analysis(args):
                 scatter_alpha=args.scatter_alpha,
                 scatter_size=args.scatter_size,
                 scatter_marker=args.scatter_marker,
-
+                
                 # Delta configuration
                 delta_base_step=args.delta_base_step,
 
@@ -594,16 +781,50 @@ def run_scaling_analysis(args):
                 smooth_strict=args.smooth_strict,
 
                 # Advanced parameters
-                warmup_frac_raw=args.warmup_clipping_factor_raw,
-                warmup_frac_smooth=args.warmup_clipping_factor_smooth,
+                warmup_frac_raw=args.warmup_clip_factor_raw,
+                warmup_frac_smooth=args.warmup_clip_factor_smooth,
+                warmup_clip_raw=args.warmup_clip_raw,
+                warmup_clip_smooth=args.warmup_clip_smooth,
+                ending_clip_raw=args.ending_clip_raw,
+                ending_clip_smooth=args.ending_clip_smooth,
                 s_factor=args.s_factor,
                 k_spline=args.k_spline,
                 rolling_window=args.rolling_window,
                 min_se=args.min_se,
                 x_inv_weight_power=args.x_inv_weight_power,
                 ax=ax,
+            )
+            
+            # Apply plot_basic_settings after process_single_eval (now includes save logic)
+            plot.plot_basic_settings(
+                ax=ax,
+                x_scale=args.plot_x_scale,
+                y_scale=args.plot_y_scale,
+                x_label=process_plot_x_label,
+                y_label=process_plot_y_label,
+                title=process_plot_title,
+                use_legend=args.plot_use_legend,
+                legend_loc=args.plot_legend_loc,
+                legend_bbox_to_anchor=args.plot_legend_bbox_to_anchor,
+                x_tick_format=args.x_tick_format,
+                y_tick_format=args.y_tick_format,
+                x_tick_spacing=args.x_tick_spacing,
+                y_tick_spacing=args.y_tick_spacing,
+                x_grid_spacing=args.x_grid_spacing,
+                y_grid_spacing=args.y_grid_spacing,
+                # Custom tick positioning
+                x_tick_subs=args.x_tick_subs,
+                y_tick_subs=args.y_tick_subs,
+                x_tick_subs_log=args.x_tick_subs_log,
+                y_tick_subs_log=args.y_tick_subs_log,
+                # Save configuration - moved from process_single_eval
                 save_to_dir=args.output_base_dir,
                 save_to_filename_prefix=args.output_prefix,
+                plot_eval_column=args.eval,
+                plot_curve_column=args.plot_curve_column,
+                plot_x_column=plot_x_column,
+                plot_metric=plot_metric,
+                plot_curve_mask=args.plot_curve_mask,
             )
 
 
@@ -625,82 +846,77 @@ def main():
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    try:
-        # Handle config file batch processing
-        if args.config_file:
-            print(f"Loading configuration from: {args.config_file}")
-            runs = load_config_file(args.config_file)
+    # Handle config file batch processing
+    if args.config_file:
+        print(f"Loading configuration from: {args.config_file}")
+        runs = load_config_file(args.config_file)
+        
+        for i, run_config in enumerate(runs):
+            print(f"\n{'='*60}")
+            print(f"Processing run {i+1}/{len(runs)}")
+            print(f"{'='*60}")
             
-            for i, run_config in enumerate(runs):
-                print(f"\n{'='*60}")
-                print(f"Processing run {i+1}/{len(runs)}")
-                print(f"{'='*60}")
-                
-                # Convert config dict to args object
-                # Parse empty args to get all default values from argument parser
-                run_args = parser.parse_args([])
-                
-                # Override with config values
-                valid_args = vars(run_args).keys()  # Get all valid argument names
-                invalid_args = []
-                
-                # Special keys that are allowed but not used as arguments
-                ignored_keys = {'comment'}
-                
-                for key, value in run_config.items():
-                    if key in valid_args:
-                        setattr(run_args, key, value)
-                    elif key not in ignored_keys:
-                        invalid_args.append(key)
-                
-                # Warn about invalid arguments
-                if invalid_args:
-                    print(f"Warning: Invalid parameters in config file: {', '.join(invalid_args)}")
-                    print("These parameters will be ignored.")
-                    
-                    # Provide suggestions for common mistakes
-                    suggestions = {
-                        'use_legend': 'plot_use_legend',
-                        'use_scatter': 'plot_use_scatter', 
-                        'use_line': 'plot_use_line',
-                        'x_scale': 'plot_x_scale',
-                        'y_scale': 'plot_y_scale',
-                        'legend_loc': 'plot_legend_loc',
-                    }
-                    
-                    for invalid_arg in invalid_args:
-                        if invalid_arg in suggestions:
-                            print(f"  Did you mean '{suggestions[invalid_arg]}' instead of '{invalid_arg}'?")
-                
-                
-                # Apply defaults and process
-                run_args = process_parsed_args(run_args)
-                validate_args(run_args)
-                run_scaling_analysis(run_args)
+            # Convert config dict to args object
+            # Parse empty args to get all default values from argument parser
+            run_args = parser.parse_args([])
             
-            print(f"\nCompleted {len(runs)} runs from config file.")
-            return
+            # Override with config values
+            valid_args = vars(run_args).keys()  # Get all valid argument names
+            invalid_args = []
+            
+            # Special keys that are allowed but not used as arguments
+            ignored_keys = {'comment'}
+            
+            for key, value in run_config.items():
+                if key in valid_args:
+                    setattr(run_args, key, value)
+                elif key not in ignored_keys:
+                    invalid_args.append(key)
+            
+            # Warn about invalid arguments
+            if invalid_args:
+                print(f"Warning: Invalid parameters in config file: {', '.join(invalid_args)}")
+                print("These parameters will be ignored.")
+                
+                # Provide suggestions for common mistakes
+                suggestions = {
+                    'use_legend': 'plot_use_legend',
+                    'use_scatter': 'plot_use_scatter', 
+                    'use_line': 'plot_use_line',
+                    'x_scale': 'plot_x_scale',
+                    'y_scale': 'plot_y_scale',
+                    'legend_loc': 'plot_legend_loc',
+                }
+                
+                for invalid_arg in invalid_args:
+                    if invalid_arg in suggestions:
+                        print(f"  Did you mean '{suggestions[invalid_arg]}' instead of '{invalid_arg}'?")
+            
+            
+            # Apply defaults and process
+            run_args = process_parsed_args(run_args)
+            validate_args(run_args)
+            run_scaling_analysis(run_args)
+        
+        print(f"\nCompleted {len(runs)} runs from config file.")
+        return
 
-        # Single run processing
-        # Process arguments first
-        args = process_parsed_args(args)
-        
-        # Check required arguments when not using config file
-        required_args = ['data_source', 'plot_curve_column', 'plot_x_columns', 'eval', 'plot_metrics']
-        missing_args = []
-        for arg in required_args:
-            if not getattr(args, arg, None):
-                missing_args.append(arg.replace('_', '-'))
-        
-        if missing_args:
-            parser.error(f"the following arguments are required when not using --config-file: {', '.join(['--' + arg for arg in missing_args])}")
-        
-        validate_args(args)
-        run_scaling_analysis(args)
-
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    # Single run processing
+    # Process arguments first
+    args = process_parsed_args(args)
+    
+    # Check required arguments when not using config file
+    required_args = ['data_source', 'plot_curve_column', 'plot_x_columns', 'eval', 'plot_metrics']
+    missing_args = []
+    for arg in required_args:
+        if not getattr(args, arg, None):
+            missing_args.append(arg.replace('_', '-'))
+    
+    if missing_args:
+        parser.error(f"the following arguments are required when not using --config-file: {', '.join(['--' + arg for arg in missing_args])}")
+    
+    validate_args(args)
+    run_scaling_analysis(args)
 
 
 if __name__ == "__main__":

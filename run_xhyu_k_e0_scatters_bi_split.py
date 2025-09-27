@@ -29,7 +29,7 @@ import config
 
 # Use holdout score evaluation
 eval_name = config.DEFAULT_TEST_EVAL
-warmup_clipping_num = 5  # Local setting for this script
+warmup_clip_num = 5  # Local setting for this script
 phi_global = 1.0
 
 def perform_fitting(df_mean, fitting_type, model_type, display_names):
@@ -151,11 +151,11 @@ def main():
         # 计算完 ImprovementRate 后，丢弃 step=0 的数据（因为 E=0 会导致 log10(E) = -inf）
         df = df[df['step'] > 0].reset_index(drop=True)
         
-        # 丢掉每个 (model_size, runid) 的前 warmup_clipping_num 个点
-        if warmup_clipping_num and warmup_clipping_num > 0:
+        # 丢掉每个 (model_size, runid) 的前 warmup_clip_num 个点
+        if warmup_clip_num and warmup_clip_num > 0:
             df = (
                 df.groupby(['model_size', 'runid'], as_index=False, group_keys=False)
-                  .apply(lambda g: g.iloc[warmup_clipping_num:])
+                  .apply(lambda g: g.iloc[warmup_clip_num:])
                   .reset_index(drop=True)
             )
         

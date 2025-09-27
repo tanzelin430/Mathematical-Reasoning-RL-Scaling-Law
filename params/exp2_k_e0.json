@@ -1,0 +1,96 @@
+{
+  "runs": [
+    {
+      "comment": "figure 7a",
+      "data_source": "exp2-base",
+      "plot_curve_column": "Tau",
+      "plot_x_columns": [
+        "step"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_raw": 10,
+      "ending_clip_raw": 100,
+      "fit": true,
+      "fit_curve_column": "Tau",
+      "fit_x_column": "step",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "plot_x_scale": "log",
+      "plot_y_scale": "log",
+      "y_tick_spacing": 0.01,
+      "y_tick_format": "auto",
+      "y_grid_spacing": 0.01,
+      "line_alpha": 1,
+      "line_width": 2,
+      "scatter_alpha": 0.5,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "plot_use_legend": true,
+      "plot_title": "Data Reuse on Base model (7B)",
+      "plot_curve_mask": [
+        1,
+        2,
+        5,
+        20,
+        25,
+        50,
+        100
+      ],
+      "highlight_curves_predict": [
+        1
+      ],
+      "highlight_line_width": 3.0,
+      "output_prefix": "fit_exp2-base_"
+    },
+    {
+      "comment": "figure 7b",
+      "data_source": "exp2-instruct",
+      "plot_curve_column": "Tau",
+      "plot_x_columns": [
+        "step"
+      ],
+      "eval": "holdout_score",
+      "plot_metrics": [
+        "ErrRate"
+      ],
+      "warmup_clip_raw": 10,
+      "ending_clip_raw": 100,
+      "fit": true,
+      "fit_curve_column": "Tau",
+      "fit_x_column": "step",
+      "fit_metrics": [
+        "ErrRate"
+      ],
+      "fit_plot_k_E0": true,
+      "plot_x_scale": "log",
+      "y_tick_spacing": 0.01,
+      "y_tick_format": "auto",
+      "y_grid_spacing": 0.01,
+      "line_alpha": 1,
+      "line_width": 2,
+      "scatter_alpha": 0.3,
+      "scatter_size": 10,
+      "scatter_marker": "o",
+      "plot_use_legend": true,
+      "plot_title": "Data Reuse on Instruct model (7B)",
+      "plot_curve_mask": [
+        1,
+        2,
+        5,
+        20,
+        25,
+        50,
+        100
+      ],
+      "highlight_curves_predict": [
+        1
+      ],
+      "highlight_line_width": 3.0,
+      "output_prefix": "fit_exp2-instruct_"
+    }
+  ]
+}

@@ -51,7 +51,7 @@ def main():
     N_billions = N_values / 1e9  # Convert to billions for better readability
     
     # Plot k(N)
-    fig1, ax1 = plt.subplots(figsize=(8, 6), dpi=150)
+    fig1, ax1 = plt.subplots(figsize=(6, 4), dpi=300)
     ax1 = plot.plot_basic(
         x=N_billions,
         y=np.abs(k_values),  # Use absolute value since k is negative
@@ -72,11 +72,11 @@ def main():
     plt.tight_layout()
     eval_file_str = config.TEST_EVALS[eval_name]['file_str']
     plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_k_scatter.pdf", bbox_inches='tight')
-    plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_k_scatter.png", bbox_inches='tight', dpi=150)
+    plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_k_scatter.png", bbox_inches='tight', dpi=300)
     print(f"Saved k(N) plot: {config.OUTPUT_BASE_DIR}/fit_{model_type}_{eval_file_str}_N_E_k_scatter.pdf")
     
     # Plot E0(N)
-    fig2, ax2 = plt.subplots(figsize=(8, 6), dpi=150)
+    fig2, ax2 = plt.subplots(figsize=(6, 4), dpi=300)
     ax2 = plot.plot_basic(
         x=N_billions,
         y=E0_values,
@@ -96,10 +96,10 @@ def main():
     )
     plt.tight_layout()
     plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_E0_scatter.pdf", bbox_inches='tight')
-    plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_E0_scatter.png", bbox_inches='tight', dpi=150)
+    plt.savefig(config.OUTPUT_BASE_DIR / f"fit_{model_type}_{eval_file_str}_N_E_E0_scatter.png", bbox_inches='tight', dpi=300)
     print(f"Saved E0(N) plot: {config.OUTPUT_BASE_DIR}/fit_{model_type}_{eval_file_str}_N_E_E0_scatter.pdf")
     
-    # df_fit_plot = data_proc.apply_warmup_clipping(df, curve_column="N", warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW)
+    # df_fit_plot = data_proc.apply_warmup_clip(df, curve_column="N", warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW)
     # ax = plot.plot_curves(df_fit_plot, curve_column=curve_column, x_column=x_column, y_column=metric+"_pred", use_line=True, x_scale="log")
 
     ax = plot_data.predict_and_plot(

@@ -693,7 +693,7 @@ def sample_x(x_range: tuple[float, float], on_log: bool = True, sample_num: int 
         x = np.exp(log_x)
     return x
 
-def predict_intrinsic_curves(df_NEC: pd.DataFrame, intrinsic: IntrinsicFunction, phi: float, warmup_clipping_factor: float, sample_size_per_step: float) -> pd.DataFrame:
+def predict_intrinsic_curves(df_NEC: pd.DataFrame, intrinsic: IntrinsicFunction, phi: float, warmup_clip_factor: float, sample_size_per_step: float) -> pd.DataFrame:
     """Predict intrinsic curves and tangent points"""
 
     rows = []
@@ -702,10 +702,10 @@ def predict_intrinsic_curves(df_NEC: pd.DataFrame, intrinsic: IntrinsicFunction,
         min_step = sub["step"].min()
         max_step = sub["step"].max()
         # apply warmup clipping to range (min, max)
-        # clipping = np.round((max_step - min_step + 1) * warmup_clipping_factor)
+        # clipping = np.round((max_step - min_step + 1) * warmup_clip_factor)
         # min_step = min_step + clipping
         # if clipping > 0:
-        #     print(f"clipping: {clipping} steps. (min_step: {min_step}, max_step: {max_step}, warmup_clipping_factor: {warmup_clipping_factor})")
+        #     print(f"clipping: {clipping} steps. (min_step: {min_step}, max_step: {max_step}, warmup_clip_factor: {warmup_clip_factor})")
 
         E_use = sample_x(x_range=(min_step * sample_size_per_step, max_step * sample_size_per_step), on_log=False, sample_num=max_step-min_step+1)
         

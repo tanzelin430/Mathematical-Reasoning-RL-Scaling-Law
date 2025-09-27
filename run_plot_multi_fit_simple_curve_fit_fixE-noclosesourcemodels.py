@@ -119,26 +119,14 @@ def main():
         
         eval_file_str = config.TEST_EVALS[eval_name]['file_str']
         
-        # 定义彩虹配色（从上到下：深红、深橙、深黄、深绿、深蓝）
-        colors = ['#CC0000', '#CC6600', '#228B22', '#0066CC', '#663399']
-        
-        # Map all model types to rainbow colors
-        all_colors = {
-            "base": colors[0],        # Deep red
-            "instruct": colors[1],    # Deep orange
-            "Sota-Qwen3-(Reason, Dense)": colors[2],    # Deep green
-            "Sota-Qwen3-(Reason, MOE)": colors[3],      # Deep blue
-            "Sota-GPT-OSS-(Reason, MOE)": colors[4],    # Purple
-        }
-        
         for model_type in model_types:
             df = all_results[model_type]['df']
             predicter = all_results[model_type]['predicter']
             E_max = all_results[model_type]['E_max']
             
-            # Create custom color mapping for this model type using rainbow colors
-            # Map E_max (the curve we're plotting) to the rainbow color scheme
-            custom_color_mapping = {E_max: all_colors[model_type]}
+            # Create custom color mapping for this model type
+            # Map E_max (the curve we're plotting) to the model_type color
+            custom_color_mapping = {E_max: config.get_color_for_curve(model_type)}
             
             # Generate prediction and plot for this model type
             ax3 = plot_data.predict_and_plot(
@@ -185,59 +173,7 @@ def main():
                 ax=ax3,
             )
 
-        # Add SOTA comparison lines
-        # Data from user requirements
-        sota_model_sizes = {
-            "Sota-Qwen3-(Reason, Dense)": [0.6, 1.7, 4, 8, 14, 32],
-            "Sota-Qwen3-(Reason, MOE)": [30, 235],
-            "Sota-GPT-OSS-(Reason, MOE)": [20, 120],
-        }
-
-        sota_scores = {
-            "Sota-Qwen3-(Reason, Dense)": [0.178, 0.288, 0.418, 0.366, 0.388, 0.412],
-            "Sota-Qwen3-(Reason, MOE)": [0.528, 0.602],
-            "Sota-GPT-OSS-(Reason, MOE)": [0.556, 0.660],
-        }
-
-        # Define colors for SOTA lines using rainbow scheme
-        sota_colors = {
-            "Sota-Qwen3-(Reason, Dense)": colors[2],  # Deep green
-            "Sota-Qwen3-(Reason, MOE)": colors[3],    # Deep blue
-            "Sota-GPT-OSS-(Reason, MOE)": colors[4],  # Purple
-        }
-
-        # Define line styles (solid for dense, dashed for MOE)
-        sota_line_styles = {
-            "Sota-Qwen3-(Reason, Dense)": '-',    # Solid line
-            "Sota-Qwen3-(Reason, MOE)": '--',     # Dashed line
-            "Sota-GPT-OSS-(Reason, MOE)": '--',   # Dashed line
-        }
-
-        # Plot each SOTA line
-        for label in sota_model_sizes:
-            x = np.array(sota_model_sizes[label]) * 1e9  # Convert to same units (billions to actual numbers)
-            y = 1 - np.array(sota_scores[label])  # Convert scores to error rates (1 - score)
             
-            # Use plot_basic to add the line
-            ax3 = plot.plot_basic(
-                x=x,
-                y=y,
-                use_line=True,
-                use_scatter=True,
-                line_alpha=1.0,
-                line_width=2,
-                scatter_alpha=0.8,
-                scatter_s=20,
-                scatter_marker='o',
-                color=sota_colors[label],
-                ax=ax3
-            )
-            
-            # Apply line style by modifying the last added line
-            if sota_line_styles[label] == '--':
-                lines = ax3.get_lines()
-                if lines:
-                    lines[-1].set_linestyle('--')
             
         plot.plot_basic_settings(
             ax=ax3,
@@ -245,11 +181,10 @@ def main():
             y_scale="log",
             x_label=config.DEFAULT_LABELS[plot_x_column],
             y_label=config.DEFAULT_LABELS[metric],
-            # title=f"L(N) (D=max) - Base vs Instruct",
-            title="Performance Scaling of Post-RFT vs. SOTA",
+            title=f"L(N) (D=max) - Base vs Instruct",
             x_tick_format="auto",
             y_tick_format="decimal",
-            y_tick_spacing=0.1,
+            y_grid_spacing=0.1,
             use_legend=False,
             save_to_dir=None,  # Don't save individual plots, we'll save the combined one
             save_to_filename_prefix=None,
@@ -258,27 +193,12 @@ def main():
         # Add combined legend manually
         legend_handles = []
         legend_labels = []
-        
-        # Add existing model types (Base and Instruct) using rainbow colors
-        model_type_labels = {
-            "base": "Ours-Qwen2.5-(Base, Dense)",
-            "instruct": "Ours-Qwen2.5-(Instruct, Dense)"
-        }
-        
         for model_type in model_types:
-            legend_handles.append(plt.Line2D([0], [0], color=all_colors[model_type], 
-                                           linewidth=2, label=model_type_labels[model_type]))
-            legend_labels.append(model_type_labels[model_type])
+            legend_handles.append(plt.Line2D([0], [0], color=config.get_color_for_curve(model_type), 
+                                           linewidth=2, label=model_type.capitalize()))
+            legend_labels.append(model_type.capitalize())
         
-        # Add SOTA lines to legend
-        for label in sota_model_sizes:
-            line_style = sota_line_styles[label]
-            legend_handles.append(plt.Line2D([0], [0], color=sota_colors[label], 
-                                           linewidth=2.5, linestyle=line_style, 
-                                           marker='o', markersize=6, label=label))
-            legend_labels.append(label)
-        
-        ax3.legend(legend_handles, legend_labels, loc='best', fontsize=8)
+        ax3.legend(legend_handles, legend_labels, loc='best')
         
         # Save the combined plot
         plt.tight_layout()

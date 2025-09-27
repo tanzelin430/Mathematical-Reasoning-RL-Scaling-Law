@@ -24,8 +24,8 @@ def main():
     
     # Extract config values to local variables
     output_base_dir = config.OUTPUT_BASE_DIR
-    warmup_clipping_factor_raw = config.WARMUP_CLIPPING_FACTOR_FOR_RAW
-    warmup_clipping_factor_smooth = config.WARMUP_CLIPPING_FACTOR_FOR_SMOOTH
+    warmup_clip_factor_raw = config.WARMUP_CLIPPING_FACTOR_FOR_RAW
+    warmup_clip_factor_smooth = config.WARMUP_CLIPPING_FACTOR_FOR_SMOOTH
     test_evals = config.TEST_EVALS
     default_labels = config.DEFAULT_LABELS
     
@@ -33,20 +33,20 @@ def main():
     eval_name = "holdout_score"
     
     # Fitting parameters - what we use for model fitting
-    fit_curve_column = 'N'  # key must be one of 'N', 'DR' - what we fit curves over
+    fit_curve_column = 'N'  # key must be one of 'N', 'Tau' - what we fit curves over
     fit_x_column = "E"       # What we use as X variable for fitting the scaling law
     fit_metrics = ["ErrRate"] # What metrics we fit
     
     # Plotting parameters - what we show in plots (can be different from fitting)
-    plot_curve_column = 'N' # key must be one of 'N', 'DR' - what curves to show
+    plot_curve_column = 'N' # key must be one of 'N', 'Tau' - what curves to show
     plot_x_columns = ["E"]   # Available x columns for plotting
     plot_metrics = ["ErrRate"] # Available metrics for plotting
     
     # Fit load/save configuration
     fit_load_path = None  # Path to load pre-fitted model (None = fit from scratch)
     fit_save_path = None  # Path to save fitted model (None = don't save)
-    # fit_load_path = "outputs/model_exp2-instruct_DR_E.json"  # Example: load from file
-    # fit_save_path = "outputs/model_exp2-instruct_DR_E.json"  # Example: save to file
+    # fit_load_path = "outputs/model_exp2-instruct_Tau_E.json"  # Example: load from file
+    # fit_save_path = "outputs/model_exp2-instruct_Tau_E.json"  # Example: save to file
     fit_plot_k_E0 = True
     
     # Plot configuration
@@ -120,7 +120,7 @@ def main():
             curve_billions = curve_values / 1e9  # Convert to billions for better readability
             
             # Plot k(curve_column) - Compact version
-            fig1, ax1 = plt.subplots(figsize=(6, 4.5), dpi=150)  # Smaller figure size
+            fig1, ax1 = plt.subplots(figsize=(6, 4.5), dpi=300)  # Smaller figure size
             ax1 = plot.plot_basic(
                 x=curve_billions,
                 y=np.abs(k_values),  # Use absolute value since k is negative
@@ -146,7 +146,7 @@ def main():
             print(f"Saved k({fit_curve_column}) plot: {config.OUTPUT_BASE_DIR}/fit_{data_source}_{eval_file_str}_{fit_curve_column}_{fit_x_column}_k_scatter.pdf")
             
             # Plot E0(curve_column) - Compact version
-            fig2, ax2 = plt.subplots(figsize=(6, 4.5), dpi=150)  # Smaller figure size
+            fig2, ax2 = plt.subplots(figsize=(6, 4.5), dpi=300)  # Smaller figure size
             ax2 = plot.plot_basic(
                 x=curve_billions,
                 y=E0_values,
@@ -172,7 +172,7 @@ def main():
         
         # fit_metric = "ErrRate"
         for plot_metric in plot_metrics: # "R", "ErrRate", "DeltaReward", "DeltaErrRate"
-            # df_fit_plot = data_proc.apply_warmup_clipping(df, curve_column="N", warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW)
+            # df_fit_plot = data_proc.apply_warmup_clip(df, curve_column="N", warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW)
             # ax = plot.plot_curves(df_fit_plot, curve_column=curve_column, x_column=x_column, y_column=metric+"_pred", use_line=True, x_scale="log")
 
             # Extract function parameters to local variables
@@ -201,7 +201,7 @@ def main():
                 plot_x_scale=plot_x_scale,
                 plot_y_scale=plot_y_scale,
                 plot_y_lambda=predict_plot_y_lambda,
-                warmup_frac_raw=warmup_clipping_factor_raw,
+                warmup_frac_raw=warmup_clip_factor_raw,
                 # ax=ax,
             )
             
@@ -248,8 +248,8 @@ def main():
                 smooth_strict=smooth_strict,
                 
                 # Advanced parameters
-                warmup_frac_raw=warmup_clipping_factor_raw,
-                warmup_frac_smooth=warmup_clipping_factor_smooth,
+                warmup_frac_raw=warmup_clip_factor_raw,
+                warmup_frac_smooth=warmup_clip_factor_smooth,
                 s_factor=s_factor,
                 k_spline=k_spline,
                 rolling_window=rolling_window,
