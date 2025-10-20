@@ -5,35 +5,14 @@
 - view the code briefly before execute, it may contain config info
 
 ```bash
-uv run python extract_csv.py
-```
-```bash
-# now support cmd line interface, with config files available for pipeline
-uv run python run_plot_multi_fit.py --config-file example_batch_config.json
-```
-```bash
-# to plot single figure, with 5 dimention control (model type, x, eval, metric, curve)
-uv run python run_plot_single.py
-
-# to plot multiple figures at a time, very handy. etc. ["C", "E"] x ["R", "ErrRate"]
-uv run python run_plot_multi.py
-
-# to plot multiple figures with fitting lines, same as above (dual logistic with k(N)=log(1-xxx) version)
-uv run python run_plot_multi_fit.py
-
-# to plot data duplication curves
-uv run python run_plot_single_slicefactor.py
-
-# other run_... scripts are not ready to use, those mainly for testing purpose.
+# preprocess data to csv
+uv run -m scripts.extract_csv
 ```
 
-Cross Domain
+Compute(C), Datasize(E) vs TestLoss:
 ```bash
-uv run python run_plot_multi-subplot_oodid.py --x-columns C --metrics ErrRate --data-source base --eval-group in_domain
-uv run python run_plot_multi-subplot_oodid.py --x-columns C --metrics ErrRate --data-source base --eval-group out_of_domain
-uv run python run_plot_multi-subplot_oodid.py --x-columns C --metrics ErrRate --data-source instruct --eval-group in_domain
-uv run python run_plot_multi-subplot_oodid.py --x-columns C --metrics ErrRate --data-source instruct --eval-group out_of_domain
-uv run python run_plot_multi-subplot_oodid.py --help
+# fitting (log linear)  - 4 figures: (C & E * base & instruct)
+uv run -m src.run.plot_multi_fit --config-file params/exp1_fit.json
 ```
 
 k - curve / E0 - curve:
@@ -43,35 +22,33 @@ k - curve / E0 - curve:
 # curve = N / Tau
 
 # plot k(N) on L(N, C_raw)
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type C_raw --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type C_raw --warmup-clip-num 10
 
 # plot appendix figure: L(N,D) vs L(N,C) k & E0
-uv run python run_xhyu_k_e0_scatters.py --model-type base --warmup-clip-num 10
-uv run python run_xhyu_k_e0_scatters.py --model-type instruct --warmup-clip-num 10
-
-# plot single k(N), E0(N):
-uv run python run_plot_multi_fit.py --config-file exp2_k_e0.json
+uv run -m src.run.xhyu_k_e0_scatters --model-type base --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters --model-type instruct --warmup-clip-num 10
 ```
 
 Data reuse
 ```bash
-# test loss vs steps - smooth curve version
-uv run python run_plot_multi_fit.py --config-file params/datareuse_tau_smooth.json
+# test loss vs steps - smooth curve - (base & instruct)
+uv run -m src.run.plot_multi_fit --config-file params/exp2_smooth.json
 
-# test loss vs steps - fit line version
-uv run python run_plot_multi_fit.py --config-file params/datareuse_tau_fit.json
+# test loss vs steps - fitting (log linear) - (base & instruct)
+uv run -m src.run.plot_multi_fit --config-file params/exp2_fit_loglinear.json
 
 # plot k(\tau) on L(\tau, steps)
 # k & E0
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable k E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
 # k
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable k --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
 # E0
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
 
 # experiment setup blocks
-uv run python run_rectangle_test.py
+uv run -m src.run.exp2_setup_rectangle
 ```
+
 notes: remember to edit this when adding new columns
 ```python
 df_mean = (
@@ -80,48 +57,64 @@ df_mean = (
 )
 ```
 
-notes: when update experiment2, remember to copy run_0 result from experiment1 7B, to exp2 csv, can replace slice_factor from 0 to 1
-
 Response Length
 ```bash
-uv run python run_plot_multi_fit.py --config-file params/response_length_E.json
-uv run python run_plot_multi_fit.py --config-file params/response_length_testloss.json
+uv run -m src.run.plot_multi_fit --config-file params/response_length_E.json
+uv run -m src.run.plot_multi_fit --config-file params/response_length_testloss.json
 
 # k & E0 together
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10
 # k
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable k --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
 # E0
-uv run python run_xhyu_k_e0_scatters_baseinstruct.py --plot-enable E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
 ```
 
 Single side scaling law
 ```bash
 # L(D)
-uv run python run_plot_multi_fit_simple_curve_fit_fixN.py
+uv run -m src.run.plot_multi_fit_simple_curve_fit_fixN
 
 # L(N)
-uv run python run_plot_multi_fit_simple_curve_fit_fixE.py
+uv run -m src.run.plot_multi_fit_simple_curve_fit_fixE
 ```
 
 GRPO
 ```bash
-uv run python run_plot_multi_fit.py --config-file params/grpo.json
+uv run -m src.run.plot_multi_fit --config-file params/grpo.json
 ```
 
 Plot single N-C-ErrRate with smooth (not fit):
 ```bash
-uv run python run_plot_multi_fit.py --config-file test_NC_smooth.json
+uv run -m src.run.plot_multi_fit --config-file params/test_NC_smooth.json
 ```
 
-All Evals
+Cross Domain (one line per domain)
 ```bash
-uv run python run_plot_multi-subplot.py --data-source base --x-columns E --metrics ErrRate --warmup-clip-num 10
-uv run python run_plot_multi-subplot.py --data-source instruct --x-columns E --metrics ErrRate --warmup-clip-num 10
-
-uv run python run_plot_multi-subplot.py --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
-uv run python run_plot_multi-subplot.py --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 14e9 --eval-group in_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 14e9 --eval-group out_of_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 14e9 --eval-group in_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 14e9 --eval-group out_of_domain
+uv run -m src.run.eval_curves_by_model --help
 ```
+
+Plot All Dataset Evaluations (deprecated, one subplot per domain)
+```bash
+uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip-num 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip-num 10
+
+uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
+```
+
+<!-- 
+```bash
+# demo plot, 5-dimention control (model type, x, eval, metric, curve), support multiple plot: etc. ["C", "E"] x ["R", "ErrRate"]
+uv run -m src.run.demo
+
+# to plot multiple figures with fitting lines, same as above (dual logistic with k(N)=log(1-xxx) version)
+uv run -m src.run.plot_multi_fit
+``` -->
 
 5-dimention control:
 - model type: 
@@ -151,3 +144,11 @@ Important config (in config.py):
 Adding data source:
 - edit `extract_csv.py` - `main()`
 - add to `config.py` - `CSV_MAP`
+
+Note: 
+- reuse exp1 7B run0 as tau=1 data
+  ```bash
+  cp -r data/Experiment1_Base/Experiment1_Base_run0/7B data/experiment2_base/7B/run_1
+  cp -r data/Experiment1_Instruct/Experiment1_Instruct_run0/7B data/experiment2_instruct/7B/run_1
+  ```
+- *rollout_n* column is only for grpo experiments

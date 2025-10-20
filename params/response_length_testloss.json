@@ -18,7 +18,7 @@
       "fit_metrics": [
         "ErrRate"
       ],
-      "fit_plot_k_E0": true,
+      "fit_plot_params": true,
       "plot_x_label": "Response Length",
       "plot_y_label": "Test Loss",
       "plot_x_scale": "log",
@@ -55,7 +55,7 @@
       "fit_metrics": [
         "ErrRate"
       ],
-      "fit_plot_k_E0": true,
+      "fit_plot_params": true,
       "plot_x_label": "Response Length",
       "plot_y_label": "Test Loss",
       "plot_x_scale": "log",

@@ -18,7 +18,7 @@
       "fit_metrics": [
         "ErrRate"
       ],
-      "fit_plot_k_E0": true,
+      "fit_plot_params": true,
       "plot_x_scale": "log",
       "plot_y_scale": "log",
       "x_tick_spacing": 0.1,
