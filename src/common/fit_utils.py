@@ -6,20 +6,6 @@ from sklearn.metrics import r2_score
 from scipy.interpolate import UnivariateSpline
 from typing import Callable, List, Dict, Union, Optional, Tuple
 
-__all__ = [
-    # Isotonic regression
-    'isotonic_regression_pav', 'strictify_on_monotonic',
-    
-    # Spline fitting
-    'fit_spline', 'fit_smooth_monotonic',
-    
-    # Weight calculation
-    'get_weight',
-    
-    # R² calculation
-    'calculate_r2'
-]
-
 '''
 Smoothing
 '''
@@ -156,8 +142,34 @@ def get_weight(
     rolling_window: int = 20,
     min_se: float = 1e-3,
     x_inv_weight_power: float = 0.2,
+    x_inv_weight_alpha: float = 1.0,
 ):
-
+    """
+    Compute combined weights from reliability (based on local variance) and x-coordinate.
+    
+    Parameters
+    ----------
+    x : array-like or pd.Series
+        The x coordinates of data points
+    y : array-like or pd.Series  
+        The y coordinates of data points
+    rolling_window : int, default=20
+        Window size for rolling standard error calculation
+    min_se : float, default=1e-3
+        Minimum standard error to avoid division by zero
+    x_inv_weight_power : float, default=0.2
+        Power for inverse x weighting (0 to disable)
+    x_inv_weight_alpha : float, default=1.0
+        Controls the strength of x-inverse weighting, in range [0, 1]
+        - alpha=0: only use reliability weights
+        - alpha=1: full combination (original behavior)
+        - 0<alpha<1: interpolates between the two
+        
+    Returns
+    -------
+    weights : ndarray
+        Normalized weights with mean=1.0
+    """
     # Dynamically adjust min_periods to ensure it doesn't exceed data length
     data_length = len(y)
     min_periods = min(max(3, rolling_window//2), data_length)
@@ -166,24 +178,17 @@ def get_weight(
     
     se = se.fillna(se.median()).clip(lower=min_se).to_numpy(float)
     
-
-    # Combined weighting: (1/SE^2) * (1/x^power)
+    # Reliability weighting: (1/SE^2)
     w_reliability = 1.0 / (se**2)
     w_reliability = w_reliability / np.mean(w_reliability)  # normalize
     
-    if x_inv_weight_power > 0:
-        # Handle two types: pandas.Series and numpy.ndarray
-        if isinstance(x, pd.Series):
-            x_vals = x.to_numpy(float)
-        else:
-            x_vals = np.asarray(x, dtype=float)
+    if x_inv_weight_power > 0 and x_inv_weight_alpha > 0:
+        # Use gen_inv_weights to compute x-based weights
+        w_xinv = gen_inv_weights(x, power=x_inv_weight_power)
         
-        x_vals = np.maximum(x_vals, 1e-12)
-        # normalize to 0-1
-        w_xinv = 1.0 / (x_vals**x_inv_weight_power)
-        w_xinv = w_xinv / np.mean(w_xinv)  # normalize
-        
-        w = w_reliability * w_xinv
+        # Modulation-style combination: w = w_reliability * (1 + alpha * (w_xinv - 1))
+        # This is equivalent to: w = (1-alpha) * w_reliability + alpha * (w_reliability * w_xinv)
+        w = w_reliability * (1 + x_inv_weight_alpha * (w_xinv - 1))
     else:
         w = w_reliability
 
@@ -191,6 +196,116 @@ def get_weight(
 
     return w
 
+def gen_inv_weights(
+    x: Union[np.ndarray, pd.Series],
+    power: float = 1.0
+) -> np.ndarray:
+    """
+    Generate inverse weights based on x coordinate: weight ~ 1/x^power.
+    
+    The x values are first normalized to relative scale (x/x_min) to avoid
+    numerical precision issues when x contains very large numbers (e.g., 1e16-1e21).
+    
+    Parameters
+    ----------
+    x : array-like or pd.Series
+        The x coordinates of data points
+    power : float, default=1.0
+        The power for inverse weighting. weight = 1/(x^power)
+        - power=0: uniform weights (all ones)
+        - power=1: inverse proportional (1/x)
+        - power>1: stronger emphasis on small x values (e.g., 1/x²)
+        
+    Returns
+    -------
+    weights : ndarray
+        Normalized weights with mean=1.0, suitable for cma_curve_fit
+        
+    Notes
+    -----
+    For numerical stability, x is normalized to x/x_min before computing weights.
+    This ensures the weight calculation operates on reasonable numerical ranges
+    even when x contains very large values.
+    """
+    # Convert to numpy array
+    if isinstance(x, pd.Series):
+        x_vals = x.to_numpy(dtype=float)
+    else:
+        x_vals = np.asarray(x, dtype=float)
+    
+    # Ensure all x values are positive (avoid division by zero)
+    x_vals = np.maximum(x_vals, 1e-12)
+    
+    if power <= 0:
+        # Return uniform weights
+        return np.ones_like(x_vals, dtype=float)
+    
+    # Normalize x to relative scale: x_rel = x / x_min
+    # This avoids numerical precision issues when x contains very large numbers
+    # The relative ratios are preserved: x_rel_max / x_rel_min = x_max / x_min
+    x_min = np.min(x_vals)
+    x_relative = x_vals / x_min  # Now x_relative ranges from 1.0 to (x_max/x_min)
+    
+    # Calculate inverse weights on the relative scale
+    w_inv = 1.0 / (x_relative ** power)
+    
+    # Normalize to mean=1
+    w_inv = w_inv / np.mean(w_inv)
+    
+    return w_inv
+
+def gen_grouped_inv_weights(
+    x_group: Union[np.ndarray, pd.Series],
+    x: Union[np.ndarray, pd.Series],
+    power: float = 1.0
+) -> np.ndarray:
+    """
+    Generate inverse weights grouped by x_group, weighted by 1/x_weight^power.
+    
+    Within each group: weights ~ 1/x_weight^power
+    Across groups: each group has equal total weight
+    
+    Parameters
+    ----------
+    x_group : array-like
+        Grouping variable (e.g., N)
+    x_weight : array-like
+        Variable for weighting (e.g., C or E)
+    power : float, default=1.0
+        Power for inverse weighting
+        
+    Returns
+    -------
+    weights : ndarray
+        Normalized weights with mean=1.0
+    """
+    # Convert to numpy
+    if isinstance(x_group, pd.Series):
+        x_group = x_group.to_numpy(dtype=float)
+    else:
+        x_group = np.asarray(x_group, dtype=float)
+        
+    if isinstance(x, pd.Series):
+        x = x.to_numpy(dtype=float)
+    else:
+        x = np.asarray(x, dtype=float)
+    
+    weights = np.zeros_like(x_group, dtype=float)
+    unique_groups = np.unique(x_group)
+    
+    for group_val in unique_groups:
+        mask = (x_group == group_val)
+        
+        # Use gen_inv_weights for this group
+        w_group = gen_inv_weights(x[mask], power=power)
+        
+        # Normalize group to sum=1 (equal total weight per group)
+        w_group = w_group / np.sum(w_group)
+        
+        weights[mask] = w_group
+    
+    # Normalize to mean=1
+    return weights / np.mean(weights)
 
 def calculate_r2(y_true, y_pred):
     """

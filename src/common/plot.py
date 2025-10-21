@@ -44,20 +44,6 @@ plt.rcParams['axes.labelweight'] = 'bold'
 plt.rcParams['axes.titleweight'] = 'bold'
 # 注意: legend.fontweight 不是有效的rcParams参数，图例字体会继承font.weight设置
 
-__all__ = [
-    # Figure plotting
-    'plot_score_c_1a', 'plot_err_rate_1c', 'plot_ip_c_1b', 'plot_fit_score_c_2a', 'plot_fit_ip_2b',
-    
-    # Utility functions
-    'human_format_N', 'setup_axis_formatter', 'setup_y_axis_formatter',
-    
-    # Empirical frontier visualization
-    'vplot_empirical_f_of_R', 'plot_phi_over_steps',
-    
-    # Multi-subplot layout utilities
-    'create_multi_subplot_axes', 'set_figure_labels', 'apply_tight_layout', 'apply_global_legend_layout'
-]
-
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================

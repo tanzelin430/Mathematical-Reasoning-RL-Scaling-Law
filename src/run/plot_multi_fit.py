@@ -348,8 +348,8 @@ Examples:
                                type=float, default=1e-6,
                                help='Minimum standard error (default: 1e-6)')
     advanced_group.add_argument('--x-inv-weight-power', dest='x_inv_weight_power',
-                               type=float, default=0.3,
-                               help='X inverse weight power (default: 0.3)')
+                               type=float, default=0,
+                               help='X inverse weight power (default: 0), for both fit and smooth')
 
     # Output configuration
     output_group = parser.add_argument_group('output options')
@@ -561,7 +561,8 @@ def run_scaling_analysis(args):
             df, eval_name = args.eval, x_column_list=[args.fit_curve_column, args.fit_x_column],
             fit_load_path=args.fit_load_path, fit_save_path=args.fit_save_path,
             warmup_clip=args.warmup_clip if args.warmup_clip is not None else 0,
-            ending_clip=args.ending_clip if args.ending_clip is not None else 0
+            ending_clip=args.ending_clip if args.ending_clip is not None else 0,
+            x_inv_weight_power=args.x_inv_weight_power,
         )
 
         # Plot params (e.g. k, E0) scatter plots if fitting was done

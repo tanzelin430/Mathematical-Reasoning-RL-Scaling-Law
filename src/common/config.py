@@ -13,9 +13,6 @@ PROJECT_DIR = Path(__file__).parent.parent.parent
 OUTPUT_BASE_DIR = PROJECT_DIR / "outputs"  # Base output directory for PNG plots
 SAMPLE_SIZE_PER_STEP = 512
 BUILD_I_ON_SMOOTHED = True
-# warmup clipping: Important even for LLM RL
-WARMUP_CLIPPING_FACTOR_FOR_RAW = 10/100  # on raw data
-WARMUP_CLIPPING_FACTOR_FOR_SMOOTH = 0/100  # only affects smoothed lines, not fitting lines, [based on clipped raw]
 
 # HOLDOUT=True,
 # Test evals to process (from the CSV columns)
@@ -95,7 +92,7 @@ COLUMN_RENAME_MAP = {
 DEBUG = False
 
 CSV_INSTRUCT_RUNS = [
-        PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
+        # PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
         PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run1.csv" ,
         PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run2.csv" ,
     ]
@@ -156,7 +153,8 @@ COLOR_MAPPING = {
     8e9: '#2c728e',    # 蓝绿
     14e9: '#5a67a8',   # 蓝紫 (更亮的蓝紫，增强与前面的区分)
     32e9: '#7b4397',   # 紫红 (偏红的紫色，增强中间色差)
-    72e9: '#440154',   # 深紫 (最大，保持原色)
+    # 72e9: '#440154',   # 深紫 (最大，保持原色)
+    72e9: '#ADFF2F',   # 深紫 (最大，保持原色)
     # for data dup factor / slice factor (从小到大：深到浅，slice factor越小数据越稀疏用更深色)
     # for data dup factor / slice factor (彩虹配色：从紫到红)
     1: '#FF4500',      # 橙红 (最小，最稀疏)

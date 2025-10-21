@@ -3,7 +3,7 @@ import pandas as pd
 from src.common import data_proc
 from src.fit.base import BaseFitter
 from typing import Callable, List, Dict, Union, Optional, Tuple
-from src.common.fit_utils import cma_curve_fit
+from src.common.fit_utils import cma_curve_fit, gen_inv_weights, gen_grouped_inv_weights
 
 def get_x_y_data_from_df(
     df, 
@@ -65,7 +65,7 @@ def get_x_y_data_from_df(
     
     return x_data, y_data
 
-def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"], x_transform_list=[None, None], fit_load_path=None, fit_save_path=None, warmup_clip=0, ending_clip=0, bounds=None, p0=None):
+def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"], x_transform_list=[None, None], fit_load_path=None, fit_save_path=None, warmup_clip=0, ending_clip=0, bounds=None, p0=None, x_inv_weight_power=0):
     """
     Fit a model to data using CMA-ES optimization.
     """
@@ -98,6 +98,13 @@ def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"
     print(f"x_arrays: {len(x_data)} arrays with shapes {[arr.shape for arr in x_data]}")
     print(f"模型: {FitterClass.__name__}, 参数数量: {len(p0)}")
     
+    # Generate grouped inverse weights: group by x_data[0] (N), weight by x_data[1] (C/E)
+    # This ensures each N curve has equal total weight, while points within each curve are weighted by 1/C
+    inv_weights = gen_grouped_inv_weights(
+        x_group=x_data[0],   # N for grouping
+        x=x_data[1],  # C/E for weighting
+        power=x_inv_weight_power
+    )
     # 使用CMA-ES curve_fit函数进行拟合
     fitted_params, best_loss, r2 = cma_curve_fit(
         FitterClass.model,
@@ -107,7 +114,8 @@ def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"
         bounds=bounds,
         n_trials=2,
         max_iters=1600,
-        verbose=True
+        verbose=True,
+        weights=inv_weights
     )
     
     print(f"\n=== 拟合结果 ===")

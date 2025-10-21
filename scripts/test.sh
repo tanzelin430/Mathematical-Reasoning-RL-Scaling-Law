@@ -21,6 +21,7 @@ uv run -m src.run.plot_multi_fit \
   --fit-curve N \
   --fit-x C_raw \
   --fit-metric ErrRate \
+  --x-inv-weight-power 0 \
   --plot-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9 \
   --plot-x-scale log \
   --plot-y-scale log \

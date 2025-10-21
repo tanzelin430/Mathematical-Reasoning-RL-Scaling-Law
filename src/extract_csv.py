@@ -432,6 +432,29 @@ class ComputeExtractorExperiment:
         self.df = df
         return self
 
+    def slice(self, start_step=None, end_step=None, model_size=None):
+        """Filter data to keep only steps within [start_step, end_step] range"""
+        if start_step is None and end_step is None:
+            return self
+        
+        # Build step mask
+        mask = pd.Series([True] * len(self.df))
+        if start_step is not None:
+            mask &= (self.df['step'] >= start_step)
+        if end_step is not None:
+            mask &= (self.df['step'] <= end_step)
+        
+        # Apply to specific model or all
+        if model_size is not None:
+            model_mask = self.df['model_size'] == model_size
+            mask = ~model_mask | (model_mask & mask)
+            print(f"Sliced {model_size}: {model_mask.sum()} -> {(model_mask & mask).sum()} rows")
+        else:
+            print(f"Sliced all: {len(self.df)} -> {mask.sum()} rows")
+        
+        self.df = self.df[mask].reset_index(drop=True)
+        return self
+
     def inspect(self):
         self.df = self.df.sort_values(['model_size','runid','step']).reset_index(drop=True)
         data_proc.inspect_data(self.df)
@@ -469,11 +492,14 @@ if __name__ == "__main__":
     (ComputeExtractorExperiment()
      .run(experiment_root_dir='data/Experiment1_Base/Experiment1_Base_run1')
      .inspect()
+     .slice(end_step=40, model_size='32B')
+     .slice(end_step=96, model_size='72B')
      .save('csv/scaling_law_data_experiment1_base_run1.csv'))
 
     (ComputeExtractorExperiment()
      .run(experiment_root_dir='data/Experiment1_Base/Experiment1_Base_run2')
      .inspect()
+     .slice(end_step=40, model_size='32B')
      .save('csv/scaling_law_data_experiment1_base_run2.csv'))
 
 
