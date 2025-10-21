@@ -206,6 +206,7 @@ COLOR_MAPPING = {
     'instruct': '#440154', # 深紫
     'k': 'blue',    # 绿青
     'E0': 'red', # 深紫
+    'S': 'green', # 深紫
 
     # # for evaluations (现代配色方案)
     # # In-domain: 暖色调渐变 (红橙黄绿青)

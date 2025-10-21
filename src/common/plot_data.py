@@ -11,9 +11,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import data_proc
 import plot
-import config
 from pathlib import Path
-import fit
+from src.fit import fit
 
 def plot_curves_with_smooth(
     # plot params
@@ -591,7 +590,7 @@ def process_single_eval_multi_metrics(
 
 def predict_and_plot(
     df,
-    predict_func, # similar to predicter.predict_errrate_df
+    fitter: fit.BaseFitter, # similar to predicter.predict_errrate_df
     predict_x_column_list,
     metric_column, # TODO: useless?
     plot_curve_column,
@@ -632,7 +631,7 @@ def predict_and_plot(
 ):
     # predicter = fit.FitLogErrRate(L=0.06333, r=1.73e-10, N0_k=4.95e9, r_e0=1e-9, N0_e0=3e9)
     pred_column = metric_column + "_pred"
-    df[pred_column] = predict_func(df, *predict_x_column_list)
+    df[pred_column] = fit.predict_on(fitter, df, x_column_list=predict_x_column_list)
     if plot_curve_mask is not None:
         df = df[df[plot_curve_column].isin(plot_curve_mask)]
     if plot_on_delta: # plot delta instead of raw pred

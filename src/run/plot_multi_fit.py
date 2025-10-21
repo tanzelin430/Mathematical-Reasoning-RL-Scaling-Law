@@ -15,11 +15,12 @@ from src.common import data_proc
 from src.common import fit_models_simple
 from src.common import plot_data
 from src.common import config
-from src.common import fit
+from src.fit import fit
 from src.common import plot
 import matplotlib.pyplot as plt
 import numpy as np
-
+from src.fit.models import get_model_class, list_available_models
+            
 
 def parse_list_argument(value: str) -> List[str]:
     """Parse comma-separated string into list"""
@@ -97,6 +98,11 @@ def validate_args(args):
             if metric not in valid_metrics:
                 raise ValueError(f"Invalid fit metric: {metric}. "
                                 f"Must be one of: {valid_metrics}, or add to config.DEFAULT_LABELS")
+        
+        # Validate fit-model is provided when --fit is enabled
+        if not args.fit_model:
+            raise ValueError("--fit-model is required when --fit is enabled. "
+                           f"Available models: {', '.join(list_available_models())}")
 
 
 def create_argument_parser():
@@ -111,7 +117,7 @@ Examples:
 
   # With fitting
   %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate \\
-           --fit --fit-curve Tau --fit-x E --fit-metric ErrRate
+           --fit --fit-model InvExp --fit-curve Tau --fit-x E --fit-metric ErrRate
 
   # Multiple metrics and x columns with highlighting
   %(prog)s --data-source exp2-base --plot-curve N -x C,E --eval holdout_score --metric ErrRate,R \\
@@ -163,6 +169,9 @@ Examples:
     fit_group.add_argument('--fit-plot-params', dest='fit_plot_params',
                           action='store_true', default=False,
                           help='Plot parameters scatter plots (default: False)')
+    fit_group.add_argument('--fit-model', dest='fit_model',
+                          choices=list_available_models(),
+                          help='Model to use for fitting (required when --fit is enabled)')
 
     # Plot configuration
     plot_group = parser.add_argument_group('plot configuration')
@@ -527,6 +536,9 @@ def convert_warmup_clip_to_factor(df, curve_column, warmup_clip_abs):
 def plot_params(args, _curve_values, params_dict):
     _curve_label = config.DEFAULT_LABELS[args.fit_curve_column]
     for _param_key, _param_arr in params_dict.items():
+        if len(_param_arr) != len(_curve_values):
+            print(f"Skipping: {_param_key} has {len(_param_arr)} values, but {_curve_values} has {len(_curve_values)} values")
+            continue
         print(f"{_param_key} values: {_param_arr}")
     
         # Plot param(curve_column) - Compact version
@@ -569,6 +581,12 @@ def run_scaling_analysis(args):
     print(f"Loading data for data_source: {args.data_source}")
     df = data_proc.load_and_preprocess(config.CSV_MAP[args.data_source])
     
+    # 移除step=0的数据（因为E=0会导致log10(E)=-inf）
+    df = df[df['step'] > 0].reset_index(drop=True)
+    
+    group_columns = [args.plot_curve_column] + ['step']
+    df = data_proc.merge_duplicate_steps(df, group_columns=group_columns, mode='mean')
+    
     # Handle absolute vs relative warmup clipping
     if args.warmup_clip_raw is not None:
         print(f"Using absolute warmup clipping: warmup_clip_raw={args.warmup_clip_raw} steps")
@@ -592,58 +610,54 @@ def run_scaling_analysis(args):
     plot_legend_lambda = lambda x: plot.legend_format(args.plot_curve_column, x)
     plot_y_lambda_r = lambda y: 1 - y  # For R metric transformation
 
-    predicter = None
+    fitter = None
     
     # Fitting phase
     if args.fit:
         print(f"\n=== Fitting for x_column: {args.fit_x_column}, curve_column: {args.fit_curve_column} ===")
+        print(f"Using model: {args.fit_model}")
         
-        # Temporarily update config for fitting to use our converted warmup factor
-        original_warmup_factor = config.WARMUP_CLIPPING_FACTOR_FOR_RAW
-        config.WARMUP_CLIPPING_FACTOR_FOR_RAW = args.warmup_clip_factor_raw
+        # Get the fitter class dynamically from the model name
+        FitterClass = get_model_class(args.fit_model)
         
-        try:
-            predicter = fit.fit_log_errrate_simple(
-                df, args.eval, args.fit_curve_column, args.fit_x_column,
-                fit_load_path=args.fit_load_path,
-                fit_save_path=args.fit_save_path,
-                data_source=args.data_source,
-                warmup_step=args.warmup_clip_raw,
-                ending_step=args.ending_clip_raw
-            )
-        finally:
-            # Restore original config value
-            config.WARMUP_CLIPPING_FACTOR_FOR_RAW = original_warmup_factor
+        # [None, lambda x: np.log10(x)]
+        fitter = fit.fit_on(
+            FitterClass,
+            df, eval_name = args.eval, x_column_list=[args.fit_curve_column, args.fit_x_column],
+            fit_load_path=args.fit_load_path, fit_save_path=args.fit_save_path,
+            warmup_step=args.warmup_clip_raw,
+            ending_step=args.ending_clip_raw
+        )
+
+        # Plot params (e.g. k, E0) scatter plots if fitting was done
+        if args.fit and args.fit_plot_params and fitter:
+            # Get k(curve_column) and E0(curve_column) arrays for further analysis
+            # curve_values, k_values = predicter.get_k_array()
+            # curve_values_E0, E0_values = predicter.get_E0_array()
+
+            _curve_values, params_dict = fitter.get_params_array()
+            print(f"\n=== params({args.fit_curve_column}) Arrays for fitted x_column={args.fit_x_column} ===")
+            print(f"{args.fit_curve_column}_values:", _curve_values)
+            plot_params(args, _curve_values, params_dict)
 
     # Plotting phase
     for plot_x_column in args.plot_x_columns:
         print(f"\n=== Plotting for x_column: {plot_x_column} ===")
         
-        # Plot k and E0 scatter plots if fitting was done
-        if args.fit and args.fit_plot_params and predicter:
-            # Get k(curve_column) and E0(curve_column) arrays for further analysis
-            # curve_values, k_values = predicter.get_k_array()
-            # curve_values_E0, E0_values = predicter.get_E0_array()
-
-            _curve_values, params_dict = predicter.get_params_array()
-            print(f"\n=== params({args.fit_curve_column}) Arrays for fitted x_column={args.fit_x_column} ===")
-            print(f"{args.fit_curve_column}_values:", _curve_values)
-            plot_params(args, _curve_values, params_dict)
-
         # Process each plot metric
         for plot_metric in args.plot_metrics:
             ax = None
             
             # Add fitted prediction curves if fitting was done
-            if args.fit and predicter:
+            if args.fit and fitter:
                 predict_x_column_list = [args.fit_curve_column, args.fit_x_column]
                 predict_plot_highlight_curves = args.highlight_curves_predict
                 predict_plot_use_scatter = False  # predict_and_plot usually shows lines only
                 predict_plot_y_lambda = plot_y_lambda_r if plot_metric == "R" else None
-
+                
                 ax = plot_data.predict_and_plot(
                     df,
-                    predicter.predict_errrate_df,
+                    fitter,
                     predict_x_column_list=predict_x_column_list,
                     metric_column=plot_metric,
                     plot_curve_column=args.plot_curve_column,

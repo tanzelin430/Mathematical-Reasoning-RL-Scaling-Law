@@ -2,8 +2,6 @@
 
 ## Quick start
 
-- view the code briefly before execute, it may contain config info
-
 ```bash
 # preprocess data to csv
 uv run -m scripts.extract_csv
@@ -11,8 +9,11 @@ uv run -m scripts.extract_csv
 
 Compute(C), Datasize(E) vs TestLoss:
 ```bash
-# fitting (log linear)  - 4 figures: (C & E * base & instruct)
-uv run -m src.run.plot_multi_fit --config-file params/exp1_fit.json
+# fitting - 4 figures: (C & E * base & instruct)
+./scripts/exp1_fit.sh
+
+# optional: smooth - 4 figures: (C & E * base & instruct)
+./scripts/exp1_smooth.sh
 ```
 
 k - curve / E0 - curve:
@@ -32,10 +33,10 @@ uv run -m src.run.xhyu_k_e0_scatters --model-type instruct --warmup-clip-num 10
 Data reuse
 ```bash
 # test loss vs steps - smooth curve - (base & instruct)
-uv run -m src.run.plot_multi_fit --config-file params/exp2_smooth.json
+./scripts/exp2_smooth.sh
 
 # test loss vs steps - fitting (log linear) - (base & instruct)
-uv run -m src.run.plot_multi_fit --config-file params/exp2_fit_loglinear.json
+./scripts/exp2_fit_loglinear.sh
 
 # plot k(\tau) on L(\tau, steps)
 # k & E0
@@ -59,8 +60,8 @@ df_mean = (
 
 Response Length
 ```bash
-uv run -m src.run.plot_multi_fit --config-file params/response_length_E.json
-uv run -m src.run.plot_multi_fit --config-file params/response_length_testloss.json
+./scripts/response_length_E.sh
+./scripts/response_length_testloss.sh
 
 # k & E0 together
 uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10
@@ -81,12 +82,7 @@ uv run -m src.run.plot_multi_fit_simple_curve_fit_fixE
 
 GRPO
 ```bash
-uv run -m src.run.plot_multi_fit --config-file params/grpo.json
-```
-
-Plot single N-C-ErrRate with smooth (not fit):
-```bash
-uv run -m src.run.plot_multi_fit --config-file params/test_NC_smooth.json
+./scripts/grpo.sh
 ```
 
 Cross Domain (one line per domain)
