@@ -4,7 +4,7 @@
 
 ```bash
 # preprocess data to csv
-uv run -m scripts.extract_csv
+uv run -m src.extract_csv
 ```
 
 Compute(C), Datasize(E) vs TestLoss:
@@ -23,11 +23,11 @@ k - curve / E0 - curve:
 # curve = N / Tau
 
 # plot k(N) on L(N, C_raw)
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type C_raw --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type C_raw --warmup-clip 10
 
 # plot appendix figure: L(N,D) vs L(N,C) k & E0
-uv run -m src.run.xhyu_k_e0_scatters --model-type base --warmup-clip-num 10
-uv run -m src.run.xhyu_k_e0_scatters --model-type instruct --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters --model-type base --warmup-clip 10
+uv run -m src.run.xhyu_k_e0_scatters --model-type instruct --warmup-clip 10
 ```
 
 Data reuse
@@ -40,11 +40,11 @@ Data reuse
 
 # plot k(\tau) on L(\tau, steps)
 # k & E0
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip 10
 # k
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip 10
 # E0
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources exp2-base exp2-instruct --curve-column Tau --fitting-type step --warmup-clip 10
 
 # experiment setup blocks
 uv run -m src.run.exp2_setup_rectangle
@@ -64,11 +64,11 @@ Response Length
 ./scripts/response_length_testloss.sh
 
 # k & E0 together
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip 10
 # k
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable k --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip 10 
 # E0
-uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip-num 10 
+uv run -m src.run.xhyu_k_e0_scatters_baseinstruct --plot-enable E0 --data-sources base instruct --curve-column N --fitting-type response_length --warmup-clip 10 
 ```
 
 Single side scaling law
@@ -96,11 +96,11 @@ uv run -m src.run.eval_curves_by_model --help
 
 Plot All Dataset Evaluations (deprecated, one subplot per domain)
 ```bash
-uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip-num 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip-num 10
+uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip 10
 
-uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip-num 10
+uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip 10
 ```
 
 <!-- 
@@ -133,7 +133,6 @@ uv run -m src.run.plot_multi_fit
   - "slice_factor": data duplication factor
 
 Important config (in config.py):
-- `WARMUP_CLIPPING_FACTOR_FOR_RAW`: data clip ratio
 - `DEFAULT_X_LABELS` `DEFAULT_Y_LABELS`: control default figure labels
 
 

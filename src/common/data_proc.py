@@ -178,80 +178,44 @@ def estimate_phi_from_runs(
     phi_by_N = {float(N): float(np.median(meds)) for N, meds in byN.items()}
     return phi_global, phi_by_N, stats
 
-def apply_clip(df, curve_column: str, warmup_frac: float = None, warmup_step: int = None, ending_step: int = None):
-    # Handle default case and validation
-    if warmup_frac is None and warmup_step is None and ending_step is None:
+def apply_clip(df, curve_column: str, warmup_clip: int = 0, ending_clip: int = 0):
+    # Handle default case
+    if warmup_clip == 0 and ending_clip == 0:
         return df
-    elif warmup_frac is not None and warmup_step is not None:
-        raise ValueError("Cannot specify both warmup_frac and warmup_step")
     
     # Apply clipping functions sequentially (can combine multiple types)
     result_df = df.copy()
     
-    # Apply warmup clipping first
-    if warmup_frac is not None:
-        result_df = pd.concat([_clip_single_curve_warmup_frac(g, warmup_frac) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
-    elif warmup_step is not None:
-        result_df = pd.concat([_clip_single_curve_warmup(g, warmup_step) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+    # Apply warmup clipping first (remove first N steps)
+    if warmup_clip > 0:
+        result_df = pd.concat([_clip_single_curve_warmup(g, warmup_clip) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
-    # Apply ending clipping second (can be combined with warmup)
-    if ending_step is not None:
-        result_df = pd.concat([_clip_single_curve_ending(g, ending_step) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+    # Apply ending clipping second (remove last N steps)
+    if ending_clip > 0:
+        result_df = pd.concat([_clip_single_curve_ending(g, ending_clip) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
     return result_df
 
 
-def _clip_single_curve_warmup_frac(df, warmup_frac: float = 1.0/64.0):
+def _clip_single_curve_warmup(df, warmup_clip: int):
     """
-    Apply warmup clipping to remove early training steps by fraction.
+    Apply warmup clipping to remove first N training steps.
     
     Args:
         df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
-        warmup_frac: Fraction of data to clip from the beginning (default: 1/64)
-    
-    Returns:
-        DataFrame with warmup steps removed
-    """
-    if len(df) == 0 or warmup_frac <= 0:
-        return df.copy()
-    
-    # Sort by step to ensure proper ordering
-    if 'step' in df.columns:
-        df = df.sort_values('step').reset_index(drop=True)
-    
-    # Calculate number of steps to clip
-    n_total = len(df)
-    n_clip = int(np.floor(n_total * float(warmup_frac)))
-    
-    if n_clip >= n_total:
-        # Clip everything - return empty DataFrame with same structure
-        return df.iloc[0:0].copy()
-    
-    # Apply clipping
-    df_clipped = df.iloc[n_clip:].copy().reset_index(drop=True)
-    
-    return df_clipped
-
-
-def _clip_single_curve_warmup(df, warmup_step: int):
-    """
-    Apply warmup clipping to remove early training steps by step value.
-    
-    Args:
-        df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
-        warmup_step: Step value threshold - keep steps >= warmup_step, remove steps < warmup_step
+        warmup_clip: Number of steps to remove from the beginning (0 means no clipping)
         
     Returns:
-        DataFrame with warmup steps removed
+        DataFrame with first warmup_clip steps removed
     """
-    if len(df) == 0:
+    if len(df) == 0 or warmup_clip <= 0:
         return df.copy()
         
     # Sort by step to ensure proper ordering
     if 'step' in df.columns:
         df = df.sort_values('step').reset_index(drop=True)
-        # Filter by step value: keep steps >= warmup_step
-        df_clipped = df[df['step'] >= warmup_step].copy().reset_index(drop=True)
+        # Remove first warmup_clip steps
+        df_clipped = df.iloc[warmup_clip:].copy().reset_index(drop=True)
     else:
         # If no step column, return empty DataFrame
         df_clipped = df.iloc[0:0].copy()
@@ -259,25 +223,29 @@ def _clip_single_curve_warmup(df, warmup_step: int):
     return df_clipped
 
 
-def _clip_single_curve_ending(df, ending_step: int):
+def _clip_single_curve_ending(df, ending_clip: int):
     """
-    Apply ending clipping to remove late training steps by step value.
+    Apply ending clipping to remove last N training steps.
     
     Args:
         df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
-        ending_step: Step value threshold - keep steps <= ending_step, remove steps > ending_step
+        ending_clip: Number of steps to remove from the end (0 means no clipping)
         
     Returns:
-        DataFrame with ending steps removed
+        DataFrame with last ending_clip steps removed
     """
-    if len(df) == 0:
+    if len(df) == 0 or ending_clip <= 0:
         return df.copy()
         
     # Sort by step to ensure proper ordering
     if 'step' in df.columns:
         df = df.sort_values('step').reset_index(drop=True)
-        # Filter by step value: keep steps <= ending_step
-        df_clipped = df[df['step'] <= ending_step].copy().reset_index(drop=True)
+        # Remove last ending_clip steps
+        if ending_clip >= len(df):
+            # If clipping more than available steps, return empty DataFrame
+            df_clipped = df.iloc[0:0].copy()
+        else:
+            df_clipped = df.iloc[:-ending_clip].copy().reset_index(drop=True)
     else:
         # If no step column, return empty DataFrame
         df_clipped = df.iloc[0:0].copy()

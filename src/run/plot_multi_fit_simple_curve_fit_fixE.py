@@ -28,7 +28,7 @@ def main():
     plot_curve_column = 'E' # curve parameter for plotting (will be fixed to E_max)
     plot_x_column = 'N'     # x variable for plotting
     
-    warmup_clip_num = 10
+    warmup_clip = 10
     
     print(f"\n=== Fitting: log_errrate = k({fit_curve_column}) * log_{fit_x_column} + E0({fit_curve_column}) ===")
     print(f"=== Plotting: Fixed {plot_curve_column}=E_max, x-axis={plot_x_column} ===")
@@ -153,7 +153,7 @@ def main():
                 plot_y_lambda=(lambda y: 1 - y) if metric == "R" else None,
                 plot_x_scale="log",
                 plot_y_scale="log",
-                warmup_clip_raw=warmup_clip_num,
+                warmup_clip=warmup_clip,
                 custom_color_mapping=custom_color_mapping,
                 ax=ax3,
             )
@@ -175,7 +175,7 @@ def main():
                 scatter_marker="o",
                 line_width=2,
                 line_alpha=1,
-                warmup_clip_raw=warmup_clip_num,
+                warmup_clip=warmup_clip,
                 s_factor=1,
                 k_spline=5,
                 rolling_window=200,

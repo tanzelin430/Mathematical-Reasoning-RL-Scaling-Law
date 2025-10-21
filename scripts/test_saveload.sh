@@ -14,7 +14,7 @@ uv run -m src.run.plot_multi_fit \
   --fit \
   --fit-plot-params \
   --fit-curve N \
-  --plot-curve-mask "0.5e9,1.5e9,3e9,7e9,14e9,32e9,72e9" \
+  --plot-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9 \
   --fit-x C_raw \
   --fit-metric ErrRate \
   --fit-save outputs/test_fitter_save.json \
@@ -44,7 +44,7 @@ uv run -m src.run.plot_multi_fit \
   --fit \
   --fit-plot-params \
   --fit-curve N \
-  --plot-curve-mask "0.5e9,1.5e9,3e9,7e9,14e9,32e9,72e9" \
+  --plot-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9 \
   --fit-x C_raw \
   --fit-metric ErrRate \
   --fit-load outputs/test_fitter_save.json \

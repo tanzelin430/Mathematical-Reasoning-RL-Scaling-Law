@@ -42,7 +42,7 @@ def main():
                         choices=['base', 'instruct', 'llama-base', 'llama-instruct', 
                                 'exp2-base', 'exp2-instruct', 'grpo-base'],
                         help='Data source to use (default: base)')
-    parser.add_argument('--warmup-clip-num', type=int, default=10,
+    parser.add_argument('--warmup-clip', type=int, default=10,
                         help='Number of warmup steps to clip (default: 10)')
     parser.add_argument('-N', '--model-size', type=float, default=14e9,
                         choices=list(config.COLOR_MAPPING.keys()),
@@ -54,7 +54,7 @@ def main():
     x_columns = [x.strip() for x in args.x_columns.split(',')]
     metrics = [m.strip() for m in args.metrics.split(',')]
     data_source = args.data_source
-    warmup_clip_num = args.warmup_clip_num
+    warmup_clip = args.warmup_clip
     N = args.model_size
     
     print(f"Configuration:")
@@ -62,7 +62,7 @@ def main():
     print(f"  X columns: {x_columns}")
     print(f"  Metrics: {metrics}")
     print(f"  Data source: {data_source}")
-    print(f"  Warmup clip num: {warmup_clip_num}")
+    print(f"  Warmup clip num: {warmup_clip}")
     print(f"  Model size N: {N}")
     print()
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
@@ -181,7 +181,7 @@ def main():
                     rolling_window=200,
                     min_se=1e-7,
                     x_inv_weight_power=0,
-                    warmup_clip_raw=warmup_clip_num,
+                    warmup_clip=warmup_clip,
                     custom_color_mapping=temp_color_mapping  # Map all runids to eval color
                 )
                 

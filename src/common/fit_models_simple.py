@@ -46,12 +46,7 @@ class SimpleLinearLookupFit:
         # Prepare data - reuse existing data processing
         df['ErrRate'] = 1 - df[eval_name]
         
-        # Apply warmup clipping using existing function
-        df_fit = data_proc.apply_clip(
-            df, 
-            curve_column="N", 
-            warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
-        )
+        df_fit = df
         
         # Remove step=0 and merge duplicates - reuse existing function
         df_fit = df_fit[df_fit['step'] > 0].reset_index(drop=True)
@@ -211,12 +206,7 @@ class SimpleLinearLookupFit:
             df_temp = df.copy()
             df_temp['ErrRate'] = 1 - df_temp[eval_name]
             
-            # Apply same preprocessing as in fitting
-            df_fit = data_proc.apply_clip(
-                df_temp, 
-                curve_column=curve_column, 
-                warmup_frac=config.WARMUP_CLIPPING_FACTOR_FOR_RAW
-            )
+            df_fit = df_temp.copy()
             df_fit = df_fit[df_fit['step'] > 0].reset_index(drop=True)
             df_fit = data_proc.merge_duplicate_steps(
                 df_fit, 

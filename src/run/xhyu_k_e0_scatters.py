@@ -4,8 +4,8 @@ Scaling Law Pipeline - Multi-Eval Analysis
 Processes multiple test evals from Experiment1 data and generates scaling law plots for each eval
 
 Usage:
-  python run_xhyu_k_e0_scatters.py --model-type base --warmup-clip-num 10
-  python run_xhyu_k_e0_scatters.py --model-type instruct --warmup-clip-num 5
+  python run_xhyu_k_e0_scatters.py --model-type base --warmup-clip 10
+  python run_xhyu_k_e0_scatters.py --model-type instruct --warmup-clip 5
 """
 
 import argparse
@@ -49,13 +49,13 @@ def main():
                         choices=['base', 'instruct', 'llama-base', 'llama-instruct', 
                                 'exp2-base', 'exp2-instruct', 'grpo-base'],
                         help='Model type to analyze (default: base)')
-    parser.add_argument('--warmup-clip-num', type=int, default=10,
+    parser.add_argument('--warmup-clip', type=int, default=10,
                         help='Number of warmup steps to clip (default: 10)')
     args = parser.parse_args()
     
     # Use parsed arguments
     model_type = args.model_type
-    warmup_clip_num = args.warmup_clip_num
+    warmup_clip = args.warmup_clip
     
     # Fixed figure sizes
     figure_width = 6.0
@@ -64,7 +64,7 @@ def main():
     print("=== Multi-Eval Scaling Law Analysis ===")
     print(f"Configuration:")
     print(f"  Model type: {model_type}")
-    print(f"  Warmup clip num: {warmup_clip_num}")
+    print(f"  Warmup clip num: {warmup_clip}")
     print()
     print(f"Loading {model_type} model data...")
     
@@ -99,11 +99,11 @@ def main():
     # 计算完 ImprovementRate 后，丢弃 step=0 的数据（因为 E=0 会导致 log10(E) = -inf）
     df = df[df['step'] > 0].reset_index(drop=True)
     
-    # 丢掉每个 (model_size, runid) 的前 warmup_clip_num 个点
-    if warmup_clip_num and warmup_clip_num > 0:
+    # 丢掉每个 (model_size, runid) 的前 warmup_clip 个点
+    if warmup_clip and warmup_clip > 0:
         df = (
             df.groupby(['model_size', 'runid'], as_index=False, group_keys=False)
-              .apply(lambda g: g.iloc[warmup_clip_num:])
+              .apply(lambda g: g.iloc[warmup_clip:])
               .reset_index(drop=True)
         )
     

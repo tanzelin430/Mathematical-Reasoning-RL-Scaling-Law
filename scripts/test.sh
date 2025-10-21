@@ -13,14 +13,15 @@ uv run -m src.run.plot_multi_fit \
   -x C_raw \
   --eval holdout_score \
   --metric ErrRate \
-  --warmup-clip-frac 0.1 \
+  --warmup-clip 0 \
+  --ending-clip 0 \
   --fit \
   --fit-model InvExp \
   --fit-plot-params \
   --fit-curve N \
   --fit-x C_raw \
   --fit-metric ErrRate \
-  --plot-curve-mask "0.5e9,1.5e9,3e9,7e9,14e9,32e9,72e9" \
+  --plot-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9 \
   --plot-x-scale log \
   --plot-y-scale log \
   --y-tick-spacing 0.1 \

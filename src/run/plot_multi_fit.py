@@ -29,13 +29,40 @@ def parse_list_argument(value: str) -> List[str]:
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
-def parse_curve_mask(value_str: str) -> List[Union[int, float]]:
-    """Parse curve mask supporting scientific notation like 7e9, 1.5e9"""
-    values = []
-    for item in value_str.split(','):
-        item = item.strip()
+def normalize_list_arg(value: Union[str, List[Union[str, List[str]]], None]) -> List[str]:
+    """Normalize CLI list-like arguments into a flat list of strings.
+
+    Supports:
+    - Single comma-separated string
+    - List of strings (space-separated via nargs='+')
+    - List of lists of strings (when flag used multiple times with nargs='+')
+    """
+    if value is None:
+        return []
+    tokens: List[str] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, list):
+                for sub in item:
+                    tokens.extend(parse_list_argument(sub) if isinstance(sub, str) else [str(sub)])
+            else:
+                tokens.extend(parse_list_argument(item) if isinstance(item, str) else [str(item)])
+    elif isinstance(value, str):
+        tokens = parse_list_argument(value)
+    else:
+        tokens = [str(value)]
+    return tokens
+
+
+def parse_curve_mask(value: Union[str, List[str]]) -> List[Union[int, float]]:
+    """Parse curve mask supporting scientific notation like 7e9, 1.5e9.
+
+    Accepts comma-separated string or a list of tokens.
+    """
+    values: List[Union[int, float]] = []
+    tokens = normalize_list_arg(value)
+    for item in tokens:
         try:
-            # Support scientific notation
             if 'e' in item.lower():
                 values.append(float(item))
             else:
@@ -45,11 +72,11 @@ def parse_curve_mask(value_str: str) -> List[Union[int, float]]:
     return values
 
 
-def parse_highlight_curves(value_str: str) -> List[Union[int, float]]:
+def parse_highlight_curves(value: Union[str, List[str]]) -> List[Union[int, float]]:
     """Parse highlight curves supporting scientific notation"""
-    if not value_str:
+    if not value:
         return []
-    return parse_curve_mask(value_str)
+    return parse_curve_mask(value)
 
 
 def validate_args(args):
@@ -116,12 +143,12 @@ Examples:
   %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate
 
   # With fitting
-  %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate \\
+  %(prog)s --data-source exp2-instruct --plot-curve Tau -x E --eval holdout_score --metric ErrRate \
            --fit --fit-model InvExp --fit-curve Tau --fit-x E --fit-metric ErrRate
 
   # Multiple metrics and x columns with highlighting
-  %(prog)s --data-source exp2-base --plot-curve N -x C,E --eval holdout_score --metric ErrRate,R \\
-           --plot-curve-mask 1e9,3e9,7e9 --highlight-curves-predict 1e9 --highlight-curves-plot 3e9
+  %(prog)s --data-source exp2-base --plot-curve N -x C E --eval holdout_score --metric ErrRate R \
+           --plot-curve-mask 1e9 3e9 7e9 --highlight-curves-predict 1e9 --highlight-curves-plot 3e9
 
   # Load configuration from file
   %(prog)s --config-file config.json
@@ -138,16 +165,16 @@ Examples:
                        help='Column to use for curve grouping in plots')
     
     parser.add_argument('-x', '--plot-x', dest='plot_x_columns',
-                       action='append',
-                       help='X columns for plotting (can be specified multiple times or comma-separated)')
+                       action='append', nargs='+',
+                       help='X columns for plotting (space- or comma-separated; flag can be repeated)')
     
     parser.add_argument('--eval',
                        choices=list(config.TEST_EVALS.keys()),
                        help='Evaluation metric to analyze')
     
     parser.add_argument('--metric', dest='plot_metrics',
-                       action='append',
-                       help='Metrics to plot (can be specified multiple times or comma-separated)')
+                       action='append', nargs='+',
+                       help='Metrics to plot (space- or comma-separated; flag can be repeated)')
 
     # Fitting arguments
     fit_group = parser.add_argument_group('fitting options')
@@ -160,8 +187,8 @@ Examples:
                           choices=list(config.DEFAULT_LABELS.keys()),
                           help='X column for fitting (default: first plot-x column)')
     fit_group.add_argument('--fit-metric', dest='fit_metrics',
-                          action='append',
-                          help='Metrics to fit (default: same as --metric)')
+                          action='append', nargs='+',
+                          help='Metrics to fit (space- or comma-separated; default: same as --metric)')
     fit_group.add_argument('--fit-load', dest='fit_load_path',
                           help='Path to load pre-fitted model')
     fit_group.add_argument('--fit-save', dest='fit_save_path',
@@ -175,12 +202,12 @@ Examples:
 
     # Plot configuration
     plot_group = parser.add_argument_group('plot configuration')
-    plot_group.add_argument('--plot-curve-mask', dest='plot_curve_mask',
-                           help='Curves to include in plots (comma-separated, supports scientific notation)')
-    plot_group.add_argument('--highlight-curves-predict', dest='highlight_curves_predict',
-                           help='Curves to highlight in predict_and_plot (comma-separated, supports scientific notation). If not set, no highlighting in predict phase.')
-    plot_group.add_argument('--highlight-curves-plot', dest='highlight_curves_plot',
-                           help='Curves to highlight in process_single_eval (comma-separated, supports scientific notation). If not set, no highlighting in plot phase.')
+    plot_group.add_argument('--plot-curve-mask', dest='plot_curve_mask', nargs='+',
+                           help='Curves to include in plots (space- or comma-separated, supports scientific notation)')
+    plot_group.add_argument('--highlight-curves-predict', dest='highlight_curves_predict', nargs='+',
+                           help='Curves to highlight in predict_and_plot (space- or comma-separated, supports scientific notation). If not set, no highlighting in predict phase.')
+    plot_group.add_argument('--highlight-curves-plot', dest='highlight_curves_plot', nargs='+',
+                           help='Curves to highlight in process_single_eval (space- or comma-separated, supports scientific notation). If not set, no highlighting in plot phase.')
     plot_group.add_argument('--highlight-line-alpha', dest='highlight_line_alpha',
                            type=float, default=1.0,
                            help='Opacity for highlighted curves (default: 1.0)')
@@ -261,17 +288,17 @@ Examples:
                             choices=['auto', 'decimal', 'sci', 'plain'], default='auto',
                             help='Y-axis tick format (default: auto)')
     style_group.add_argument('--x-tick-subs', dest='x_tick_subs',
-                            type=str, default=None,
-                            help='Custom x-axis tick positions (comma-separated list, e.g., "1000,5000,10000")')
+                            nargs='+', type=str, default=None,
+                            help='Custom x-axis tick positions (space- or comma-separated list, e.g., "1000 5000 10000")')
     style_group.add_argument('--y-tick-subs', dest='y_tick_subs',
-                            type=str, default=None,
-                            help='Custom y-axis tick positions (comma-separated list)')
+                            nargs='+', type=str, default=None,
+                            help='Custom y-axis tick positions (space- or comma-separated list)')
     style_group.add_argument('--x-tick-subs-log', dest='x_tick_subs_log',
-                            type=str, default=None,
-                            help='Custom x-axis log tick multipliers (comma-separated list, e.g., "1,2,5")')
+                            nargs='+', type=str, default=None,
+                            help='Custom x-axis log tick multipliers (space- or comma-separated list, e.g., "1 2 5")')
     style_group.add_argument('--y-tick-subs-log', dest='y_tick_subs_log',
-                            type=str, default=None,
-                            help='Custom y-axis log tick multipliers (comma-separated list)')
+                            nargs='+', type=str, default=None,
+                            help='Custom y-axis log tick multipliers (space- or comma-separated list)')
 
     # Smoothing configuration
     smooth_group = parser.add_argument_group('smoothing options')
@@ -293,24 +320,18 @@ Examples:
 
     # Advanced parameters
     advanced_group = parser.add_argument_group('advanced parameters')
-    advanced_group.add_argument('--warmup-clip-frac', dest='warmup_clip_factor_raw',
-                               type=float, default=0.0,
-                               help='Warmup clipping fraction for raw data (default: 0.1)')
-    advanced_group.add_argument('--warmup-clip-frac-smooth', dest='warmup_clip_factor_smooth',
-                               type=float, default=0.0,
-                               help='Warmup clipping fraction for smooth data (default: 0.0)')
-    advanced_group.add_argument('--warmup-clip', dest='warmup_clip_raw',
+    advanced_group.add_argument('--warmup-clip', dest='warmup_clip',
                                type=int, default=None,
-                               help='Warmup clipping by absolute number of data points for raw data (clips first N points per curve, overrides --warmup-clip-frac)')
+                               help='Warmup clipping: number of steps to remove from the beginning for raw data (0 means no clipping)')
     advanced_group.add_argument('--warmup-clip-smooth', dest='warmup_clip_smooth',
                                type=int, default=None,
-                               help='Warmup clipping by absolute number of data points for smooth data (clips first N points per curve, overrides --warmup-clip-frac-smooth)')
-    advanced_group.add_argument('--ending-clip', dest='ending_clip_raw',
+                               help='Warmup clipping: number of steps to remove from the beginning for smooth data (0 means no clipping)')
+    advanced_group.add_argument('--ending-clip', dest='ending_clip',
                                type=int, default=None,
-                               help='Ending clipping by absolute step value for raw data (clips steps > ending_step per curve)')
+                               help='Ending clipping: number of steps to remove from the end for raw data (0 means no clipping)')
     advanced_group.add_argument('--ending-clip-smooth', dest='ending_clip_smooth',
                                type=int, default=None,
-                               help='Ending clipping by absolute step value for smooth data (clips steps > ending_step per curve)')
+                               help='Ending clipping: number of steps to remove from the end for smooth data (0 means no clipping)')
     advanced_group.add_argument('--delta-base-step', dest='delta_base_step',
                                type=int, default=1,
                                help='Base step for delta calculation (default: 1)')
@@ -347,42 +368,15 @@ Examples:
 
 def process_parsed_args(args):
     """Process and normalize parsed arguments"""
-    # Handle comma-separated values for list arguments
+    # Normalize list-like arguments (support nargs and comma-separated tokens)
     if args.plot_x_columns:
-        # If already a list (from config file) with no commas in individual items, keep as-is
-        if isinstance(args.plot_x_columns, list) and all(isinstance(x, str) and ',' not in x for x in args.plot_x_columns):
-            # Already a proper list from config file
-            pass
-        else:
-            # Flatten list and parse comma-separated values from CLI
-            flat_list = []
-            for item in args.plot_x_columns:
-                flat_list.extend(parse_list_argument(item))
-            args.plot_x_columns = flat_list
+        args.plot_x_columns = normalize_list_arg(args.plot_x_columns)
     
     if args.plot_metrics:
-        # If already a list (from config file) with no commas in individual items, keep as-is
-        if isinstance(args.plot_metrics, list) and all(isinstance(x, str) and ',' not in x for x in args.plot_metrics):
-            # Already a proper list from config file
-            pass
-        else:
-            # Flatten list and parse comma-separated values from CLI
-            flat_list = []
-            for item in args.plot_metrics:
-                flat_list.extend(parse_list_argument(item))
-            args.plot_metrics = flat_list
+        args.plot_metrics = normalize_list_arg(args.plot_metrics)
 
     if args.fit_metrics:
-        # If already a list (from config file) with no commas in individual items, keep as-is
-        if isinstance(args.fit_metrics, list) and all(isinstance(x, str) and ',' not in x for x in args.fit_metrics):
-            # Already a proper list from config file
-            pass
-        else:
-            # Flatten list and parse comma-separated values from CLI
-            flat_list = []
-            for item in args.fit_metrics:
-                flat_list.extend(parse_list_argument(item))
-            args.fit_metrics = flat_list
+        args.fit_metrics = normalize_list_arg(args.fit_metrics)
 
     # Set defaults for fit parameters
     if args.fit:
@@ -395,24 +389,18 @@ def process_parsed_args(args):
 
     # Parse curve masks and highlight curves
     if args.plot_curve_mask:
-        if isinstance(args.plot_curve_mask, str):
-            args.plot_curve_mask = parse_curve_mask(args.plot_curve_mask)
-        # else: already a list from config file
+        args.plot_curve_mask = parse_curve_mask(args.plot_curve_mask)
     else:
         args.plot_curve_mask = None  # Default
 
     # Parse highlight curve arguments
     if args.highlight_curves_predict:
-        if isinstance(args.highlight_curves_predict, str):
-            args.highlight_curves_predict = parse_highlight_curves(args.highlight_curves_predict)
-        # else: already a list from config file
+        args.highlight_curves_predict = parse_highlight_curves(args.highlight_curves_predict)
     else:
         args.highlight_curves_predict = None  # Default
     
     if args.highlight_curves_plot:
-        if isinstance(args.highlight_curves_plot, str):
-            args.highlight_curves_plot = parse_highlight_curves(args.highlight_curves_plot)
-        # else: already a list from config file
+        args.highlight_curves_plot = parse_highlight_curves(args.highlight_curves_plot)
     else:
         args.highlight_curves_plot = None  # Default
 
@@ -436,15 +424,14 @@ def process_parsed_args(args):
         args.smooth_increasing = False
 
     # Parse tick_subs parameters
-    def parse_tick_subs(value_str):
-        """Parse comma-separated tick positions supporting scientific notation"""
-        if not value_str:
+    def parse_tick_subs(value_any):
+        """Parse tick positions supporting both space- and comma-separated inputs"""
+        tokens = normalize_list_arg(value_any)
+        if not tokens:
             return None
         values = []
-        for item in value_str.split(','):
-            item = item.strip()
+        for item in tokens:
             try:
-                # Support scientific notation
                 values.append(float(item))
             except ValueError:
                 raise ValueError(f"Invalid tick position value: {item}")
@@ -452,33 +439,25 @@ def process_parsed_args(args):
 
     # Parse x_tick_subs
     if args.x_tick_subs:
-        if isinstance(args.x_tick_subs, str):
-            args.x_tick_subs = parse_tick_subs(args.x_tick_subs)
-        # else: already a list from config file
+        args.x_tick_subs = parse_tick_subs(args.x_tick_subs)
     else:
         args.x_tick_subs = None
 
     # Parse y_tick_subs
     if args.y_tick_subs:
-        if isinstance(args.y_tick_subs, str):
-            args.y_tick_subs = parse_tick_subs(args.y_tick_subs)
-        # else: already a list from config file
+        args.y_tick_subs = parse_tick_subs(args.y_tick_subs)
     else:
         args.y_tick_subs = None
 
     # Parse x_tick_subs_log
     if args.x_tick_subs_log:
-        if isinstance(args.x_tick_subs_log, str):
-            args.x_tick_subs_log = parse_tick_subs(args.x_tick_subs_log)
-        # else: already a list from config file
+        args.x_tick_subs_log = parse_tick_subs(args.x_tick_subs_log)
     else:
         args.x_tick_subs_log = None
 
     # Parse y_tick_subs_log
     if args.y_tick_subs_log:
-        if isinstance(args.y_tick_subs_log, str):
-            args.y_tick_subs_log = parse_tick_subs(args.y_tick_subs_log)
-        # else: already a list from config file
+        args.y_tick_subs_log = parse_tick_subs(args.y_tick_subs_log)
     else:
         args.y_tick_subs_log = None
 
@@ -507,31 +486,6 @@ def process_parsed_args(args):
     return args
 
 
-def convert_warmup_clip_to_factor(df, curve_column, warmup_clip_abs):
-    """
-    Convert absolute warmup_clip to relative warmup_clip_factor per curve.
-    
-    Args:
-        df: DataFrame with curves
-        curve_column: Column defining the curves 
-        warmup_clip_abs: Absolute number of steps to clip
-        
-    Returns:
-        Dictionary mapping curve_id to warmup_clip_factor
-    """
-    if warmup_clip_abs is None or warmup_clip_abs <= 0:
-        return None
-        
-    curve_factors = {}
-    for curve_id, group_df in df.groupby(curve_column):
-        n_total = len(group_df)
-        if n_total > 0:
-            warmup_clip_factor = min(warmup_clip_abs / n_total, 1.0)  # Cap at 1.0
-            curve_factors[curve_id] = warmup_clip_factor
-        else:
-            curve_factors[curve_id] = 0.0
-    
-    return curve_factors
 
 def plot_params(args, _curve_values, params_dict):
     _curve_label = config.DEFAULT_LABELS[args.fit_curve_column]
@@ -586,25 +540,6 @@ def run_scaling_analysis(args):
     
     group_columns = [args.plot_curve_column] + ['step']
     df = data_proc.merge_duplicate_steps(df, group_columns=group_columns, mode='mean')
-    
-    # Handle absolute vs relative warmup clipping
-    if args.warmup_clip_raw is not None:
-        print(f"Using absolute warmup clipping: warmup_clip_raw={args.warmup_clip_raw} steps")
-        # For fitting, we still need to convert to a reasonable factor
-        curve_factors_raw = convert_warmup_clip_to_factor(df, args.plot_curve_column, args.warmup_clip_raw)
-        if curve_factors_raw:
-            args.warmup_clip_factor_raw = sum(curve_factors_raw.values()) / len(curve_factors_raw)
-        else:
-            args.warmup_clip_factor_raw = 0.0
-    
-    if args.warmup_clip_smooth is not None:
-        print(f"Using absolute warmup clipping: warmup_clip_smooth={args.warmup_clip_smooth} steps")
-        # For fitting, we still need to convert to a reasonable factor
-        curve_factors_smooth = convert_warmup_clip_to_factor(df, args.plot_curve_column, args.warmup_clip_smooth)
-        if curve_factors_smooth:
-            args.warmup_clip_factor_smooth = sum(curve_factors_smooth.values()) / len(curve_factors_smooth)
-        else:
-            args.warmup_clip_factor_smooth = 0.0
 
     # Lambda functions (not CLI configurable)
     plot_legend_lambda = lambda x: plot.legend_format(args.plot_curve_column, x)
@@ -625,8 +560,8 @@ def run_scaling_analysis(args):
             FitterClass,
             df, eval_name = args.eval, x_column_list=[args.fit_curve_column, args.fit_x_column],
             fit_load_path=args.fit_load_path, fit_save_path=args.fit_save_path,
-            warmup_step=args.warmup_clip_raw,
-            ending_step=args.ending_clip_raw
+            warmup_clip=args.warmup_clip if args.warmup_clip is not None else 0,
+            ending_clip=args.ending_clip if args.ending_clip is not None else 0
         )
 
         # Plot params (e.g. k, E0) scatter plots if fitting was done
@@ -693,9 +628,8 @@ def run_scaling_analysis(args):
                     x_grid_spacing=args.x_grid_spacing,
                     y_grid_spacing=args.y_grid_spacing,
                     
-                    warmup_frac_raw=args.warmup_clip_factor_raw,
-                    warmup_clip_raw=args.warmup_clip_raw,
-                    ending_clip_raw=args.ending_clip_raw,
+                    warmup_clip=args.warmup_clip,
+                    ending_clip=args.ending_clip,
                 )
 
             # Process the actual data plot
@@ -767,11 +701,9 @@ def run_scaling_analysis(args):
                 smooth_strict=args.smooth_strict,
 
                 # Advanced parameters
-                warmup_frac_raw=args.warmup_clip_factor_raw,
-                warmup_frac_smooth=args.warmup_clip_factor_smooth,
-                warmup_clip_raw=args.warmup_clip_raw,
+                warmup_clip=args.warmup_clip,
                 warmup_clip_smooth=args.warmup_clip_smooth,
-                ending_clip_raw=args.ending_clip_raw,
+                ending_clip=args.ending_clip,
                 ending_clip_smooth=args.ending_clip_smooth,
                 s_factor=args.s_factor,
                 k_spline=args.k_spline,

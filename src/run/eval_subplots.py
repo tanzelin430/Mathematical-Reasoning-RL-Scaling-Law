@@ -4,8 +4,8 @@ Scaling Law Pipeline - Multi-Eval Analysis
 Processes multiple test evals from Experiment1 data and generates scaling law plots for each eval
 
 Usage:
-  python run_plot_multi-subplot.py --data-source base --x-columns E --metrics ErrRate --warmup-clip-num 10
-  python run_plot_multi-subplot.py --data-source instruct --x-columns C,N --metrics ErrRate,Score --warmup-clip-num 5
+  python run_plot_multi-subplot.py --data-source base --x-columns E --metrics ErrRate --warmup-clip 10
+  python run_plot_multi-subplot.py --data-source instruct --x-columns C,N --metrics ErrRate,Score --warmup-clip 5
 """
 
 import argparse
@@ -25,7 +25,7 @@ def main():
                         help='Comma-separated list of x-axis variables (default: E)')
     parser.add_argument('--metrics', type=str, default='ErrRate',
                         help='Comma-separated list of metrics (default: ErrRate)')
-    parser.add_argument('--warmup-clip-num', type=int, default=10,
+    parser.add_argument('--warmup-clip', type=int, default=10,
                         help='Number of warmup steps to clip (default: 10)')
     args = parser.parse_args()
     
@@ -33,13 +33,13 @@ def main():
     data_source = args.data_source
     x_columns = [x.strip() for x in args.x_columns.split(',')]
     metrics = [m.strip() for m in args.metrics.split(',')]
-    warmup_clip_raw = args.warmup_clip_num
+    warmup_clip = args.warmup_clip
     
     print(f"Configuration:")
     print(f"  Data source: {data_source}")
     print(f"  X columns: {x_columns}")
     print(f"  Metrics: {metrics}")
-    print(f"  Warmup clip num: {warmup_clip_raw}")
+    print(f"  Warmup clip num: {warmup_clip}")
     print()
     
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
@@ -93,7 +93,7 @@ def main():
                         calc_delta=calc_delta,
                         add_smooth=True,
                         smooth_monotonic=True,
-                        warmup_clip_raw=warmup_clip_raw,
+                        warmup_clip=warmup_clip,
                     )
                     if x_column == "E":
                         plot.plot_basic_settings(

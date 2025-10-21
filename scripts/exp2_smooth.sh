@@ -33,8 +33,8 @@ uv run -m src.run.plot_multi_fit \
   --scatter-marker o \
   --plot-use-legend \
   --plot-title "Data Reuse on Base model (7B)" \
-  --plot-curve-mask "1,2,5,20,25,50,100" \
-  --highlight-curves-predict "1" \
+  --plot-curve-mask 1 2 5 20 25 50 100 \
+  --highlight-curves-predict 1 \
   --highlight-line-width 3.0 \
   --output-prefix exp2-base_
 
@@ -68,8 +68,8 @@ uv run -m src.run.plot_multi_fit \
   --scatter-marker o \
   --plot-use-legend \
   --plot-title "Data Reuse on Instruct model (7B)" \
-  --plot-curve-mask "1,2,5,20,25,50,100" \
-  --highlight-curves-predict "1" \
+  --plot-curve-mask 1 2 5 20 25 50 100 \
+  --highlight-curves-predict 1 \
   --highlight-line-width 3.0 \
   --output-prefix exp2-instruct_
 

@@ -61,7 +61,7 @@ def parse_arguments():
                         choices=["N", "Tau"],
                         help='Column to use for curve fitting and plotting (default: "Tau")')
     
-    parser.add_argument('--warmup-clip-num', 
+    parser.add_argument('--warmup-clip', 
                         type=int, 
                         default=5,
                         help='Number of warmup steps to clip (default: 5)')
@@ -88,7 +88,7 @@ args = parse_arguments()
 
 # Use holdout score evaluation
 eval_name = config.DEFAULT_TEST_EVAL
-warmup_clip_num = args.warmup_clip_num
+warmup_clip = args.warmup_clip
 
 # Plot control: specify which plots to generate
 plot_enable = args.plot_enable
@@ -235,11 +235,11 @@ def main():
         if curve_mask is not None:
             df = df[df[curve_column].isin(curve_mask)]
 
-        # 丢掉每个 (curve_column, runid) 的前 warmup_clip_num 个点
-        if warmup_clip_num and warmup_clip_num > 0:
+        # 丢掉每个 (curve_column, runid) 的前 warmup_clip 个点
+        if warmup_clip and warmup_clip > 0:
             df = (
                 df.groupby([curve_column, 'runid'], as_index=False, group_keys=False)
-                  .apply(lambda g: g.iloc[warmup_clip_num:])
+                  .apply(lambda g: g.iloc[warmup_clip:])
                   .reset_index(drop=True)
             )
         

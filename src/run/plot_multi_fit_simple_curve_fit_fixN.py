@@ -21,7 +21,7 @@ def main():
     eval_name = "holdout_score"
     curve_column = 'N' # key must be one of 'N', 'data_fator'
 
-    warmup_clip_num = 10
+    warmup_clip = 10
     plot_fit_title = f"L(D) (N=14B) - Base vs Instruct"
     plot_curve_mask = [14e9]
 
@@ -165,7 +165,7 @@ def main():
                     plot_y_scale="log",
                     line_width=2,
                     line_alpha=1,
-                    warmup_clip_raw=warmup_clip_num,
+                    warmup_clip=warmup_clip,
                     custom_color_mapping=custom_color_mapping,
                     ax=ax3,
                 )
@@ -183,7 +183,7 @@ def main():
                     scatter_alpha=0.5,
                     scatter_size=20,
                     scatter_marker="o",
-                    warmup_clip_raw=warmup_clip_num,
+                    warmup_clip=warmup_clip,
                     s_factor=1,
                     k_spline=5,
                     rolling_window=200,

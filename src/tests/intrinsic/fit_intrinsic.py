@@ -114,7 +114,6 @@ def process_single_eval_intrinsic(df, plot_x_column: str, eval_name, curve_colum
 
     # runs_raw_dfs = data_proc.sort_dfs(runs_raw_dfs)
     df = df[df['step'] > 0].copy()
-    df = data_proc.apply_clip(df, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR_FOR_SMOOTH)
     # monotonic smoothing
     df_R_smooth = data_proc.smooth_df(
         df, 
@@ -133,8 +132,6 @@ def process_single_eval_intrinsic(df, plot_x_column: str, eval_name, curve_colum
         min_se=1e-6, 
         x_inv_weight_power=0.3
     )
-    
-    df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR_FOR_SMOOTH)
     
     # =============================================================================
     # PHASE 3: INTRINSIC TABLE
@@ -262,8 +259,6 @@ def process_single_eval_intrinsic(df, plot_x_column: str, eval_name, curve_colum
     tangent_points = intrinsic.calc_tangent_points(df_I_pred_CNE_newX)
     
     df_R_pred_I_pred_CNE_newX = intrinsic.predict_return_curves(df_I_pred_CNE_newX, f_R_logI)
-
-    df_R_pred_I_pred_CNE_newX = data_proc.apply_clip(df_R_pred_I_pred_CNE_newX, curve_column=curve_column, warmup_frac=WARMUP_CLIPPING_FACTOR_FOR_SMOOTH)
 
     ax = plot.plot_fit_score_c_2a(
         df_R_smooth,

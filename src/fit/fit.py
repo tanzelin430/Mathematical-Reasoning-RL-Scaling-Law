@@ -11,9 +11,8 @@ def get_x_y_data_from_df(
     y_column, 
     x_transform_list: list[Callable | None]=None, 
     y_transform: Callable=None,
-    warmup_frac: float = None,
-    warmup_step: int = None,
-    ending_step: int = None
+    warmup_clip: int = 0,
+    ending_clip: int = 0
 ) -> Tuple[Tuple[np.ndarray, ...], np.ndarray]:
     """
     Extract and preprocess x, y data from dataframe for fitting.
@@ -30,12 +29,10 @@ def get_x_y_data_from_df(
         List of transform functions for each x column
     y_transform : callable, optional
         Transform function for y column (e.g., lambda x: 1-x for ErrRate)
-    warmup_frac : float, optional
-        Warmup clipping fraction. If None, no warmup clipping is applied.
-    warmup_step : int, optional
-        Warmup clipping by step value (keep steps >= warmup_step)
-    ending_step : int, optional
-        Ending clipping by step value (keep steps <= ending_step)
+    warmup_clip : int, optional
+        Number of steps to remove from the beginning (0 means no clipping)
+    ending_clip : int, optional
+        Number of steps to remove from the end (0 means no clipping)
         
     Returns:
     --------
@@ -43,15 +40,14 @@ def get_x_y_data_from_df(
     """
     df_fit = df.copy()
     
-    # Apply clipping (warmup_step/ending_step takes precedence over warmup_frac)
-    if warmup_step is not None or ending_step is not None or warmup_frac is not None:
+    # Apply clipping
+    if warmup_clip > 0 or ending_clip > 0:
         curve_column = x_column_list[0] if x_column_list else "N"
         df_fit = data_proc.apply_clip(
             df_fit, 
             curve_column=curve_column, 
-            warmup_step=warmup_step,
-            ending_step=ending_step,
-            warmup_frac=warmup_frac
+            warmup_clip=warmup_clip,
+            ending_clip=ending_clip
         )
     
     # 准备拟合数据 - 返回tuple避免后续转置
@@ -69,7 +65,7 @@ def get_x_y_data_from_df(
     
     return x_data, y_data
 
-def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"], x_transform_list=[None, None], fit_load_path=None, fit_save_path=None, warmup_step=None, ending_step=None, bounds=None, p0=None):
+def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"], x_transform_list=[None, None], fit_load_path=None, fit_save_path=None, warmup_clip=0, ending_clip=0, bounds=None, p0=None):
     """
     Fit a model to data using CMA-ES optimization.
     """
@@ -87,8 +83,8 @@ def fit_on(FitterClass, df, eval_name = "holdout_score", x_column_list=["N", "E"
         y_column=eval_name,
         x_transform_list=x_transform_list,
         y_transform=logErrRate,
-        warmup_step=warmup_step,
-        ending_step=ending_step
+        warmup_clip=warmup_clip,
+        ending_clip=ending_clip
     )
     
     # Get bounds and p0: caller's args > FitterClass defaults

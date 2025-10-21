@@ -59,12 +59,10 @@ def plot_curves_with_smooth(
     smooth_monotonic: bool = False,
     smooth_increasing: bool = True,
     smooth_strict: bool = False,
-    warmup_frac_raw: float = 0,
-    warmup_frac_smooth: float = 0,
-    warmup_clip_raw: int = None,  # Absolute count clipping for raw data (clips first N points)
-    warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data (clips first N points)
-    ending_clip_raw: int = None,  # Absolute ending clipping for raw data (clips last steps > ending_step)
-    ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data (clips last steps > ending_step)
+    warmup_clip: int = None,  # Number of steps to remove from beginning for raw data (0 means no clipping)
+    warmup_clip_smooth: int = None,  # Number of steps to remove from beginning for smooth data (0 means no clipping)
+    ending_clip: int = None,  # Number of steps to remove from end for raw data (0 means no clipping)
+    ending_clip_smooth: int = None,  # Number of steps to remove from end for smooth data (0 means no clipping)
     s_factor: float = 1,
     k_spline: int = 5,
     rolling_window: int = 200,
@@ -76,18 +74,14 @@ def plot_curves_with_smooth(
     custom_color_mapping: dict = None,  # Custom color mapping to override config colors
 ):
 
-    # Apply warmup clipping for raw data
-    if warmup_clip_raw is not None:
-        # Use absolute count clipping (clips first N data points per curve)
-        df = data_proc.apply_clip(df, curve_column=curve_column, warmup_step=warmup_clip_raw)
-    elif warmup_frac_raw > 0:
-        # Use relative clipping
-        df = data_proc.apply_clip(df, curve_column=curve_column, warmup_frac=warmup_frac_raw)
-    
-    # Apply ending clipping for raw data
-    if ending_clip_raw is not None:
-        # Use absolute ending clipping (clips steps > ending_step per curve)
-        df = data_proc.apply_clip(df, curve_column=curve_column, ending_step=ending_clip_raw)
+    # Apply clipping for raw data
+    if warmup_clip is not None or ending_clip is not None:
+        df = data_proc.apply_clip(
+            df, 
+            curve_column=curve_column, 
+            warmup_clip=warmup_clip if warmup_clip is not None else 0,
+            ending_clip=ending_clip if ending_clip is not None else 0
+        )
     
     df_R_smooth = None
     if add_smooth:
@@ -110,18 +104,14 @@ def plot_curves_with_smooth(
             x_inv_weight_power=x_inv_weight_power,
             use_linear=use_linear
         )
-        # Apply warmup clipping for smooth data
-        if warmup_clip_smooth is not None:
-            # Use absolute count clipping (clips first N data points per curve)
-            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, warmup_step=warmup_clip_smooth)
-        elif warmup_frac_smooth > 0:
-            # Use relative clipping
-            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, warmup_frac=warmup_frac_smooth)
-        
-        # Apply ending clipping for smooth data
-        if ending_clip_smooth is not None:
-            # Use absolute ending clipping (clips steps > ending_step per curve)
-            df_R_smooth = data_proc.apply_clip(df_R_smooth, curve_column=curve_column, ending_step=ending_clip_smooth)
+        # Apply clipping for smooth data
+        if warmup_clip_smooth is not None or ending_clip_smooth is not None:
+            df_R_smooth = data_proc.apply_clip(
+                df_R_smooth, 
+                curve_column=curve_column, 
+                warmup_clip=warmup_clip_smooth if warmup_clip_smooth is not None else 0,
+                ending_clip=ending_clip_smooth if ending_clip_smooth is not None else 0
+            )
 
     ax = plot.plot_curves(
         df,
@@ -217,11 +207,9 @@ def process_single_eval(
     smooth_monotonic=False,
     smooth_increasing=None,
     smooth_strict=False,
-    warmup_frac_raw: float=0,
-    warmup_frac_smooth: float=0,
-    warmup_clip_raw: int = None,  # Absolute count clipping for raw data
+    warmup_clip: int = None,  # Absolute count clipping for raw data
     warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data
-    ending_clip_raw: int = None,  # Absolute ending clipping for raw data
+    ending_clip: int = None,  # Absolute ending clipping for raw data
     ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data
     calc_delta: bool=False, # in case there's no step 0 but don't care of it.
     s_factor=1,
@@ -315,11 +303,9 @@ def process_single_eval(
         smooth_monotonic=smooth_monotonic,
         smooth_increasing=smooth_increasing,
         smooth_strict=smooth_strict,
-        warmup_frac_raw=warmup_frac_raw,
-        warmup_frac_smooth=warmup_frac_smooth,
-        warmup_clip_raw=warmup_clip_raw,
+        warmup_clip=warmup_clip,
         warmup_clip_smooth=warmup_clip_smooth,
-        ending_clip_raw=ending_clip_raw,
+        ending_clip=ending_clip,
         ending_clip_smooth=ending_clip_smooth,
         s_factor=s_factor,
         k_spline=k_spline,
@@ -357,11 +343,9 @@ def process_single_eval_multi_metrics(
     plot_reward: bool=False, plot_err_rate: bool=False, plot_delta_reward: bool=False, plot_delta_err_rate: bool=False, 
     ax_reward: plt.Axes=None, ax_err_rate: plt.Axes=None, ax_delta_reward: plt.Axes=None, ax_delta_err_rate: plt.Axes=None, 
     delta_base_step: int = 0,
-    warmup_frac_raw: float = 0,
-    warmup_frac_smooth: float = 0,
-    warmup_clip_raw: int = None,  # Absolute count clipping for raw data
+    warmup_clip: int = None,  # Absolute count clipping for raw data
     warmup_clip_smooth: int = None,  # Absolute count clipping for smooth data
-    ending_clip_raw: int = None,  # Absolute ending clipping for raw data
+    ending_clip: int = None,  # Absolute ending clipping for raw data
     ending_clip_smooth: int = None,  # Absolute ending clipping for smooth data
     output_dir: str = None,
     use_linear=False,
@@ -430,11 +414,9 @@ def process_single_eval_multi_metrics(
             smooth_monotonic=False,
             smooth_increasing=None,
             smooth_strict=False,
-            warmup_frac_raw=warmup_frac_raw,
-            warmup_frac_smooth=warmup_frac_smooth,
-            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip=warmup_clip,
             warmup_clip_smooth=warmup_clip_smooth,
-            ending_clip_raw=ending_clip_raw,
+            ending_clip=ending_clip,
             ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
@@ -476,11 +458,9 @@ def process_single_eval_multi_metrics(
             smooth_monotonic=False,
             smooth_increasing=None,
             smooth_strict=False,
-            warmup_frac_raw=warmup_frac_raw,
-            warmup_frac_smooth=warmup_frac_smooth,
-            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip=warmup_clip,
             warmup_clip_smooth=warmup_clip_smooth,
-            ending_clip_raw=ending_clip_raw,
+            ending_clip=ending_clip,
             ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
@@ -522,11 +502,9 @@ def process_single_eval_multi_metrics(
             smooth_monotonic=False,
             smooth_increasing=None,
             smooth_strict=False,
-            warmup_frac_raw=warmup_frac_raw,
-            warmup_frac_smooth=warmup_frac_smooth,
-            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip=warmup_clip,
             warmup_clip_smooth=warmup_clip_smooth,
-            ending_clip_raw=ending_clip_raw,
+            ending_clip=ending_clip,
             ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
@@ -568,11 +546,9 @@ def process_single_eval_multi_metrics(
             smooth_monotonic=False,
             smooth_increasing=None,
             smooth_strict=False,
-            warmup_frac_raw=warmup_frac_raw,
-            warmup_frac_smooth=warmup_frac_smooth,
-            warmup_clip_raw=warmup_clip_raw,
+            warmup_clip=warmup_clip,
             warmup_clip_smooth=warmup_clip_smooth,
-            ending_clip_raw=ending_clip_raw,
+            ending_clip=ending_clip,
             ending_clip_smooth=ending_clip_smooth,
             s_factor=1,
             k_spline=5,
@@ -624,9 +600,8 @@ def predict_and_plot(
     y_grid_spacing: float = None,  # Spacing for y-axis grid lines
     # Custom color mapping override
     custom_color_mapping: dict = None,  # Custom color mapping to override config colors
-    warmup_frac_raw = 0,
-    warmup_clip_raw: int = None,  # Absolute count clipping for prediction data
-    ending_clip_raw: int = None,  # Absolute ending clipping for prediction data
+    warmup_clip: int = None,  # Absolute count clipping for prediction data
+    ending_clip: int = None,  # Absolute ending clipping for prediction data
     ax: plt.Axes=None,
 ):
     # predicter = fit.FitLogErrRate(L=0.06333, r=1.73e-10, N0_k=4.95e9, r_e0=1e-9, N0_e0=3e9)
@@ -650,19 +625,16 @@ def predict_and_plot(
     # curve_column = 'N' # key must be one of 'N', 'data_fator'
 
     # Apply warmup clipping for prediction data
-    if warmup_clip_raw is not None:
-        # Use absolute count clipping
-        df_fit_plot = data_proc.apply_clip(df, curve_column=plot_curve_column, warmup_step=warmup_clip_raw)
-    elif warmup_frac_raw > 0:
-        # Use relative clipping
-        df_fit_plot = data_proc.apply_clip(df, curve_column=plot_curve_column, warmup_frac=warmup_frac_raw)
+    # Apply clipping for prediction data
+    if warmup_clip is not None or ending_clip is not None:
+        df_fit_plot = data_proc.apply_clip(
+            df, 
+            curve_column=plot_curve_column, 
+            warmup_clip=warmup_clip if warmup_clip is not None else 0,
+            ending_clip=ending_clip if ending_clip is not None else 0
+        )
     else:
         df_fit_plot = df
-    
-    # Apply ending clipping for prediction data
-    if ending_clip_raw is not None:
-        # Use absolute ending clipping
-        df_fit_plot = data_proc.apply_clip(df_fit_plot, curve_column=plot_curve_column, ending_step=ending_clip_raw)
     ax = plot.plot_curves(
         df_fit_plot, 
         curve_column=plot_curve_column, x_column=plot_x_column, y_column=pred_column, 

@@ -109,7 +109,6 @@ def main():
                 plot_y_scale="log",
                 line_width=2,
                 line_alpha=1,
-                warmup_frac_raw=config.WARMUP_CLIPPING_FACTOR_FOR_RAW,
                 # ax=ax,
             )
             
@@ -140,8 +139,6 @@ def main():
                 # smooth_monotonic=True,
                 # smooth_increasing=None,
                 # smooth_strict=False,
-                warmup_frac_raw=config.WARMUP_CLIPPING_FACTOR_FOR_RAW,
-                warmup_frac_smooth=config.WARMUP_CLIPPING_FACTOR_FOR_SMOOTH,
                 s_factor=1,
                 k_spline=5,
                 rolling_window=200,
