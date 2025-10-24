@@ -1,5 +1,4 @@
 /*.log
-/*.json
 /outputs/
 /results/
 /data/
@@ -11,3 +10,4 @@
 /wandb/
 *.egg-info/
 __pycache__/
+tests/
