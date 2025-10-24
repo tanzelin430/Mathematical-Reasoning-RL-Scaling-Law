@@ -1,86 +1,77 @@
 import numpy as np
+from dataclasses import dataclass
+from typing import ClassVar
 from src.fit.base import BaseFitter
 
 
+@dataclass
 class InvExp(BaseFitter):
     """
-    Inverse exponential model: L=(X_0/C)^k(N)
-    y = log(L) = k(x0) * log(S/x1)
-    where k(x0) is a lookup table for each x0 value and S is a constant.
-    x0: N; x1: E, C
+    Inverse exponential model: y=(S/x)^k(n)
+    where k(n) is a lookup table for each n value and S is a constant.
     """
+    MODEL_NAME = 'invexp'
+    # Instance fields - dataclass automatically generates __init__
+    S: float
+    k0_5: float
+    k1_5: float
+    k3: float
+    k7: float
+    k14: float
+    k32: float
+    k72: float
     
-    PARAM_NAMES = ['S', 'k0_5', 'k1_5', 'k3', 'k7', 'k14', 'k32', 'k72']
-    
-    N_VALUES = [0.5e9, 1.5e9, 3e9, 7e9, 14e9, 32e9, 72e9]
-    
-    # Configuration for get_params_array (for plotting/analysis)
-    PARAM_ARRAY_CONFIG = {
-        'curve_values': [0.5e9, 1.5e9, 3e9, 7e9, 14e9, 32e9, 72e9],
-        'param_groups': {
-            'k': ['k0_5', 'k1_5', 'k3', 'k7', 'k14', 'k32', 'k72'],
-            'S': ['S']
-        }
-    }
-    
-    # Default fitting parameters (8 params: 1 S + 7 k's)
-    DEFAULT_BOUNDS = (
+    DEFAULT_BOUNDS: ClassVar[tuple] = (
         [1e0] + [1e-6] * 7,   # Lower
         [1e20] + [1] * 7   # Upper
     )
     
-    DEFAULT_P0 = [1e15] + [0.1] * 7  # Initial guess: S=1e6, k=0.5
-    
-    def __init__(self, S, k0_5, k1_5, k3, k7, k14, k32, k72):
-        # Store S constant
-        self.S = S
-        
-        # Store as lookup tables for efficient prediction with tolerance
-        self.k_lookup = {
-            0.5e9: k0_5, 1.5e9: k1_5, 3e9: k3, 7e9: k7,
-            14e9: k14, 32e9: k32, 72e9: k72
-        }
-        
-        # Also store as individual attributes for JSON serialization (via PARAM_NAMES)
-        self.k0_5, self.k1_5, self.k3, self.k7 = k0_5, k1_5, k3, k7
-        self.k14, self.k32, self.k72 = k14, k32, k72
+    DEFAULT_P0: ClassVar[list] = [1e15] + [0.1] * 7  # Initial guess: S=1e15, k=0.1
     
     @staticmethod
-    def model(data, S, k0_5, k1_5, k3, k7, k14, k32, k72):
-        """Model function for CMA-ES curve fitting."""
-        fitter = InvExp(S, k0_5, k1_5, k3, k7, k14, k32, k72)
-        return fitter.predict(data)
-
-    def predict(self, data):
+    def _build_lookup(S, k0_5, k1_5, k3, k7, k14, k32, k72):
+        """Build lookup table from parameters."""
+        return {
+            'k': {
+                0.5e9: k0_5, 1.5e9: k1_5, 3e9: k3, 7e9: k7,
+                14e9: k14, 32e9: k32, 72e9: k72
+            }
+        }
+    
+    @classmethod
+    def model(cls, data, *args):
         """
-        Predict y for given (N, x) values.
-        Supports both single values and arrays.
+        Args:
+            data: (n, x) tuple of arrays
+            *args: S, k0_5, k1_5, k3, k7, k14, k32, k72
+        """
+        n, x = data
+        S = args[0]
         
-        Formula: y = (S/x)^k(N)
-        """
-        x0, x1 = data
+        # Build lookup table
+        lookup = cls._build_lookup(*args)
         
         # Convert to arrays for vectorized operations
-        x0 = np.atleast_1d(x0)
-        x1 = np.atleast_1d(x1)
+        n = np.atleast_1d(n)
+        x = np.atleast_1d(x)
         
         # Initialize output array
-        result = np.zeros_like(x0, dtype=float)
+        result = np.zeros_like(n, dtype=float)
         
-        # Process each unique N value
-        unique_N_values = np.unique(x0)
-        for N_val in unique_N_values:
-            # Find closest N in lookup table
-            closest_N = min(self.k_lookup.keys(), key=lambda n: abs(n - N_val))
-            if abs(closest_N - N_val) > 1:  # Tolerance: 1
-                raise ValueError(f"N={N_val/1e9:.1f}B not in lookup table (closest: {closest_N/1e9:.1f}B)")
+        # Group by n
+        unique_n_values = np.unique(n)
+        for n_val in unique_n_values:
+            # Find closest n in lookup table
+            closest_n = min(lookup['k'].keys(), key=lambda n: abs(n - n_val))
+            if abs(closest_n - n_val) > 1:  # Tolerance: 1
+                raise ValueError(f"n={n_val/1e9:.1f}B not in lookup table (closest: {closest_n/1e9:.1f}B)")
             
-            # Get parameters for this N
-            k = self.k_lookup[closest_N]
+            # Get parameters for this n
+            k = lookup['k'][closest_n]
             
             # Apply formula to all points with this N value: y = (S/x)^k(N)
-            mask = (x0 == N_val)
-            result[mask] = k * np.log10(self.S / x1[mask])
+            mask = (n == n_val)
+            result[mask] = (S / x[mask]) ** k
         
         return result
 

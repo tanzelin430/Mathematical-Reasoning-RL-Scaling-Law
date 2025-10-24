@@ -27,7 +27,7 @@ def load_and_preprocess(
     
     # Sort, Inspect, Validate and Normalize data
     df = df.sort_values(['model_size','runid','step']).reset_index(drop=True)
-    # data_proc.inspect_data(df)
+    # inspect_data(df)
     validate_data(df, eval_columns=config.TEST_EVALS.keys())
     df = rename_columns(df)
     
@@ -124,6 +124,72 @@ def merge_duplicate_steps(df, group_columns: list, mode: str = 'mean') -> pd.Dat
 def split_df(df: pd.DataFrame, by_column: str) -> List[pd.DataFrame]:
     return [g.copy().reset_index(drop=True) for _, g in df.groupby(by_column, sort=False)]
 
+
+def prepare_eval_data(
+    df,
+    eval_column: str,
+    curve_column: str,
+    x_columns: list,
+    calc_delta: bool = False,
+    delta_base_step: int = 0,
+):
+    """
+    为评估数据准备用于绘图的处理
+    
+    处理流程：
+    1. Copy eval_column to 'R'
+    2. 计算 ErrRate, DeltaReward, DeltaErrRate
+    3. 计算 std（基于多个 rollout）
+    4. merge_duplicate_steps（平均多个 rollout）
+    5. 把 std 列 merge 回去
+    
+    Args:
+        df: 原始数据
+        eval_column: 评估列名（如 'holdout_score'）
+        curve_column: 曲线分组列名（如 'N', 'Tau'）
+        x_columns: x轴列名列表（如 ['C', 'E']），用于 merge 时避免不同 x 值被错误合并
+        calc_delta: 是否计算 Delta 指标
+        delta_base_step: Delta 计算的基准 step
+    
+    Returns:
+        df: 处理后的数据，包含 'R', 'ErrRate', 'R_std', 'ErrRate_std' 等列
+    """
+    # 1. Copy to R
+    # df = df.rename(columns={eval_column: 'R'})
+    df['R'] = df[eval_column]
+    
+    # 2. Calculate ErrRate
+    df['ErrRate'] = 1 - df['R']
+    
+    # 3. Calculate std BEFORE merging
+    R_std = df.groupby([curve_column, 'step'])['R'].std().to_frame('R_std')
+    ErrRate_std = df.groupby([curve_column, 'step'])['ErrRate'].std().to_frame('ErrRate_std')
+    
+    # 4. Calculate delta if needed
+    if calc_delta:
+        df['DeltaReward'] = calc_delta_y(df, 'R', base_step=delta_base_step, curve_column=curve_column)
+        df['DeltaErrRate'] = calc_delta_y(df, 'ErrRate', base_step=delta_base_step, curve_column=curve_column)
+        DeltaReward_std = df.groupby([curve_column, 'step'])['DeltaReward'].std().to_frame('DeltaReward_std')
+        DeltaErrRate_std = df.groupby([curve_column, 'step'])['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
+    
+    # 5. Merge duplicate steps (average multiple rollouts)
+    merge_columns = [curve_column, 'step']
+    for x_col in x_columns:
+        if x_col not in merge_columns:
+            merge_columns.append(x_col)
+    df = merge_duplicate_steps(df, group_columns=merge_columns, mode='mean')
+    
+    # 6. Add std cols back
+    std_merge_columns = [curve_column, 'step']
+    df = df.merge(R_std, on=std_merge_columns)
+    df = df.merge(ErrRate_std, on=std_merge_columns)
+    if calc_delta:
+        df = df.merge(DeltaReward_std, on=std_merge_columns)
+        df = df.merge(DeltaErrRate_std, on=std_merge_columns)
+    
+    return df
+
+
 def estimate_phi_from_runs(
     df,
     sample_size_per_step: float = 512.0,
@@ -170,79 +236,88 @@ def estimate_phi_from_runs(
     phi_by_N = {float(N): float(np.median(meds)) for N, meds in byN.items()}
     return phi_global, phi_by_N, stats
 
-def apply_clip(df, curve_column: str, warmup_clip: int = 0, ending_clip: int = 0):
+def apply_clip(df, curve_column: str, warmup_clip: int = 0, warmup_clip_to: int = None, ending_clip: int = 0, ending_clip_to: int = None):
     # Handle default case
-    if warmup_clip == 0 and ending_clip == 0:
+    if warmup_clip == 0 and warmup_clip_to is None and ending_clip == 0 and ending_clip_to is None:
         return df
     
     # Apply clipping functions sequentially (can combine multiple types)
     result_df = df.copy()
     
-    # Apply warmup clipping first (remove first N steps)
+    # Apply warmup clipping first (remove first N steps by index)
     if warmup_clip > 0:
-        result_df = pd.concat([_clip_single_curve_warmup(g, warmup_clip) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=warmup_clip, end_idx=None) 
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
-    # Apply ending clipping second (remove last N steps)
+    # Apply warmup_clip_to second (remove steps < warmup_clip_to by value)
+    if warmup_clip_to is not None:
+        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=None) 
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+    
+    # Apply ending clipping third (remove last N steps by index)
     if ending_clip > 0:
-        result_df = pd.concat([_clip_single_curve_ending(g, ending_clip) for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=None, end_idx=-ending_clip) 
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+    
+    # Apply ending_clip_to fourth (remove steps > ending_clip_to by value)
+    if ending_clip_to is not None:
+        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=None, max_step=ending_clip_to) 
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
     return result_df
 
 
-def _clip_single_curve_warmup(df, warmup_clip: int):
+def _clip_single_curve_by_index(df, start_idx=None, end_idx=None):
     """
-    Apply warmup clipping to remove first N training steps.
+    Clip dataframe by row index (after sorting by step).
     
     Args:
         df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
-        warmup_clip: Number of steps to remove from the beginning (0 means no clipping)
+        start_idx: Start index (None means from beginning), can use negative indices
+        end_idx: End index (None means to end), can use negative indices
         
     Returns:
-        DataFrame with first warmup_clip steps removed
+        DataFrame with rows outside [start_idx:end_idx] removed
     """
-    if len(df) == 0 or warmup_clip <= 0:
+    if len(df) == 0:
         return df.copy()
         
-    # Sort by step to ensure proper ordering
-    if 'step' in df.columns:
-        df = df.sort_values('step').reset_index(drop=True)
-        # Remove first warmup_clip steps
-        df_clipped = df.iloc[warmup_clip:].copy().reset_index(drop=True)
-    else:
-        # If no step column, return empty DataFrame
-        df_clipped = df.iloc[0:0].copy()
+    if 'step' not in df.columns:
+        return df.iloc[0:0].copy()
     
-    return df_clipped
+    # Sort by step to ensure proper ordering
+    df_sorted = df.sort_values('step').reset_index(drop=True)
+    
+    # Apply index slicing
+    return df_sorted.iloc[start_idx:end_idx].copy().reset_index(drop=True)
 
 
-def _clip_single_curve_ending(df, ending_clip: int):
+def _clip_single_curve_by_step_value(df, min_step=None, max_step=None):
     """
-    Apply ending clipping to remove last N training steps.
+    Clip dataframe by step value range.
     
     Args:
         df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
-        ending_clip: Number of steps to remove from the end (0 means no clipping)
+        min_step: Keep step >= min_step (None means no lower bound)
+        max_step: Keep step <= max_step (None means no upper bound)
         
     Returns:
-        DataFrame with last ending_clip steps removed
+        DataFrame with steps outside [min_step, max_step] removed
     """
-    if len(df) == 0 or ending_clip <= 0:
+    if len(df) == 0:
         return df.copy()
         
-    # Sort by step to ensure proper ordering
-    if 'step' in df.columns:
-        df = df.sort_values('step').reset_index(drop=True)
-        # Remove last ending_clip steps
-        if ending_clip >= len(df):
-            # If clipping more than available steps, return empty DataFrame
-            df_clipped = df.iloc[0:0].copy()
-        else:
-            df_clipped = df.iloc[:-ending_clip].copy().reset_index(drop=True)
-    else:
-        # If no step column, return empty DataFrame
-        df_clipped = df.iloc[0:0].copy()
+    if 'step' not in df.columns:
+        return df.iloc[0:0].copy()
     
-    return df_clipped
+    # Build filter condition
+    mask = pd.Series(True, index=df.index)
+    if min_step is not None:
+        mask &= (df['step'] >= min_step)
+    if max_step is not None:
+        mask &= (df['step'] <= max_step)
+    
+    return df[mask].copy().reset_index(drop=True)
 
 
 def calc_delta_y(df, y_column: str, base_step: int, curve_column: str, debug=config.DEBUG):

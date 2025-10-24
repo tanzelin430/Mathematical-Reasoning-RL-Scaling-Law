@@ -10,7 +10,6 @@ Usage:
 
 import argparse
 from src.common import data_proc
-from src.common import plot_data
 from src.common import config
 from src.common import plot
 
@@ -42,7 +41,11 @@ def main():
     print(f"  Warmup clip num: {warmup_clip}")
     print()
     
+    # Load data
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
+    
+    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
+    df = df[df['step'] > 0].reset_index(drop=True)
     
     # ===========================
     # Plot Basic Curves
@@ -69,37 +72,85 @@ def main():
             for metric in metrics:
                 metric_label = config.DEFAULT_LABELS[metric]
                 if metric in axes:
-                    # Check if delta calculation is needed
-                    calc_delta = metric.startswith('Delta')
-                    
-                    plot_data.process_single_eval(
-                        df.copy(), 
-                        plot_x_column=x_column,
-                        plot_eval_column=eval_name, 
-                        plot_metric=metric,
-                        plot_curve_column='N',
-                        # plot_x_label=x_label,
-                        # plot_y_label=metric_label,
-                        plot_x_scale="log",
-                        plot_title=eval_config['plot_str'],
-                        plot_use_legend=True,
-                        plot_use_scatter=True,
-                        plot_use_line=False,
-                        plot_smooth_use_scatter=False,
-                        plot_smooth_use_line=True,
-                        plot_legend_lambda=lambda x: plot.human_format_N(x),
-                        ax=axes[metric],
-                        delta_base_step=1,
-                        calc_delta=calc_delta,
-                        add_smooth=True,
-                        smooth_monotonic=True,
-                        warmup_clip=warmup_clip,
+                    # Prepare eval data for this specific evaluation
+                    df_eval = df.copy()
+                    df_eval = data_proc.prepare_eval_data(
+                        df_eval,
+                        eval_column=eval_name,
+                        curve_column='N',
+                        x_columns=[x_column],
+                        calc_delta=metric.startswith('Delta'),
+                        delta_base_step=1
                     )
-                    if x_column == "E":
-                        plot.plot_basic_settings(
-                            ax=axes[metric],
-                            x_tick_subs=[5e3, 1e4, 5e4],
+                    
+                    # Apply clipping if specified
+                    if warmup_clip > 0:
+                        df_eval = data_proc.apply_clip(
+                            df_eval,
+                            curve_column='N',
+                            warmup_clip=warmup_clip,
+                            warmup_clip_to=None,
+                            ending_clip=0,
+                            ending_clip_to=None
                         )
+                    
+                    # Plot raw scatter points
+                    ax = plot.plot_curves(
+                        df_eval,
+                        curve_column='N',
+                        x_column=x_column,
+                        y_column=metric,
+                        use_scatter=True,
+                        use_line=False,
+                        scatter_alpha=1.0,
+                        scatter_size=8.0,
+                        scatter_marker='o',
+                        ax=axes[metric],
+                    )
+                    
+                    # Add smooth curves
+                    smooth_out_column = metric + "_smooth"
+                    df_smooth = data_proc.smooth_df(
+                        df_eval,
+                        curve_column='N',
+                        col_x=x_column,
+                        col_y=metric,
+                        col_y_out=smooth_out_column,
+                        monotonic=True,
+                        increasing=None,
+                        strict=False,
+                        s_factor=1,
+                        k_spline=5,
+                        rolling_window=200,
+                        min_se=1e-6,
+                        x_inv_weight_power=0.3,
+                        use_linear=False
+                    )
+                    
+                    ax = plot.plot_curves(
+                        df_smooth,
+                        curve_column='N',
+                        x_column=x_column,
+                        y_column=smooth_out_column,
+                        use_scatter=False,
+                        use_line=True,
+                        line_alpha=1.0,
+                        line_width=2.0,
+                        ax=axes[metric]
+                    )
+                    
+                    # Apply basic settings and title
+                    extra_settings = {}
+                    if x_column == "E":
+                        extra_settings['x_tick_subs'] = [5e3, 1e4, 5e4]
+                    
+                    plot.plot_basic_settings(
+                        ax=axes[metric],
+                        x_scale="log",
+                        title=eval_config['plot_str'],
+                        use_legend=True,
+                        **extra_settings
+                    )
         
         # Set figure labels
         plot.set_figure_labels(fig_axes, x_label, metrics_labels)

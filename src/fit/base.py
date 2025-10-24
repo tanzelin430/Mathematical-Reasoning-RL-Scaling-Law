@@ -1,118 +1,137 @@
 import numpy as np
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from datetime import datetime
+from abc import ABC, abstractmethod
+from dataclasses import fields, is_dataclass
 import json
+import inspect
 # ============================================================================
 # Base Fitter Class - Provides common functionality for all fitters
 # ============================================================================
 
-class BaseFitter:
+class BaseFitter(ABC):
     """
     Base class for all fitting models. Provides core functionality:
     - save_to_json / load_from_json: automatic serialization based on PARAM_NAMES
-    - get_params_array: generic method for extracting parameters for plotting/analysis
+    - get_lookup_params: generic method for extracting parameters for plotting/analysis
+    - model: generic classmethod for CMA-ES curve fitting (subclasses don't need to override)
     
-    Subclasses should define:
-    - PARAM_NAMES: list of parameter names (required for serialization)
-    - PARAM_ARRAY_CONFIG: dict for get_params_array (optional, for plotting/analysis)
-      Format: {'curve_values': [...], 'param_groups': {'group1': [...], ...}}
-    - __init__: constructor accepting all parameters in PARAM_NAMES
+    Subclasses should define (as dataclass):
+    - Use @dataclass decorator and define instance fields with type annotations
     - predict: core prediction logic (model-specific)
+    - get_lookup_params: (optional) return lookup table parameters for plotting/analysis
+    
+    PARAM_NAMES is automatically extracted from dataclass fields.
     
     Note: DataFrame prediction is handled by business layer functions in fit.py
     """
     
-    PARAM_NAMES = []  # Subclass should override this
-    
-    def get_params_array(self) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+    def __init_subclass__(cls, **kwargs):
+        """Enforce MODEL_NAME definition in concrete subclasses."""
+        super().__init_subclass__(**kwargs)
+        if not inspect.isabstract(cls) and (not hasattr(cls, 'MODEL_NAME') or cls.MODEL_NAME is None):
+                raise TypeError(f"{cls.__name__} must define MODEL_NAME class attribute.\n")
+
+    @classmethod
+    def get_param_names(cls) -> List[str]:
         """
-        Get parameters as arrays for analysis and plotting.
+        Get parameter names for this model.
         
-        This is a generic method that works with declarative configuration.
-        Subclasses should define PARAM_ARRAY_CONFIG with:
-        - 'curve_values': list/array of x-axis values for plotting
-        - 'param_groups': dict mapping group names to lists of parameter names
+        Automatically extracts field names from dataclass.
         
         Returns:
-        --------
-        tuple : (curve_values, params_dict)
-            - curve_values: np.ndarray of x-axis values
-            - params_dict: dict mapping group names to parameter value arrays
-        
-        Example:
-        --------
-        class MyModel(BaseFitter):
-            PARAM_NAMES = ['k0_5', 'k1_5', 'k3', 'E0_0_5', 'E0_1_5', 'E0_3']
-            PARAM_ARRAY_CONFIG = {
-                'curve_values': [0.5e9, 1.5e9, 3e9],
-                'param_groups': {
-                    'k': ['k0_5', 'k1_5', 'k3'],
-                    'E0': ['E0_0_5', 'E0_1_5', 'E0_3']
-                }
-            }
-        
-        Then get_params_array() returns:
-        (array([0.5e9, 1.5e9, 3e9]), {'k': array([...]), 'E0': array([...])})
+            List of parameter names in order
         """
-        if not hasattr(self.__class__, 'PARAM_ARRAY_CONFIG'):
-            raise NotImplementedError(
-                f"{self.__class__.__name__} must define PARAM_ARRAY_CONFIG class attribute "
-                "for get_params_array to work. See BaseFitter.get_params_array docstring for format."
-            )
-        
-        config = self.__class__.PARAM_ARRAY_CONFIG
-        
-        # Extract curve values
-        curve_values = np.array(config['curve_values'])
-        
-        # Extract parameter groups
-        params_dict = {}
-        for group_name, param_names in config['param_groups'].items():
-            param_values = np.array([getattr(self, name) for name in param_names])
-            params_dict[group_name] = param_values
-        
-        return curve_values, params_dict
-    
-    def save_to_json(self, filepath: str, 
-                     metadata: dict = None):
-        """Save model to JSON file."""
-        # Get parameters as dict
-        params_dict = self._get_params_for_json()
-        
-        result = {
-            "model": self.__class__.__name__,
-            "params": params_dict,
-            "datetime": datetime.now().isoformat(),
-        }
-        
-        # Add optional metadata
-        if metadata:
-            result["metadata"] = metadata
-        
-        from pathlib import Path
-        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(filepath, 'w') as f:
-            json.dump(result, f, indent=2)
-        
-        print(f"Model saved to: {filepath}")
+        if not is_dataclass(cls):
+            raise ValueError(f"{cls.__name__} must be a dataclass (use @dataclass decorator)")
+        return [f.name for f in fields(cls)]
     
     @classmethod
-    def load_from_json(cls, filepath: str):
-        """Load model from JSON file."""
-        with open(filepath, 'r') as f:
-            data = json.load(f)
+    @abstractmethod
+    def model(cls, data, *args):
+        """
+        Core model function for CMA-ES curve fitting.
         
-        if data["model"] != cls.__name__:
-            raise ValueError(f"Expected {cls.__name__} model, got {data['model']}")
+        This method must be implemented by all subclasses. It should directly
+        compute predictions from the given parameters without creating an instance.
+        This avoids instance creation overhead during optimization.
         
-        instance = cls._create_from_params(data["params"])
+        Args:
+            data: Input data (typically tuple of arrays like (N, C))
+            *args: Model parameters in the order defined by PARAM_NAMES
+            
+        Returns:
+            np.ndarray: Predicted values
+            
+        Example:
+            @classmethod
+            def model(cls, data, E, A, B):
+                n, x = data
+                return E - A * np.log(x) + B
+        """
+        pass
+    
+    def predict(self, data):
+        """
+        Predict output for given input data using this instance's parameters.
         
-        print(f"Model loaded from: {filepath}")
-        if 'metadata' in data:
-            print(f"Fit metadata: {data['metadata']}")
+        This method is generic and works for all subclasses by extracting
+        parameters from the instance and calling the model method.
         
-        return instance
+        Args:
+            data: Input data, typically a tuple of arrays (e.g., (N, C) or (N, E))
+                  where the first element is the curve parameter and the second
+                  is the x-axis variable.
+                  
+        Returns:
+            np.ndarray: Predicted values. Supports both single values and arrays.
+        """
+        # Extract parameters from instance in the correct order
+        param_values = [getattr(self, name) for name in self.__class__.get_param_names()]
+        return self.__class__.model(data, *param_values)
+    
+    def __post_init__(self):
+        """
+        Generic post-initialization for dataclasses.
+        
+        If the subclass implements _build_lookup(), this method will automatically
+        extract parameters and build the lookup table. Otherwise, sets lookup to None.
+        
+        Also initializes CONTEXT and INFO (uppercase to avoid conflicts with model params).
+        
+        Subclasses can override this method if they need custom initialization.
+        """
+        if hasattr(self.__class__, '_build_lookup'):
+            # Auto-extract parameters and build lookup
+            param_values = [getattr(self, name) for name in self.get_param_names()]
+            self.lookup = self.__class__._build_lookup(*param_values)
+        else:
+            self.lookup = None
+        
+        # Initialize context and info (uppercase to avoid param conflicts)
+        self.CONTEXT = {}
+        self.INFO = {}
+    
+    def get_lookup_params(self) -> dict:
+        if not hasattr(self, 'lookup') or self.lookup is None:
+            return None
+        return self.lookup
+    
+    def set_context(self, context: dict):
+        """Set fit context (configuration)."""
+        self.CONTEXT = context
+    
+    def get_context(self) -> dict:
+        """Get fit context (configuration)."""
+        return self.CONTEXT
+    
+    def set_info(self, info: dict):
+        """Set fit info (quality metrics)."""
+        self.INFO = info
+    
+    def get_info(self) -> dict:
+        """Get fit info (quality metrics)."""
+        return self.INFO
     
     def _get_params_for_json(self) -> dict:
         """
@@ -122,7 +141,8 @@ class BaseFitter:
         Handles dict with numeric keys by converting them to strings.
         """
         params = {}
-        for name in self.PARAM_NAMES:
+        param_names = self.__class__.get_param_names()
+        for name in param_names:
             value = getattr(self, name)
             # Handle dict with numeric keys (e.g., {1e9: 0.5} -> {"1e9": 0.5})
             if isinstance(value, dict) and value:
@@ -141,7 +161,8 @@ class BaseFitter:
         converting them back to numeric keys.
         """
         processed_params = {}
-        for name in cls.PARAM_NAMES:
+        param_names = cls.get_param_names()
+        for name in param_names:
             value = params[name]
             # Handle dict with string keys that look like numbers
             if isinstance(value, dict) and value:

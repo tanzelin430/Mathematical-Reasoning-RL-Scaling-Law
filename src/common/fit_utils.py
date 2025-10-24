@@ -366,7 +366,7 @@ def cma_curve_fit(
     popsize: int = 20,
     sigma0: float = 0.3,
     seed: int = 0,
-    verbose: bool = True,
+    verbose_interval: int = 200,
     # Advanced options
     normalize_params: bool = True,  # 归一化参数到[0,1]以提高CMA-ES稳定性
     custom_loss: Optional[Callable] = None,
@@ -404,8 +404,8 @@ def cma_curve_fit(
         Initial step size for CMA-ES.
     seed : int, default=0
         Random seed for reproducibility.
-    verbose : bool, default=True
-        Whether to print optimization progress.
+    verbose_interval : int, default=200
+        Interval for printing progress. Set to 0 to disable periodic progress output.
     custom_loss : callable, optional
         Custom loss function. Should take (y_pred, y_true, weights) and return scalar.
     **cma_kwargs
@@ -504,8 +504,7 @@ def cma_curve_fit(
             loss = loss_func(y_pred, ydata, weights)
             return loss
         except Exception as e:
-            if verbose:
-                print(f"  Warning: objective evaluation failed: {type(e).__name__}: {e}")
+            print(f"  Warning: objective evaluation failed: {type(e).__name__}: {e}")
             return _PENALTY_LARGE
     
     # === 可选：参数归一化包装器（消除CMA-ES警告，提高稳定性）===
@@ -523,9 +522,16 @@ def cma_curve_fit(
     best_params = None
     best_es = None
     
+    # Use better random seed strategy: if seed is 0, generate random seeds
+    if seed == 0:
+        rng_master = np.random.default_rng()
+        trial_seeds = [rng_master.integers(0, 2**31) for _ in range(n_trials)]
+    else:
+        trial_seeds = [seed + trial for trial in range(n_trials)]
+    
     for trial in range(n_trials):
-        if verbose:
-            print(f"=== CMA-ES Trial {trial + 1}/{n_trials} ===")
+        trial_seed = trial_seeds[trial]
+        print(f"=== CMA-ES Trial {trial + 1}/{n_trials} ===")
         
         # Set initial parameters for this trial
         if trial == 0:
@@ -533,7 +539,7 @@ def cma_curve_fit(
             initial_params = p0.copy()
         else:
             # Subsequent trials: random initialization within bounds
-            rng = np.random.default_rng(seed + trial)
+            rng = np.random.default_rng(trial_seed)
             initial_params = rng.uniform(lower_bounds, upper_bounds, n_params)
         
         # Bounds check for init params 
@@ -548,7 +554,7 @@ def cma_curve_fit(
             sigma0,
             {
                 'popsize': popsize, 
-                'seed': seed + trial,
+                'seed': trial_seed,
                 'bounds': [lower_bounds, upper_bounds],
                 # 'verb_disp': 0,  # Suppress CMA-ES output
                 **cma_kwargs
@@ -562,8 +568,8 @@ def cma_curve_fit(
             
             current_best = es.best.f
             
-            # Verbose output every 50 iterations
-            if verbose and (iteration + 1) % 200 == 0:
+            # Verbose output
+            if verbose_interval > 0 and (iteration + 1) % verbose_interval == 0:
                 params_display = from_norm(es.best.x)
                 bound_flags = []
                 for i, (p, lb, ub) in enumerate(zip(es.best.x, lower_bounds, upper_bounds)):
@@ -580,8 +586,7 @@ def cma_curve_fit(
                 print(f"  Iter {iteration+1:3d}: loss={current_best:.6e}, params=[{params_str}]{bound_str}")
             
             if es.stop():
-                if verbose:
-                    print(f"  CMA-ES stopping criteria met at iteration {iteration+1}")
+                print(f"  CMA-ES stopping criteria met at iteration {iteration+1}")
                 break
         
         # Store trial result
@@ -596,9 +601,8 @@ def cma_curve_fit(
         }
         all_results.append(trial_result)
         
-        if verbose:
-            print(f"  Final loss: {final_loss:.6e}")
-            print(f"  Final params: {final_params}")
+        print(f"  Final loss: {final_loss:.6e}")
+        print(f"  Final params: {final_params}")
         
         # Update best result
         if final_loss < best_loss:
@@ -622,10 +626,9 @@ def cma_curve_fit(
     except:
         r2 = np.nan
         
-    if verbose:
-        print(f"\n=== Final Results ===")
-        print(f"Best loss: {best_loss:.6e}")
-        print(f"Best parameters: {best_params}")
-        print(f"R²: {r2:.4f}")
+    print(f"\n=== Final Results ===")
+    print(f"Best loss: {best_loss:.6e}")
+    print(f"Best parameters: {best_params}")
+    print(f"R²: {r2:.4f}")
     
     return best_params, best_loss, r2

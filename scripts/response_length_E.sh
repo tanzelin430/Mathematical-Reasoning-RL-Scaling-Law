@@ -4,9 +4,10 @@
 # This script contains 2 runs
 
 echo "=== Run 1/2: Response Length - base ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source base \
-  --plot-curve N \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources base \
+  --curve N \
   -x E \
   --eval response_length \
   --metric R \
@@ -28,13 +29,14 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 15 \
   --scatter-marker o \
-  --output-prefix base_
+  --output-prefix response_
 
 echo ""
 echo "=== Run 2/2: Response Length - instruct ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source instruct \
-  --plot-curve N \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources instruct \
+  --curve N \
   -x E \
   --eval response_length \
   --metric R \
@@ -56,7 +58,7 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 15 \
   --scatter-marker o \
-  --output-prefix instruct_
+  --output-prefix response_
 
 echo ""
 echo "All runs completed!"

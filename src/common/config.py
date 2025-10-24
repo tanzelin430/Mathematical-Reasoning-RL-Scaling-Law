@@ -60,8 +60,8 @@ DEFAULT_LABELS = {
     "step": "Steps",
     "rollout_n": "ρ",
 
-    'base': 'Base Model', 
-    'instruct': 'Instruct Model',
+    'base': 'Base', 
+    'instruct': 'Instruct',
     'exp2-base': '7B-Base',
     'exp2-instruct': '7B-Instruct',
 
@@ -202,6 +202,8 @@ COLOR_MAPPING = {
     # for model type comparison
     'base': '#27ad81',    # 绿青
     'instruct': '#440154', # 深紫
+    'C_raw': '#27ad81',    # 绿青
+    'E': '#440154', # 深紫
     'k': 'blue',    # 绿青
     'E0': 'red', # 深紫
     'S': 'green', # 深紫

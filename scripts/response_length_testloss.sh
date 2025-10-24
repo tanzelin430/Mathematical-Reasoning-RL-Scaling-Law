@@ -4,18 +4,18 @@
 # This script contains 2 runs
 
 echo "=== Run 1/2: Response Length - loss - base ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source base \
-  --plot-curve N \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources base \
+  --curve N \
   -x response_length \
   --eval holdout_score \
   --metric ErrRate \
   --warmup-clip 0 \
   --fit \
-  --fit-curve N \
+  --fit-model loglinear \
   --fit-x response_length \
   --fit-metric ErrRate \
-  --fit-plot-params \
   --plot-x-label "Response Length" \
   --plot-y-label "Test Loss" \
   --plot-x-scale log \
@@ -32,22 +32,22 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 1 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix fit_base_
+  --output-prefix response_fit_
 
 echo ""
 echo "=== Run 2/2: Response Length - loss - instruct ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source instruct \
-  --plot-curve N \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources instruct \
+  --curve N \
   -x response_length \
   --eval holdout_score \
   --metric ErrRate \
   --warmup-clip 0 \
   --fit \
-  --fit-curve N \
+  --fit-model loglinear \
   --fit-x response_length \
   --fit-metric ErrRate \
-  --fit-plot-params \
   --plot-x-label "Response Length" \
   --plot-y-label "Test Loss" \
   --plot-x-scale log \
@@ -64,7 +64,7 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 1 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix fit_instruct_
+  --output-prefix response_fit_
 
 echo ""
 echo "All runs completed!"

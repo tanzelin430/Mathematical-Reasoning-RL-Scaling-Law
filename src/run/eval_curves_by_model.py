@@ -23,7 +23,6 @@ with one line per evaluation for the specified model size.
 
 import argparse
 from src.common import data_proc
-from src.common import plot_data
 from src.common import config
 from src.common import plot
 import matplotlib.pyplot as plt
@@ -65,6 +64,8 @@ def main():
     print(f"  Warmup clip num: {warmup_clip}")
     print(f"  Model size N: {N}")
     print()
+    
+    # Load data
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
     
     # Filter for specified model size only
@@ -76,6 +77,9 @@ def main():
     # Merge duplicate steps (aggregate multiple runs) by averaging
     df = data_proc.merge_duplicate_steps(df, group_columns=['N', 'step'], mode='mean')
     print(f"After merging runs: {df.shape[0]} data points")
+    
+    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
+    df = df[df['step'] > 0].reset_index(drop=True)
     
     # Define evaluation group keys (using config.TEST_EVALS for metadata)
     eval_group_keys = {
@@ -116,6 +120,7 @@ def main():
         for metric in metrics:
             metric_label = config.DEFAULT_LABELS[metric]
             
+            
             # Create single figure
             fig, ax = plt.subplots(1, 1, figsize=(6, 4))
             
@@ -136,59 +141,94 @@ def main():
                 if not any(eval_config['plot_str'] == item[1]['plot_str'] for item in ordered_evals):
                     ordered_evals.append((eval_name, eval_config))
             
-            # Plot each evaluation as a separate line using process_single_eval
+            # Plot each evaluation as a separate line
             for i, (eval_name, eval_config) in enumerate(ordered_evals):
                 # Check if evaluation column exists in data
                 if eval_name not in df.columns:
                     print(f"Warning: {eval_name} not found in data, skipping...")
                     continue
                 
-                # Check if delta calculation is needed
-                calc_delta = metric.startswith('Delta')
-                
-                # Since we aggregated runs, we need a dummy curve column
-                # Add a constant column to use as curve identifier
+                # Prepare eval data for this specific evaluation
                 df_eval = df.copy()
                 df_eval['eval_curve'] = eval_name  # Use eval name as curve identifier
+                
+                df_eval = data_proc.prepare_eval_data(
+                    df_eval,
+                    eval_column=eval_name,
+                    curve_column='eval_curve',
+                    x_columns=[x_column],
+                    calc_delta=metric.startswith('Delta'),
+                    delta_base_step=1
+                )
+                
+                # Apply clipping if specified
+                if warmup_clip > 0:
+                    df_eval = data_proc.apply_clip(
+                        df_eval,
+                        curve_column='eval_curve',
+                        warmup_clip=warmup_clip,
+                        warmup_clip_to=None,
+                        ending_clip=0,
+                        ending_clip_to=None
+                    )
                 
                 # Create color mapping for this eval
                 eval_color = config.get_color_for_curve(eval_name)
                 temp_color_mapping = {eval_name: eval_color}
                 
-                # Use process_single_eval with shared axes
-                plot_data.process_single_eval(
-                    df_eval, 
-                    plot_x_column=x_column,
-                    plot_eval_column=eval_name, 
-                    plot_metric=metric,
-                    plot_curve_column='eval_curve',  # Use eval name as curve column
-                    plot_use_legend=False,  # We'll handle legend ourselves later
-                    plot_use_scatter=True,
-                    plot_use_line=False,
-                    plot_smooth_use_scatter=False,
-                    plot_smooth_use_line=True,
-                    scatter_alpha=1,
+                # Plot raw scatter points
+                ax = plot.plot_curves(
+                    df_eval,
+                    curve_column='eval_curve',
+                    x_column=x_column,
+                    y_column=metric,
+                    use_scatter=True,
+                    use_line=False,
+                    scatter_alpha=1.0,
                     scatter_size=8.0,
                     scatter_marker='o',
                     line_alpha=1.0,
                     line_width=2.0,
+                    custom_color_mapping=temp_color_mapping,
                     ax=ax,
-                    delta_base_step=1,
-                    calc_delta=calc_delta,
-                    add_smooth=True,
-                    smooth_monotonic=True,
+                )
+                
+                # Add smooth curves
+                smooth_out_column = metric + "_smooth"
+                df_smooth = data_proc.smooth_df(
+                    df_eval,
+                    curve_column='eval_curve',
+                    col_x=x_column,
+                    col_y=metric,
+                    col_y_out=smooth_out_column,
+                    monotonic=True,
+                    increasing=None,
+                    strict=False,
+                    s_factor=1,
                     k_spline=4,
                     rolling_window=200,
                     min_se=1e-7,
                     x_inv_weight_power=0,
-                    warmup_clip=warmup_clip,
-                    custom_color_mapping=temp_color_mapping  # Map all runids to eval color
+                    use_linear=False
+                )
+                
+                ax = plot.plot_curves(
+                    df_smooth,
+                    curve_column='eval_curve',
+                    x_column=x_column,
+                    y_column=smooth_out_column,
+                    use_scatter=False,
+                    use_line=True,
+                    line_alpha=1.0,
+                    line_width=2.0,
+                    custom_color_mapping=temp_color_mapping,
+                    ax=ax
                 )
                 
                 # Collect legend handles and labels in order
                 lines = ax.get_lines()
                 if lines:
-                    # Get the last line that was plotted
+                    # Get the last line that was plotted (the smooth line)
                     handle = lines[-1]
                     label = eval_config['plot_str']
                     legend_handles.append(handle)

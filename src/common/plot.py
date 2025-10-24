@@ -205,6 +205,26 @@ def _get_legends(_curves: list[float], legend_lambda = None):
     labels = [legend_lambda(n) for n in sort_curves]
     return handles, labels, sort_curves
 
+
+def prepare_legend(df, curve_column: str, legend_lambda=None):
+    """
+    Prepare legend handles and labels for plotting.
+    
+    Args:
+        df: DataFrame containing the curve data
+        curve_column: Column name to group curves by
+        legend_lambda: Optional function to format legend labels. If None, uses legend_format(curve_column, x)
+    
+    Returns:
+        (handles, labels): Tuple of legend handles and labels for plot_basic_settings
+    """
+    unique_curves = df[curve_column].unique()
+    if legend_lambda is None:
+        legend_lambda = lambda x: legend_format(curve_column, x)
+    handles, labels, _ = _get_legends(unique_curves, legend_lambda)
+    return handles, labels
+
+
 def plot_basic(
     x: np.ndarray,
     y: np.ndarray,
@@ -225,6 +245,7 @@ def plot_basic(
     """Generic plotting function that can handle both score and error rate plots"""
     if ax is None:
         fig, ax = plt.subplots(figsize=(6,4), dpi=300)
+    
     # Scatter
     if use_scatter:
         ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, marker=scatter_marker, color=color, edgecolors='none')
@@ -279,10 +300,9 @@ def plot_basic_settings(
     save_to_filename_prefix: str = None,
     # Additional save configuration for process_single_eval compatibility
     plot_eval_column: str = None,
-    plot_curve_column: str = None, 
+    plot_curve: str = None, 
     plot_x_column: str = None,
     plot_metric: str = None,
-    plot_curve_mask: list = None,
 ):
     # Import required ticker classes
     from matplotlib.ticker import MultipleLocator, LogLocator, FixedLocator
@@ -489,17 +509,17 @@ def plot_basic_settings(
         
         plt.tight_layout()
         
-        if plot_eval_column and plot_curve_column and plot_x_column and plot_metric:
+        if plot_eval_column and plot_curve and plot_x_column and plot_metric:
             # Create eval-specific output directory (same logic as process_single_eval)
             eval_file_str = config.TEST_EVALS[plot_eval_column]['file_str']
             Path(save_to_dir).mkdir(parents=True, exist_ok=True)
-            filename = f"{eval_file_str}_{plot_curve_column}_{plot_x_column}_{plot_metric}"
+            filename = f"{eval_file_str}_{plot_curve}_{plot_x_column}_{plot_metric}"
             if save_to_filename_prefix is not None:
                 filename = save_to_filename_prefix + filename
-            # if plot_curve_mask is not None:
+            # if curve_mask is not None:
             #     # Convert mask values to clean format for filename
             #     mask_str = "_".join([str(int(float(val))) if isinstance(val, (int, float)) or hasattr(val, 'item') 
-            #                         else str(val) for val in plot_curve_mask])
+            #                         else str(val) for val in curve_mask])
             #     filename += f"_{mask_str}"
             filename += ".pdf"
             if save_to_filename is not None:
@@ -519,64 +539,45 @@ def plot_basic_settings(
     return ax
 
 def plot_curves(
-    df,    # raw data to overlay as scatter points
+    df,
     curve_column: str,
     x_column: str,
-    y_column: str,  # column for raw scatter points
-    df_smooth=None,  # smoothed data for curves, if None use df
-    y_smooth_column: str = None,  # column for smooth curves, if None use y_column
-    y_width_column: str = None, # e.g. std
-    width_on_smooth: bool = False,
-    x_scale: str = None,
-    y_scale: str = None,
-    x_label: str = None,
-    y_label: str = None,
-    title: str = None,
+    y_column: str,
+    y_std_column: str = None,
     use_scatter: bool = False,
     use_line: bool = False,
-    smooth_use_scatter: bool = False,
-    smooth_use_line: bool = False,
-    use_legend: bool = False,
-    legend_lambda: Callable = None,
-    legend_loc: str = 'best',
-    legend_bbox_to_anchor: tuple = None,
-    legend_fontsize: int = 8,
-    # Highlight specific curves (backward compatible)
+    # Highlight specific curves
     highlight_curves: list = None,  # List of curve values to highlight
-    highlight_line_alpha: float = 1.0,  # Alpha for highlighted curves
-    highlight_line_width: float = None,  # Linewidth for highlighted curves
+    highlight_alpha: float = 1.0,  # Alpha for highlighted curves
+    highlight_width: float = None,  # Width for highlighted curves (line width and scatter size)
     # Line and scatter styling
     line_alpha: float = 1.0,
     line_width: float = 2.0,
     scatter_alpha: float = 0.3,
-    scatter_s: float = 8.0,
+    scatter_size: float = 8.0,
     scatter_marker: str = 'o',
-    # Axis formatting control
-    x_tick_format: str = None,  # 'auto', 'decimal', 'sci', or 'plain'
-    y_tick_format: str = 'auto',  # 'auto', 'decimal', 'sci', or 'plain'
-    # Tick and grid spacing
-    x_tick_spacing: float = None,
-    y_tick_spacing: float = None,
-    x_grid_spacing: float = None,
-    y_grid_spacing: float = None,
     # Custom color mapping override
-    custom_color_mapping: dict = None,  # Custom color mapping to override config colors
+    custom_color_mapping: dict = None,
     ax=None
 ):
-    """Generic plotting function that can handle both score and error rate plots"""
-    # Plot raw data as scatter points
+    """
+    Generic plotting function for curves grouped by curve_column.
+    Only handles data plotting; settings and legend should be handled by caller.
+    """
+    df = df.sort_values(x_column)
+    # Plot curves by group
     for g in data_proc.split_df(df, by_column=curve_column):
         curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-        # always sort by x column
         g = g.sort_values(x_column)
         x = g[x_column].to_numpy()
         y = g[y_column].to_numpy()
-        y_width = g[y_width_column].to_numpy() if y_width_column and not width_on_smooth and y_width_column in g.columns else None
+        y_width = g[y_std_column].to_numpy() if y_std_column and y_std_column in g.columns else None
         
         # Determine if this curve should be highlighted
         is_highlighted = highlight_curves is not None and curve_id in highlight_curves
-        final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
-        final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
+        final_line_alpha = highlight_alpha if is_highlighted else line_alpha
+        final_line_width = highlight_width if is_highlighted and highlight_width is not None else line_width
+        final_scatter_size = highlight_width if is_highlighted and highlight_width is not None else scatter_size
         
         # Use custom color mapping if provided, otherwise use config color mapping
         if custom_color_mapping is not None and curve_id in custom_color_mapping:
@@ -584,120 +585,24 @@ def plot_curves(
         else:
             color = get_color_for_curve(curve_id)
             
-        ax = plot_basic(x, y, 
-            use_scatter=use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
-            use_line=use_line, line_alpha=final_line_alpha, line_width=final_line_width,
-            fill_width=y_width, fill_width_alpha=0.2, color=color, ax=ax)
-        
-    # Plot smooth curves
-    if y_smooth_column is not None:
-        if df_smooth is None:
-            raise ValueError("df_smooth is required when y_smooth_column is not None")
-        for g in data_proc.split_df(df_smooth, by_column=curve_column):
-            curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-            # always sort by x column
-            g = g.sort_values(x_column)
-            x = g[x_column].to_numpy()
-            y = g[y_smooth_column].to_numpy()
-            y_width = g[y_width_column].to_numpy() if y_width_column and width_on_smooth and y_width_column in g.columns else None
-            
-            # Determine if this curve should be highlighted
-            is_highlighted = highlight_curves is not None and curve_id in highlight_curves
-            final_line_alpha = highlight_line_alpha if is_highlighted else line_alpha
-            final_line_width = highlight_line_width if is_highlighted and highlight_line_width is not None else line_width
-            
-            # Use custom color mapping if provided, otherwise use config color mapping
-            if custom_color_mapping is not None and curve_id in custom_color_mapping:
-                color = custom_color_mapping[curve_id]
-            else:
-                color = get_color_for_curve(curve_id)
-                
-            ax = plot_basic(x, y, 
-                use_scatter=smooth_use_scatter, scatter_alpha=scatter_alpha, scatter_s=scatter_s, scatter_marker=scatter_marker,
-                use_line=smooth_use_line, line_alpha=final_line_alpha, line_width=final_line_width,
-                fill_width=y_width, fill_width_alpha=0.2, color=color, ax=ax)
-            # # Line
-            # (ln,) = ax.plot(x, y, alpha=0.5, color=COLOR_MAPPING[curve_id])
-            # # Plot width span
-            # if y_width_column and y_width_column in g.columns and width_on_smooth:
-            #     y_width = g[y_width_column].to_numpy()
-            #     ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=COLOR_MAPPING[curve_id])
+        ax = plot_basic(
+            x, y, 
+            use_scatter=use_scatter, 
+            scatter_alpha=scatter_alpha, 
+            scatter_s=final_scatter_size,
+            scatter_marker=scatter_marker,
+            use_line=use_line, 
+            line_alpha=final_line_alpha, 
+            line_width=final_line_width,
+            fill_width=y_width, 
+            fill_width_alpha=0.2, 
+            color=color, 
+            ax=ax
+        )
     
-    # set legend
-    if use_legend:
-        unique_curves = df[curve_column].unique()
-        if legend_lambda is None:
-            legend_lambda = lambda x: legend_format(curve_column, x)
-            # legend_lambda = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}"
-        handles, labels, _ = _get_legends(unique_curves, legend_lambda)
-    else:
-        handles, labels = None, None
-    
-    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, (handles, labels), legend_loc, legend_bbox_to_anchor, legend_fontsize, 
-                            x_tick_format=x_tick_format, y_tick_format=y_tick_format,
-                            x_tick_spacing=x_tick_spacing, y_tick_spacing=y_tick_spacing,
-                            x_grid_spacing=x_grid_spacing, y_grid_spacing=y_grid_spacing)
     return ax
 
-def _backup_plot_curves(
-    df,    # raw data to overlay as scatter points
-    curve_column: str,
-    x_column: str,
-    y_column: str,  # column for raw scatter points
-    df_smooth=None,  # smoothed data for curves, if None use df
-    y_smooth_column: str = None,  # column for smooth curves, if None use y_column
-    y_width_column: str = None, # e.g. std
-    width_on_smooth: bool = False,
-    x_scale: str = None,
-    y_scale: str = None,
-    x_label: str = None,
-    y_label: str = None,
-    title: str = None,
-    use_legend: bool = False,
-    legend_lambda: Callable = lambda x: f"N={human_format_N(x, mode='eng', sig=3, sci_coeff=True)}",
-    legend_loc: str = 'best',
-    legend_bbox_to_anchor: tuple = None,
-    legend_fontsize: int = 8,
-    ax=None
-):
-    """Generic plotting function that can handle both score and error rate plots"""
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6,4), dpi=300)
-    
-    # set legend
-    unique_curves = sorted(df[curve_column].unique())
-    handles, labels, _ = _get_legends(unique_curves, legend_lambda)
-
-    # Plot raw data as scatter points
-    for g in data_proc.split_df(df, by_column=curve_column):
-        curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-        x = g[x_column].to_numpy()
-        y = g[y_column].to_numpy()
-        # Plot as scatter points with lighter color
-        ax.scatter(x, y, alpha=0.3, s=8, color=get_color_for_curve(curve_id), edgecolors='none')
-        # Plot width span
-        if y_width_column and y_width_column in g.columns and not width_on_smooth:
-            y_width = g[y_width_column].to_numpy()
-            ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=get_color_for_curve(curve_id))
-    
-    # Plot smooth curves
-    if y_smooth_column is not None:
-        if df_smooth is None:
-            raise ValueError("df_smooth is required when y_smooth_column is not None")
-        for g in data_proc.split_df(df_smooth, by_column=curve_column):
-            curve_id = g[curve_column].iloc[0] if curve_column in g.columns else None
-            x = g[x_column].to_numpy()
-            y = g[y_smooth_column].to_numpy()
-            # Line
-            (ln,) = ax.plot(x, y, alpha=0.5, color=get_color_for_curve(curve_id))
-            # Plot width span
-            if y_width_column and y_width_column in g.columns and width_on_smooth:
-                y_width = g[y_width_column].to_numpy()
-                ax.fill_between(x, y - y_width, y + y_width, alpha=0.2, color=get_color_for_curve(curve_id))
-    ax = plot_basic_settings(ax, x_scale, y_scale, x_label, y_label, title, use_legend, handles, labels, legend_loc, legend_bbox_to_anchor, legend_fontsize)
-    return ax
-
-def vplot_empirical_f_of_R(
+def plot_empirical_f_of_R(
     df,
     I_of_R: pd.DataFrame,
     use_smooth: bool = True,

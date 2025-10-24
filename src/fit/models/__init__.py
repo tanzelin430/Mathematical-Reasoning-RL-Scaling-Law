@@ -5,23 +5,29 @@ This module provides a registry of all available fit models and utilities
 to dynamically access them by name.
 """
 
+import inspect
 from typing import Type
+from src.fit.base import BaseFitter
+# don't delete, used in MODEL_REGISTRY
 from .loglinear import LogLinear
 from .invexp import InvExp
 from .invexp_klinear import InvExpKLinear
 from .invexp_kexp import InvExpKExp
 from .invexp_kquadlog import InvExpKQuadLog
+from .powlaw import PowLaw
+from .powlaw2 import PowLaw2
+from .powlaw3 import PowLaw3
+from .powlaw4 import PowLaw4
+from .powlawmul import PowLawMul
+from .loglinear_tau import LogLinearTau
 
-
-# Model Registry - maps model names to their classes
 MODEL_REGISTRY = {
-    'LogLinear': LogLinear,
-    'InvExp': InvExp,
-    'InvExpKLinear': InvExpKLinear,
-    'InvExpKQuadLog': InvExpKQuadLog,
-    'InvExpKExp': InvExpKExp,
+    cls.MODEL_NAME: cls
+    for name, cls in globals().items()
+    if (inspect.isclass(cls) and 
+        issubclass(cls, BaseFitter) and 
+        cls is not BaseFitter)
 }
-
 
 def get_model_class(model_name: str) -> Type:
     """

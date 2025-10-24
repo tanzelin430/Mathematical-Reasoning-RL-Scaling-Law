@@ -4,13 +4,13 @@
 # This script contains 4 runs (GRPO experiments)
 
 echo "=== Run 1/4: GRPO Rollout - Base (E) ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source grpo-base \
-  --plot-curve rollout_n \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources grpo-base \
+  --curve rollout_n \
   -x E \
   --eval holdout_score \
   --metric ErrRate \
-  --warmup-clip-frac 0.1 \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -31,17 +31,17 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix grpo_base_
+  --warmup-clip-to 10
 
 echo ""
 echo "=== Run 2/4: GRPO Rollout - Base (C_raw) ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source grpo-base \
-  --plot-curve rollout_n \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources grpo-base \
+  --curve rollout_n \
   -x C_raw \
   --eval holdout_score \
   --metric ErrRate \
-  --warmup-clip-frac 0.1 \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -60,17 +60,17 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix grpo_base_
+  --warmup-clip-to 10
 
 echo ""
 echo "=== Run 3/4: GRPO Rollout - Instruct (E) ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source grpo-instruct \
-  --plot-curve rollout_n \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources grpo-instruct \
+  --curve rollout_n \
   -x E \
   --eval holdout_score \
   --metric ErrRate \
-  --warmup-clip-frac 0.1 \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -91,17 +91,17 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix grpo_instruct_
+  --warmup-clip-to 10
 
 echo ""
 echo "=== Run 4/4: GRPO Rollout - Instruct (C_raw) ==="
-uv run -m src.run.plot_multi_fit \
-  --data-source grpo-instruct \
-  --plot-curve rollout_n \
+uv run -m src.scaling_analysis \
+  --plot \
+  --data-sources grpo-instruct \
+  --curve rollout_n \
   -x C_raw \
   --eval holdout_score \
   --metric ErrRate \
-  --warmup-clip-frac 0.1 \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -120,7 +120,7 @@ uv run -m src.run.plot_multi_fit \
   --scatter-alpha 0.8 \
   --scatter-size 10 \
   --scatter-marker o \
-  --output-prefix grpo_instruct_
+  --warmup-clip-to 10
 
 echo ""
 echo "All runs completed!"
