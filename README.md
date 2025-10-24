@@ -65,6 +65,9 @@ Important config (in config.py):
 ## Quick start
 
 Compute(C), Datasize(E) vs TestLoss:
+**Note: to change fit model:**
+- update `exp1_fits_save.sh` `--fit-model loglinear` to `invexp` etc.
+
 ```bash
 # Fitting for (C & E * base & instruct)
 ./scripts/exp1_fits_save.sh
