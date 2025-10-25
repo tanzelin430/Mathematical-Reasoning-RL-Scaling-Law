@@ -67,9 +67,11 @@ Note:
   - invexp_klinear, invexp_kquadlog, invexp_kexp: other invariants
 
 - Adding new fitting model
-  - implement `BaseFitter`-based class
-  - import in `src/fit/models/__init__.py`: `from .loglinear_tau import LogLinearTau`
-  - use it as `--fit-model {MODEL_NAME}`
+  1. implement `BaseFitter`-based class
+  2. import in `src/fit/models/__init__.py`: `from .loglinear_tau import LogLinearTau`
+  3. use it as `--fit-model {MODEL_NAME}`
+  4. carefully set bound `DEFAULT_BOUNDS` and initial value `DEFAULT_P0` for parameters, to guide the fitting search
+  5. easy test using `exp1_fit_model_test.sh` (fit + plot, skip result saving)
 
 ### Config
 Important config (in config.py):
