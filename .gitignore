@@ -11,3 +11,4 @@
 *.egg-info/
 __pycache__/
 tests/
+.DS_Store
