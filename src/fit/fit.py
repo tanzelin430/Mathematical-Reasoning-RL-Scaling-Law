@@ -131,7 +131,7 @@ def fit_on(
         y_data,
         p0=p0,
         bounds=bounds,
-        n_trials=3,  # 增加以提高稳定性
+        n_trials=5,  # 增加以提高稳定性
         max_iters=1600,
         verbose=True,
         verbose_interval=cma_verbose_interval,

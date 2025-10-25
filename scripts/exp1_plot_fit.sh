@@ -6,6 +6,7 @@
 echo "=== Run 1/4: figure 1a & 2a ==="
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
@@ -32,6 +33,7 @@ echo "=== Run 2/4: figure 1b & 3a ==="
 
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
@@ -57,6 +59,7 @@ echo ""
 echo "=== Run 3/4: figure 2a ==="
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \
@@ -82,6 +85,7 @@ echo ""
 echo "=== Run 4/4: figure 3b ==="
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \

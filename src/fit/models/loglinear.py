@@ -7,7 +7,7 @@ from src.fit.base import BaseFitter
 class LogLinear(BaseFitter):
     """
     Log-linear lookup table model:
-    y = log(L) = -k(n) * log(x) + E0(n)
+    log(y) = -k(n) * log(x) + E0(n)
     where k(n) and E0(n) are lookup tables for each n value.
     """
     MODEL_NAME = 'loglinear'

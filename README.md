@@ -52,6 +52,20 @@ Note:
 
 
 ### Fitting
+- Existing models:
+  - loglinear: 
+    - log(y) = -k(n) * log(x) + E0(n)
+    - k & E0 lookup table
+  - invexp: 
+    - L = (S/x)^k(n); 
+    - k lookup table, all curve cross same point x=S
+  - powlaw: 
+    - L = E + (A/n)^alpha + (B/x)^beta
+  - powlawmul: 
+    - L(N, C) = L_* * ( (C0 * N^r) / C )^( N / (N + N0) )
+    - cross point varies with N
+  - invexp_klinear, invexp_kquadlog, invexp_kexp: other invariants
+
 - Adding new fitting model
   - implement `BaseFitter`-based class
   - import in `src/fit/models/__init__.py`: `from .loglinear_tau import LogLinearTau`

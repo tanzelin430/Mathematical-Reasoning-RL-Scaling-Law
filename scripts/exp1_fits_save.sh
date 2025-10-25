@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Fitting C
-# Generated from params/test.json
-# 
-# Available fit models: LogLinear, InvExp, InvExpKLinear, InvExpKQuadLog, InvExpKExp
-# Note: fit_model is required when --fit is enabled, but not specified in test.json
-# Using InvExp as default here
+# Fitting L(N, C) & L(N, D) on Base & Instruct models, save fit result to json.
+# Use exp1_plot_fit.sh to load and plot the fitting curves.
 
+# Available -fit-model options: 
+#   loglinear, invexp, powlaw, powlawmul, invexp_klinear, invexp_kquadlog, invexp_kexp
+
+echo "=== Run 1/2: Fitting L(N, C) on Base & Instruct models ==="
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \
   --ending-clip 0 \
@@ -21,6 +21,8 @@ uv run -m src.scaling_analysis \
   --x-inv-weight-power 0 \
   --curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9 \
 
+echo ""
+echo "=== Run 2/2: Fitting L(N, D) on Base & Instruct models ==="
 
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \

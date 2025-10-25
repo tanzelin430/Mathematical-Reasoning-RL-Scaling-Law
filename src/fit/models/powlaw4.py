@@ -7,7 +7,7 @@ from src.fit.base import BaseFitter
 @dataclass
 class PowLaw4(BaseFitter):
     """
-    Power law model: L = E + (A/n)^alpha + (B/(x+Z))^beta
+    Power law model: y = E + (A/n)^alpha + (B/(x+Z))^beta
     
     where:
     - n: N (model parameters)

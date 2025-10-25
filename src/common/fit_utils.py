@@ -351,6 +351,8 @@ _EPS_TOLERANCE = 1e-15   # Close to zero tolerance
 _EPS_POS  = 1e-30  # Minimum positive value to prevent log(0)
 _EPS_MONO = 1e-12  # Minimum increment to ensure strict monotonicity
 _PENALTY_LARGE = 1e12  # Large penalty value for infeasible solutions
+_SUCC_LOSS_THRESHOLD = 5e-4  # Success threshold for optimization (~ r2>0.99)
+_SUCC_R2_THRESHOLD = 0.9
 
 
 def cma_curve_fit(
@@ -531,7 +533,7 @@ def cma_curve_fit(
     
     for trial in range(n_trials):
         trial_seed = trial_seeds[trial]
-        print(f"=== CMA-ES Trial {trial + 1}/{n_trials} ===")
+        print(f"    --- CMA-ES Trial {trial + 1}/{n_trials} ---")
         
         # Set initial parameters for this trial
         if trial == 0:
@@ -583,10 +585,10 @@ def cma_curve_fit(
                 
                 # Format params as single line string
                 params_str = ' '.join([f'{p:.2e}' for p in params_display])
-                print(f"  Iter {iteration+1:3d}: loss={current_best:.6e}, params=[{params_str}]{bound_str}")
+                print(f"    Iter {iteration+1:3d}: loss={current_best:.6e}, params=[{params_str}]{bound_str}")
             
             if es.stop():
-                print(f"  CMA-ES stopping criteria met at iteration {iteration+1}")
+                print(f"    CMA-ES stopping criteria met at iteration {iteration+1}")
                 break
         
         # Store trial result
@@ -601,14 +603,18 @@ def cma_curve_fit(
         }
         all_results.append(trial_result)
         
-        print(f"  Final loss: {final_loss:.6e}")
-        print(f"  Final params: {final_params}")
+        print(f"    trial loss: {final_loss:.6e}")
+        print(f"    trial params: {final_params}")
         
         # Update best result
         if final_loss < best_loss:
             best_loss = final_loss
             best_params = final_params.copy()
             best_es = es
+        
+        # Early stopping
+        if best_loss < _SUCC_LOSS_THRESHOLD:
+            break
     
     # Prepare return values
     if best_params is None:
@@ -626,9 +632,11 @@ def cma_curve_fit(
     except:
         r2 = np.nan
         
-    print(f"\n=== Final Results ===")
-    print(f"Best loss: {best_loss:.6e}")
+    print(f"\n--- Final Results ---")
+    # print(f"Best loss: {best_loss:.6e}")
     print(f"Best parameters: {best_params}")
-    print(f"R²: {r2:.4f}")
+    # print(f"R²: {r2:.4f}")
+    if r2 < _SUCC_R2_THRESHOLD:
+        print(f"\n[Warning] R² is too low: {r2:.4f}\n")
     
     return best_params, best_loss, r2

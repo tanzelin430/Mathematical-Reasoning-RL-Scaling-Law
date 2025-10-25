@@ -311,7 +311,7 @@ def _fit_multiple(args, df_map):
     return [_fit_once(args, df, data_source) for data_source, df in df_map.items()]
 
 def _fit_once(args, df, data_source):
-    print(f"\n=== Fitting for x_column: {args.fit_x}, curve_column: {args.curve} ===")
+    print(f"\n=== Fitting on data_source: {data_source}, L({args.curve}, {args.fit_x}) ===")
     print(f"Using model: {args.fit_model}")
     
     FitterClass = get_model_class(args.fit_model)
