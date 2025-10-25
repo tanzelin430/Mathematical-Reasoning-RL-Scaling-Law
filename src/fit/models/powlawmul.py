@@ -36,42 +36,18 @@ class PowLawMul(BaseFitter):
     # Class variables (not part of __init__)
     # PARAM_NAMES is auto-generated from dataclass fields
     
-    # DEFAULT_BOUNDS = (
-    #     [0.60,  5e10,  0.20,   8e9],    # Lower: L_star, C0,   r,     N0
-    #     [2,  2e17,  1,  1e13],    # Upper
-    # )
-
-    # DEFAULT_P0 = [
-    #     0.70,         # L_star
-    #     1e17,         # C0  ⬅⬅ 控制交点x轴位置
-    #     0.40,         # r   ⬅⬅ 适度控制随 N 右移速度
-    #     15e9          # N0    ⬅⬅ 变大，缓和幂指数变化
-    # ]
-
-    # R2=0.7945
-    # DEFAULT_BOUNDS: ClassVar[tuple] = (
-    #     [0.65,   1e7,   0.30,   3e10],     # Lower: L_star, C0,    r,     N0
-    #     [0.95,   5e12,  0.80,   5e11],     # Upper
-    # )
-
-    # DEFAULT_P0: ClassVar[list] = [
-    #     0.80,            # L_star
-    #     1e8,            # C0       ⬅ 更自由地选交点位置
-    #     0.55,            # r        ⬅ 控制右移速度
-    #     1e11             # N0       ⬅ 幂指数变化更稳
-    # ]
-
     DEFAULT_BOUNDS = (
-        [0.65,   1e7,   0.30,   1e9, 0.1],      # Lower: L_star, C0,    r,     N0,    k_max
-        [2,   5e15,  0.80,   5e11, 1.0],     # Upper: tighter N0 to force early flattening
+        # L_star, C0,    r,     N0,    k_max
+        [0.65,   1e-5,   0.30,   1e9, 0.01],      # Lower
+        [2,      5e11,  2,   5e11, 1.0],     # Upper
     )
 
     DEFAULT_P0 = [
         0.80,           # L_star
         1e8,            # C0       ⬅ 更自由地选交点位置
-        0.55,            # r        ⬅ 控制右移速度
-        1e11,             # N0       ⬅ 幂指数变化更稳
-        0.6
+        0.55,           # r        ⬅ 控制右移速度
+        1e11,           # N0       ⬅ tighter：幂指数收敛越快(early flattening)，同时变化越快
+        0.6,            # k_max    ⬅ 最大渐进斜率/k(N)整体系数
     ]
 
     @classmethod

@@ -351,7 +351,7 @@ _EPS_TOLERANCE = 1e-15   # Close to zero tolerance
 _EPS_POS  = 1e-30  # Minimum positive value to prevent log(0)
 _EPS_MONO = 1e-12  # Minimum increment to ensure strict monotonicity
 _PENALTY_LARGE = 1e12  # Large penalty value for infeasible solutions
-_SUCC_LOSS_THRESHOLD = 5e-4  # Success threshold for optimization (~ r2>0.99)
+_SUCC_LOSS_THRESHOLD = 3e-4  # Success threshold for optimization (~ r2>0.99)
 _SUCC_R2_THRESHOLD = 0.9
 
 

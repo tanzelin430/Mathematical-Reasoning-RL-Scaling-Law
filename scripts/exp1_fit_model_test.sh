@@ -10,7 +10,8 @@ args=(
   --ending-clip 0
   
   # Data sources and evaluation
-  --data-sources base
+  # --data-sources base
+  --data-sources instruct
   --eval holdout_score
   
   # Fit configuration
@@ -51,7 +52,7 @@ args=(
   --line-alpha 1
   --line-width 2.0
   --plot-use-legend
-  --plot-title "Fitted L(N, C) on Base models"
+  --plot-title "Fitted L(N, C)"
   --scatter-alpha 0.3
   --scatter-size 15
   --scatter-marker o
