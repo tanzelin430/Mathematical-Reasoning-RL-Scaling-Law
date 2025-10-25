@@ -16,8 +16,8 @@ args=(
   # Fit configuration
   --fit
   # --fit-model loglinear # change model here
-  --fit-model invexp # change model here
-  # --fit-model powlawmul # change model here
+  # --fit-model invexp # change model here
+  --fit-model powlawmul # change model here
   --curve N
   --fit-x C_raw
   --fit-metric ErrRate
