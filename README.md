@@ -62,7 +62,7 @@ Note:
   - powlaw: 
     - L = E + (A/n)^alpha + (B/x)^beta
   - powlawmul: 
-    - L(N, C) = L_* * ( (C0 * N^r) / C )^( N / (N + N0) )
+    - L(N, C) = ((C0 * N^r) / C )^( k_{max} * N / (N + N0) )
     - cross point varies with N
   - invexp_klinear, invexp_kquadlog, invexp_kexp: other invariants
 
