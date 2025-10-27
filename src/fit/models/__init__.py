@@ -21,6 +21,8 @@ from .powlaw4 import PowLaw4
 from .powlawmul import PowLawMul
 from .powlawmul_lstar import PowLawMulLStar
 from .powlawplus import PowLawPlus
+from .powlawmul2 import PowLawMul2
+from .powlawmul3 import PowLawMul3
 from .loglinear_tau import LogLinearTau
 
 MODEL_REGISTRY = {
