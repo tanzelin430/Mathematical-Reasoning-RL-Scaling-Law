@@ -16,20 +16,25 @@ def main():
     # data_source = "llama-instruct"
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
     
+    # Get physical dimensions for this data source
+    physical_dimensions = config.get_physical_dimensions(data_source)
+    physical_curve_column = physical_dimensions[0]  # N, slice_factor, or rollout_n
+    physical_x_column = physical_dimensions[1]      # step
+    
     # Remove step=0 data (because E=0 will cause log10(E)=-inf)
     df = df[df['step'] > 0].reset_index(drop=True)
     
     # eval_name = "val/test_score/openai/gsm8k" # must be one of config.TEST_EVALS.keys()
     eval_name = "holdout_score"
-    curve_column = 'N' # key must be one of 'N', 'data_fator'
+    curve_column = 'N' #
     for x_column in [ "C", "E", "T"]: # "T", "C", "E"
         for metric in ["ErrRate"]: # "R", "ErrRate", "DeltaReward", "DeltaErrRate"
-            # Prepare eval data
+            # Prepare eval data (using physical dimensions for merging)
             df_eval = data_proc.prepare_eval_data(
                 df,
                 eval_column=eval_name,
-                curve_column=curve_column,
-                x_columns=[x_column],
+                curve_column=physical_curve_column,
+                x_column=physical_x_column,
                 calc_delta=metric.startswith('Delta'),
                 delta_base_step=1
             )

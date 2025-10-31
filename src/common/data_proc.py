@@ -129,7 +129,7 @@ def prepare_eval_data(
     df,
     eval_column: str,
     curve_column: str,
-    x_columns: list,
+    x_column: str,
     calc_delta: bool = False,
     delta_base_step: int = 0,
 ):
@@ -146,13 +146,17 @@ def prepare_eval_data(
     Args:
         df: 原始数据
         eval_column: 评估列名（如 'holdout_score'）
-        curve_column: 曲线分组列名（如 'N', 'Tau'）
-        x_columns: x轴列名列表（如 ['C', 'E']），用于 merge 时避免不同 x 值被错误合并
+        curve_column: 主要实验变量（如 'N', 'slice_factor', 'rollout_n'），用于 delta 分组
+        x_column: 第二维度（通常是 'step'），与 curve_column 一起构成物理维度
         calc_delta: 是否计算 Delta 指标
         delta_base_step: Delta 计算的基准 step
     
     Returns:
         df: 处理后的数据，包含 'R', 'ErrRate', 'R_std', 'ErrRate_std' 等列
+    
+    Note:
+        Merge 基于物理维度 [curve_column, x_column]（如 ['N', 'step']），
+        而不是显示维度（plot_curve/plot_x）。
     """
     # 1. Copy to R
     # df = df.rename(columns={eval_column: 'R'})
@@ -161,31 +165,27 @@ def prepare_eval_data(
     # 2. Calculate ErrRate
     df['ErrRate'] = 1 - df['R']
     
-    # 3. Calculate std BEFORE merging
-    R_std = df.groupby([curve_column, 'step'])['R'].std().to_frame('R_std')
-    ErrRate_std = df.groupby([curve_column, 'step'])['ErrRate'].std().to_frame('ErrRate_std')
+    # 3. Calculate std BEFORE merging - based on physical dimensions
+    physical_dimensions = [curve_column, x_column]
+    R_std = df.groupby(physical_dimensions)['R'].std().to_frame('R_std')
+    ErrRate_std = df.groupby(physical_dimensions)['ErrRate'].std().to_frame('ErrRate_std')
     
-    # 4. Calculate delta if needed
+    # 4. Calculate delta if needed (group by curve_column)
     if calc_delta:
         df['DeltaReward'] = calc_delta_y(df, 'R', base_step=delta_base_step, curve_column=curve_column)
         df['DeltaErrRate'] = calc_delta_y(df, 'ErrRate', base_step=delta_base_step, curve_column=curve_column)
-        DeltaReward_std = df.groupby([curve_column, 'step'])['DeltaReward'].std().to_frame('DeltaReward_std')
-        DeltaErrRate_std = df.groupby([curve_column, 'step'])['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
+        DeltaReward_std = df.groupby(physical_dimensions)['DeltaReward'].std().to_frame('DeltaReward_std')
+        DeltaErrRate_std = df.groupby(physical_dimensions)['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
     
-    # 5. Merge duplicate steps (average multiple rollouts)
-    merge_columns = [curve_column, 'step']
-    for x_col in x_columns:
-        if x_col not in merge_columns:
-            merge_columns.append(x_col)
-    df = merge_duplicate_steps(df, group_columns=merge_columns, mode='mean')
+    # 5. Merge duplicate steps (average multiple rollouts) by physical dimensions
+    df = merge_duplicate_steps(df, group_columns=physical_dimensions, mode='mean')
     
-    # 6. Add std cols back
-    std_merge_columns = [curve_column, 'step']
-    df = df.merge(R_std, on=std_merge_columns)
-    df = df.merge(ErrRate_std, on=std_merge_columns)
+    # 6. Add std cols back - based on physical dimensions
+    df = df.merge(R_std, on=physical_dimensions)
+    df = df.merge(ErrRate_std, on=physical_dimensions)
     if calc_delta:
-        df = df.merge(DeltaReward_std, on=std_merge_columns)
-        df = df.merge(DeltaErrRate_std, on=std_merge_columns)
+        df = df.merge(DeltaReward_std, on=physical_dimensions)
+        df = df.merge(DeltaErrRate_std, on=physical_dimensions)
     
     return df
 
@@ -236,32 +236,25 @@ def estimate_phi_from_runs(
     phi_by_N = {float(N): float(np.median(meds)) for N, meds in byN.items()}
     return phi_global, phi_by_N, stats
 
-def apply_clip(df, curve_column: str, warmup_clip: int = 0, warmup_clip_to: int = None, ending_clip: int = 0, ending_clip_to: int = None):
+def apply_clip(df, curve_column: str, warmup_clip: int = None, warmup_clip_to: int = None, ending_clip: int = None, ending_clip_to: int = None):
     # Handle default case
-    if warmup_clip == 0 and warmup_clip_to is None and ending_clip == 0 and ending_clip_to is None:
+    if all(x is None for x in [warmup_clip, warmup_clip_to, ending_clip, ending_clip_to]):
         return df
     
-    # Apply clipping functions sequentially (can combine multiple types)
-    result_df = df.copy()
+    # Apply clipping functions (merge operations to reduce passes)
+    result_df = df
     
-    # Apply warmup clipping first (remove first N steps by index)
-    if warmup_clip > 0:
-        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=warmup_clip, end_idx=None) 
+    # Apply index-based clipping (warmup and ending together)
+    if warmup_clip is not None or ending_clip is not None:
+        # Convert 0 to None (0 means no clipping)
+        start_idx = warmup_clip if warmup_clip else None
+        end_idx = -ending_clip if (ending_clip is not None and ending_clip > 0) else None
+        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=start_idx, end_idx=end_idx) 
                                for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
-    # Apply warmup_clip_to second (remove steps < warmup_clip_to by value)
-    if warmup_clip_to is not None:
-        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=None) 
-                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
-    
-    # Apply ending clipping third (remove last N steps by index)
-    if ending_clip > 0:
-        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=None, end_idx=-ending_clip) 
-                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
-    
-    # Apply ending_clip_to fourth (remove steps > ending_clip_to by value)
-    if ending_clip_to is not None:
-        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=None, max_step=ending_clip_to) 
+    # Apply value-based clipping (warmup_clip_to and ending_clip_to together)
+    if warmup_clip_to is not None or ending_clip_to is not None:
+        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=ending_clip_to) 
                                for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
     
     return result_df
@@ -280,16 +273,16 @@ def _clip_single_curve_by_index(df, start_idx=None, end_idx=None):
         DataFrame with rows outside [start_idx:end_idx] removed
     """
     if len(df) == 0:
-        return df.copy()
+        return df
         
     if 'step' not in df.columns:
-        return df.iloc[0:0].copy()
+        return df.iloc[0:0]
     
     # Sort by step to ensure proper ordering
     df_sorted = df.sort_values('step').reset_index(drop=True)
     
     # Apply index slicing
-    return df_sorted.iloc[start_idx:end_idx].copy().reset_index(drop=True)
+    return df_sorted.iloc[start_idx:end_idx].reset_index(drop=True)
 
 
 def _clip_single_curve_by_step_value(df, min_step=None, max_step=None):
@@ -305,10 +298,10 @@ def _clip_single_curve_by_step_value(df, min_step=None, max_step=None):
         DataFrame with steps outside [min_step, max_step] removed
     """
     if len(df) == 0:
-        return df.copy()
+        return df
         
     if 'step' not in df.columns:
-        return df.iloc[0:0].copy()
+        return df.iloc[0:0]
     
     # Build filter condition
     mask = pd.Series(True, index=df.index)
@@ -317,7 +310,7 @@ def _clip_single_curve_by_step_value(df, min_step=None, max_step=None):
     if max_step is not None:
         mask &= (df['step'] <= max_step)
     
-    return df[mask].copy().reset_index(drop=True)
+    return df[mask].reset_index(drop=True)
 
 
 def calc_delta_y(df, y_column: str, base_step: int, curve_column: str, debug=config.DEBUG):

@@ -7,10 +7,10 @@ echo "=== Run 1/2: figure 7a ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources exp2-base \
-  --curve Tau \
-  -x step \
+  --plot-curve Tau \
+  --plot-x step \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -34,7 +34,7 @@ uv run -m src.scaling_analysis \
   --scatter-marker o \
   --plot-use-legend \
   --plot-title "Data Reuse on Base model (7B)" \
-  --curve-mask 1 2 5 20 25 50 100 \
+  --plot-curve-mask 1 2 5 20 25 50 100 \
   --highlight-curves-predict 1 \
   --highlight-width 3.0 \
 
@@ -43,10 +43,10 @@ echo "=== Run 2/2: figure 7b ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources exp2-instruct \
-  --curve Tau \
-  -x step \
+  --plot-curve Tau \
+  --plot-x step \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --s-factor 1 \
   --k-spline 3 \
@@ -69,7 +69,7 @@ uv run -m src.scaling_analysis \
   --scatter-marker o \
   --plot-use-legend \
   --plot-title "Data Reuse on Instruct model (7B)" \
-  --curve-mask 1 2 5 20 25 50 100 \
+  --plot-curve-mask 1 2 5 20 25 50 100 \
   --highlight-curves-predict 1 \
   --highlight-width 3.0 \
 

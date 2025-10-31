@@ -15,10 +15,6 @@ def get_x_y_data_from_df(
     y_column, 
     x_transform_list: list[Callable | None]=None, 
     y_transform: Callable=None,
-    warmup_clip: int = 0,
-    warmup_clip_to: int = None,
-    ending_clip: int = 0,
-    ending_clip_to: int = None
 ) -> Tuple[Tuple[np.ndarray, ...], np.ndarray]:
     """
     Extract and preprocess x, y data from dataframe for fitting.
@@ -35,28 +31,12 @@ def get_x_y_data_from_df(
         List of transform functions for each x column
     y_transform : callable, optional
         Transform function for y column (e.g., lambda x: 1-x for ErrRate)
-    warmup_clip : int, optional
-        Number of steps to remove from the beginning (0 means no clipping)
-    ending_clip : int, optional
-        Number of steps to remove from the end (0 means no clipping)
         
     Returns:
     --------
     tuple : (x_data_tuple, y_data_array)
     """
     df_fit = df.copy()
-    
-    # Apply clipping
-    if warmup_clip > 0 or warmup_clip_to is not None or ending_clip > 0 or ending_clip_to is not None:
-        curve_column = x_column_list[0] if x_column_list else "N"
-        df_fit = data_proc.apply_clip(
-            df_fit, 
-            curve_column=curve_column, 
-            warmup_clip=warmup_clip,
-            warmup_clip_to=warmup_clip_to,
-            ending_clip=ending_clip,
-            ending_clip_to=ending_clip_to
-        )
     
     # 准备拟合数据 - 返回tuple避免后续转置
     x_transform_list = [None] * len(x_column_list) if x_transform_list is None else x_transform_list
@@ -80,10 +60,6 @@ def fit_on(
     x_column_list=["N", "E"], 
     x_transform_list=[None, None], 
     y_transform: Callable=None, 
-    warmup_clip=0, 
-    warmup_clip_to=None, 
-    ending_clip=0, 
-    ending_clip_to=None, 
     bounds=None, 
     p0=None, 
     x_inv_weight_power=0, 
@@ -104,10 +80,6 @@ def fit_on(
         y_column=eval_name,
         x_transform_list=x_transform_list,
         y_transform=y_transform,
-        warmup_clip=warmup_clip,
-        warmup_clip_to=warmup_clip_to,
-        ending_clip=ending_clip,
-        ending_clip_to=ending_clip_to
     )
     
     # Get bounds and p0: caller's args > FitterClass defaults

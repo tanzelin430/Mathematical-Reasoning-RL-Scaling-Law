@@ -47,7 +47,7 @@ def normalize_list_arg(value: Union[str, List[Union[str, List[str]]], None]) -> 
     return tokens
 
 
-def parse_curve_mask(value: Union[str, List[str]]) -> List[Union[int, float]]:
+def parse_curves(value: Union[str, List[str]]) -> List[Union[int, float]]:
     """Parse curve mask supporting scientific notation like 7e9, 1.5e9.
 
     Accepts comma-separated string or a list of tokens.
@@ -63,14 +63,6 @@ def parse_curve_mask(value: Union[str, List[str]]) -> List[Union[int, float]]:
         except ValueError:
             raise ValueError(f"Invalid curve mask value: {item}")
     return values
-
-
-def parse_highlight_curves(value: Union[str, List[str]]) -> List[Union[int, float]]:
-    """Parse highlight curves supporting scientific notation"""
-    if not value:
-        return []
-    return parse_curve_mask(value)
-
 
 def validate_args(args):
     """Validate command line arguments
@@ -91,8 +83,11 @@ def validate_args(args):
     
     # Validate curve columns (only if provided)
     valid_curves = list(config.DEFAULT_LABELS.keys())
-    if args.curve and args.curve not in valid_curves:
-        raise ValueError(f"Invalid curve: {args.curve}. "
+    if args.plot_curve and args.plot_curve not in valid_curves:
+        raise ValueError(f"Invalid plot-curve: {args.plot_curve}. "
+                        f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
+    if args.fit_curve and args.fit_curve not in valid_curves:
+        raise ValueError(f"Invalid fit-curve: {args.fit_curve}. "
                         f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
     
     # Validate x columns (only if provided)
@@ -157,9 +152,8 @@ Examples:
                        action='append', nargs='+',
                        help='Data source(s) to use (space- or comma-separated; flag can be repeated). Valid choices: ' + ', '.join(config.CSV_MAP.keys()))
     
-    parser.add_argument('--curve',
-                       choices=['N', 'Tau', 'rollout_n'],
-                       help='Column to use for curve grouping (used for both fitting and plotting)')
+    parser.add_argument('--curve', '--plot-curve', dest='plot_curve',
+                       help='Curve column for plotting, e.g.\'N\', \'Tau\', \'rollout_n\'')
     
     parser.add_argument('-x', '--plot-x', dest='plot_x_columns',
                        action='append', nargs='+',
@@ -169,7 +163,7 @@ Examples:
                        choices=list(config.TEST_EVALS.keys()),
                        help='Evaluation metric to analyze')
     
-    parser.add_argument('--metric', dest='plot_metrics',
+    parser.add_argument('--metric', '--plot-metric', dest='plot_metrics',
                        action='append', nargs='+',
                        help='Metrics to plot (space- or comma-separated; flag can be repeated)')
     parser.add_argument('--plot', action='store_true',
@@ -181,6 +175,10 @@ Examples:
     fit_group = parser.add_argument_group('fitting options')
     fit_group.add_argument('--fit', action='store_true',
                           help='Enable model fitting')
+    fit_group.add_argument('--fit-curve',
+                          help='Curve column for fitting, e.g.\'N\', \'Tau\', \'rollout_n\'')
+    fit_group.add_argument('--fit-curve-mask', dest='fit_curve_mask', nargs='+',
+                           help='Curves to include in fitting (space- or comma-separated, supports scientific notation)')
     fit_group.add_argument('--fit-x', dest='fit_x',
                           choices=list(config.DEFAULT_LABELS.keys()),
                           help='X column for fitting (default: first --plot-x column)')
@@ -204,7 +202,7 @@ Examples:
                           help='CMA-ES verbose interval, 0 to disable verbose output (default: 0)')
     # Plot configuration
     plot_group = parser.add_argument_group('plot configuration')
-    plot_group.add_argument('--curve-mask', dest='curve_mask', nargs='+',
+    plot_group.add_argument('--plot-curve-mask', dest='plot_curve_mask', nargs='+',
                            help='Curves to include in plots (space- or comma-separated, supports scientific notation)')
     plot_group.add_argument('--highlight-curves-predict', dest='highlight_curves_predict', nargs='+',
                            help='Curves to highlight in predict_and_plot (space- or comma-separated, supports scientific notation). If not set, no highlighting in predict phase.')
@@ -235,11 +233,11 @@ Examples:
     # Plot style
     style_group = parser.add_argument_group('plot style')
     style_group.add_argument('--plot-use-scatter', dest='plot_use_scatter',
-                            type=lambda x: x.lower() in ['true', '1', 'yes'], default=True,
+                            action='store_true', default=True,
                             help='Use scatter plots (default: True)')
     style_group.add_argument('--plot-use-line', dest='plot_use_line',
-                            type=lambda x: x.lower() in ['true', '1', 'yes'], default=False,
-                            help='Use line plots (default: True)')
+                            action='store_true', default=False,
+                            help='Use line plots (default: False)')
     style_group.add_argument('--no-scatter', dest='plot_use_scatter',
                             action='store_false',
                             help='Disable scatter plots')
@@ -390,21 +388,10 @@ def process_parsed_args(args):
             args.fit_metric = args.plot_metrics[0] if args.plot_metrics else None
 
     # Parse curve masks and highlight curves
-    if args.curve_mask:
-        args.curve_mask = parse_curve_mask(args.curve_mask)
-    else:
-        args.curve_mask = None  # Default
-
-    # Parse highlight curve arguments
-    if args.highlight_curves_predict:
-        args.highlight_curves_predict = parse_highlight_curves(args.highlight_curves_predict)
-    else:
-        args.highlight_curves_predict = None  # Default
-    
-    if args.highlight_curves_plot:
-        args.highlight_curves_plot = parse_highlight_curves(args.highlight_curves_plot)
-    else:
-        args.highlight_curves_plot = None  # Default
+    args.fit_curve_mask = parse_curves(args.fit_curve_mask) if args.fit_curve_mask else None
+    args.plot_curve_mask = parse_curves(args.plot_curve_mask) if args.plot_curve_mask else None
+    args.highlight_curves_predict = parse_curves(args.highlight_curves_predict) if args.highlight_curves_predict else None
+    args.highlight_curves_plot = parse_curves(args.highlight_curves_plot) if args.highlight_curves_plot else None
 
     # Parse plot_titles JSON
     if args.plot_titles:
@@ -525,22 +512,22 @@ def validate_required_args(args):
     missing_args = []
     # If loading from file, no required arguments (all loaded from context)
     if args.plot:
-        # Check required arguments when not loading from file
-        required_args = ['data_sources', 'eval', 'curve', 'plot_x_columns', 'plot_metrics']
+        # Check required arguments
+        required_args = ['data_sources', 'eval', 'plot_curve', 'plot_x_columns', 'plot_metrics']
         for arg in required_args:
             if not getattr(args, arg, None):
                 missing_args.append(arg.replace('_', '-'))
     
     if args.plot_fit:
-        # Check required arguments when not loading from file
-        required_args = ['data_sources', 'fit_x']
+        # Check required arguments
+        required_args = ['data_sources', 'fit_x', 'fit_curve', 'fit_metric']
         for arg in required_args:
             if not getattr(args, arg, None):
                 missing_args.append(arg.replace('_', '-'))
 
     if args.fit:
         # Check required arguments when not loading from file
-        required_args = ['data_sources', 'fit_x', 'eval']
+        required_args = ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval']
         for arg in required_args:
             if not getattr(args, arg, None):
                 missing_args.append(arg.replace('_', '-'))

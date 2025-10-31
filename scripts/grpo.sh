@@ -7,10 +7,10 @@ echo "=== Run 1/4: GRPO Rollout - Base (E) ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources grpo-base \
-  --curve rollout_n \
-  -x E \
+  --plot-curve rollout_n \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -38,10 +38,10 @@ echo "=== Run 2/4: GRPO Rollout - Base (C_raw) ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources grpo-base \
-  --curve rollout_n \
-  -x C_raw \
+  --plot-curve rollout_n \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -67,10 +67,10 @@ echo "=== Run 3/4: GRPO Rollout - Instruct (E) ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources grpo-instruct \
-  --curve rollout_n \
-  -x E \
+  --plot-curve rollout_n \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -98,10 +98,10 @@ echo "=== Run 4/4: GRPO Rollout - Instruct (C_raw) ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources grpo-instruct \
-  --curve rollout_n \
-  -x C_raw \
+  --plot-curve rollout_n \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \

@@ -7,10 +7,10 @@ echo "=== Run 1/4: figure 1a & 2a ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources base \
-  --curve N \
-  -x C_raw \
+  --plot-curve N \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -37,12 +37,11 @@ echo "=== Run 2/4: figure 1b & 3a ==="
 
 uv run -m src.scaling_analysis \
   --plot \
-  --fit-x C_raw \
   --data-sources base \
-  --curve N \
-  -x E \
+  --plot-curve N \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -68,12 +67,11 @@ echo ""
 echo "=== Run 3/4: figure 2a ==="
 uv run -m src.scaling_analysis \
   --plot \
-  --fit-x C_raw \
   --data-sources instruct \
-  --curve N \
-  -x C_raw \
+  --plot-curve N \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \
@@ -99,12 +97,11 @@ echo ""
 echo "=== Run 4/4: figure 3b ==="
 uv run -m src.scaling_analysis \
   --plot \
-  --fit-x C_raw \
   --data-sources instruct \
-  --curve N \
-  -x E \
+  --plot-curve N \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --add-smooth \
   --smooth-monotonic \
   --s-factor 1 \

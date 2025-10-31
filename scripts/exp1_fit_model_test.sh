@@ -20,17 +20,18 @@ args=(
   # --fit-model invexp # change model here
   --fit-model powlawmul3 # change model here
   # --fit-model powlawplus # change model here
-  --curve N
+  --fit-curve N
   --fit-x C_raw
   --fit-metric ErrRate
-  --fit-save outputs/fits_exp1.json
+  --fit-save outputs/fits_exp1_test.json
   --x-inv-weight-power 0
-  --curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9
+  --fit-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9
   
   # Plot configuration
   --plot
   --plot-fit
-  -x C_raw
+  --plot-x C_raw
+  --plot-curve N
   --metric ErrRate
   
   # Plot styling

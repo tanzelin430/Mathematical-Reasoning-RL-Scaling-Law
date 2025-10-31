@@ -30,12 +30,14 @@ def main():
     
     # Parse comma-separated arguments
     data_source = args.data_source
+    curve_column = 'N'
     x_columns = [x.strip() for x in args.x_columns.split(',')]
     metrics = [m.strip() for m in args.metrics.split(',')]
     warmup_clip = args.warmup_clip
     
     print(f"Configuration:")
     print(f"  Data source: {data_source}")
+    print(f"  Curve column: {curve_column}")
     print(f"  X columns: {x_columns}")
     print(f"  Metrics: {metrics}")
     print(f"  Warmup clip num: {warmup_clip}")
@@ -43,6 +45,11 @@ def main():
     
     # Load data
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
+    
+    # Get physical dimensions for this data source
+    physical_dimensions = config.get_physical_dimensions(data_source)
+    physical_curve_column = physical_dimensions[0]
+    physical_x_column = physical_dimensions[1]
     
     # Remove step=0 data (because E=0 will cause log10(E)=-inf)
     df = df[df['step'] > 0].reset_index(drop=True)
@@ -77,8 +84,8 @@ def main():
                     df_eval = data_proc.prepare_eval_data(
                         df_eval,
                         eval_column=eval_name,
-                        curve_column='N',
-                        x_columns=[x_column],
+                        curve_column=physical_curve_column,
+                        x_column=physical_x_column,
                         calc_delta=metric.startswith('Delta'),
                         delta_base_step=1
                     )
@@ -87,17 +94,17 @@ def main():
                     if warmup_clip > 0:
                         df_eval = data_proc.apply_clip(
                             df_eval,
-                            curve_column='N',
+                            curve_column=physical_curve_column,
                             warmup_clip=warmup_clip,
                             warmup_clip_to=None,
                             ending_clip=0,
                             ending_clip_to=None
                         )
                     
-                    # Plot raw scatter points
+                    # Plot raw scatter points (using physical_curve_column for grouping)
                     ax = plot.plot_curves(
                         df_eval,
-                        curve_column='N',
+                        curve_column=curve_column,
                         x_column=x_column,
                         y_column=metric,
                         use_scatter=True,
@@ -112,7 +119,7 @@ def main():
                     smooth_out_column = metric + "_smooth"
                     df_smooth = data_proc.smooth_df(
                         df_eval,
-                        curve_column='N',
+                        curve_column=curve_column,
                         col_x=x_column,
                         col_y=metric,
                         col_y_out=smooth_out_column,
@@ -129,7 +136,7 @@ def main():
                     
                     ax = plot.plot_curves(
                         df_smooth,
-                        curve_column='N',
+                        curve_column=curve_column,
                         x_column=x_column,
                         y_column=smooth_out_column,
                         use_scatter=False,
@@ -155,8 +162,8 @@ def main():
         # Set figure labels
         plot.set_figure_labels(fig_axes, x_label, metrics_labels)
         
-        # Apply full global legend layout for normal mode with formatted N labels
-        plot.apply_global_legend_layout(fig_axes, sorted(df['N'].unique()), legend_lambda=lambda x: plot.human_format_N(x))
+        # Apply full global legend layout for normal mode with formatted labels
+        plot.apply_global_legend_layout(fig_axes, sorted(df[curve_column].unique()), legend_lambda=lambda x: plot.human_format_N(x))
         
         # Save files - one file per metric
         for metric in metrics:

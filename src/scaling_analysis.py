@@ -27,18 +27,6 @@ R_FROM = {
     'LogErrRate': lambda logerrrate: 1 - 10**logerrrate,
 }
 
-def _set_args_from_context(args, context):
-    args.fit_model = context["fit_model"]
-    args.curve = context["fit_curve"]
-    args.fit_x = context["fit_x"]
-    args.eval = context["eval"]
-    args.fit_metric = context["metric"]
-    args.warmup_clip = context["warmup_clip"]
-    args.ending_clip = context["ending_clip"]
-    args.x_inv_weight_power = context["x_inv_weight_power"]
-    args.curve_mask = context["curve_mask"]
-    return args
-
 def run_scaling_analysis(args):
     """Run the scaling law analysis with given arguments"""
 
@@ -92,10 +80,24 @@ def run_scaling_analysis(args):
                 ax = None
                 
                 for data_source, df in df_map.items():
+
+                    # Apply curve mask filter
+                    df = _apply_curve_mask(df, args.plot_curve, args.plot_curve_mask)
+                    
                     # Add fitted prediction curves if fitting was done
-                    if args.plot_fit and (data_source, args.fit_x) in fitter_map:
-                        ax = _plot_fit_prediction(ax, args, df, fitter_map[(data_source, args.fit_x)], plot_x_column, plot_metric)
-                        
+                    fitter_key = (data_source, args.fit_x)
+                    if args.plot_fit:
+                        if fitter_key in fitter_map:
+                            ax = _plot_fit_prediction(ax, args, df, fitter_map[fitter_key], plot_x_column, plot_metric)
+                        else:
+                            # User explicitly requested --plot-fit but no matching fitter found - this is an error
+                            available = [f"({ds}, {fx})" for (ds, fx) in fitter_map.keys()] if fitter_map else ["none"]
+                            raise ValueError(
+                                f"No fitter found for data_source='{data_source}', fit_x='{args.fit_x}'. "
+                                f"Available: {', '.join(available)}"
+                            )
+                    
+                    print(f"----------- Unique values: {df[plot_x_column]}")
                     # Process the actual data plot
                     ax = _plot_raw_data(ax, args, df, plot_x_column, plot_metric)
                     
@@ -107,40 +109,10 @@ def run_scaling_analysis(args):
                     ax = _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source)
                     plt.close(ax.figure)
 
-def _data_prepare_single_source(args, data_source):
-    print(f"Loading data for data_source: {data_source}")
-    df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
-    
-    # Prepare eval data once
-    unique_x_columns = list(set((args.plot_x_columns or []) + ([args.fit_x] if args.fit_x else [])))
-    unique_metrics = list(set((args.plot_metrics or []) + ([args.fit_metric] if args.fit_metric else [])))
-    df = data_proc.prepare_eval_data(
-        df,
-        eval_column=args.eval,
-        curve_column=args.curve,
-        x_columns=unique_x_columns,
-        calc_delta=any(metric is not None and metric.startswith('Delta') for metric in unique_metrics),
-        delta_base_step=args.delta_base_step
-    )
-    
-    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
-    df = df[df['step'] > 0].reset_index(drop=True)
-    
-    # Apply clipping
-    if args.warmup_clip is not None or args.warmup_clip_to is not None or args.ending_clip is not None or args.ending_clip_to is not None:
-        df = data_proc.apply_clip(
-            df, 
-            curve_column=args.curve,
-            warmup_clip=args.warmup_clip if args.warmup_clip is not None else 0,
-            warmup_clip_to=args.warmup_clip_to,
-            ending_clip=args.ending_clip if args.ending_clip is not None else 0,
-            ending_clip_to=args.ending_clip_to
-        )
-    
-    # Apply curve mask filter
-    if args.curve_mask is not None:
-        print(f"Filtering curves: {args.curve_mask}")
-        df = df[df[args.curve].isin(args.curve_mask)]
+def _apply_curve_mask(df, curve_column, curve_mask):
+    if curve_mask is not None:
+        print(f"Filtering curves ({curve_column}): {curve_mask}")
+        df = df[df[curve_column].isin(curve_mask)]
     return df
 
 def _data_prepare(args):
@@ -148,6 +120,43 @@ def _data_prepare(args):
     for data_source in args.data_sources:
         df_map[data_source] = _data_prepare_single_source(args, data_source)
     return df_map
+
+def _data_prepare_single_source(args, data_source):
+    print(f"Loading data for data_source: {data_source}")
+    df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
+    
+    # Get physical dimensions for this data source (must be configured)
+    physical_dimensions = config.get_physical_dimensions(data_source)
+    physical_curve_column = physical_dimensions[0]  # N, slice_factor, or rollout_n
+    physical_x_column = physical_dimensions[1]      # step
+    
+    # Collect all metrics that might need delta calculation
+    all_metrics = list(set((args.plot_metrics or []) + ([args.fit_metric] if args.fit_metric else [])))
+    
+    # Prepare eval data
+    df = data_proc.prepare_eval_data(
+        df,
+        eval_column=args.eval,
+        curve_column=physical_curve_column,
+        x_column=physical_x_column,
+        calc_delta=any(metric is not None and metric.startswith('Delta') for metric in all_metrics),
+        delta_base_step=args.delta_base_step
+    )
+    
+    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
+    df = df[df['step'] > 0].reset_index(drop=True)
+    
+    # Apply clipping (use curve_column for curve grouping)
+    if args.warmup_clip is not None or args.warmup_clip_to is not None or args.ending_clip is not None or args.ending_clip_to is not None:
+        df = data_proc.apply_clip(
+            df, 
+            curve_column=physical_curve_column,
+            warmup_clip=args.warmup_clip,
+            warmup_clip_to=args.warmup_clip_to,
+            ending_clip=args.ending_clip,
+            ending_clip_to=args.ending_clip_to
+        )
+    return df
 
 def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric):
     fitter_context = fitter.get_context()
@@ -169,7 +178,7 @@ def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric):
     
     ax = plot.plot_curves(
         df, 
-        curve_column=fit_curve_column, 
+        curve_column=args.plot_curve, # go with plot_curve
         x_column=plot_x_column, 
         y_column=pred_column, 
         use_line=True,
@@ -190,7 +199,7 @@ def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric):
 def _plot_raw_data(ax, args, df, plot_x_column, plot_metric):
     ax = plot.plot_curves(
         df,
-        curve_column=args.curve,
+        curve_column=args.plot_curve,
         x_column=plot_x_column,
         y_column=plot_metric,
         y_std_column=plot_metric + '_std' if args.add_std else None,
@@ -213,7 +222,7 @@ def _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric):
     
     df_smooth = data_proc.smooth_df(
         df,
-        curve_column=args.curve,
+        curve_column=args.plot_curve,
         col_x=plot_x_column,
         col_y=plot_metric,
         col_y_out=smooth_out_column,
@@ -230,7 +239,7 @@ def _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric):
     
     ax = plot.plot_curves(
         df_smooth,
-        curve_column=args.curve,
+        curve_column=args.plot_curve,
         x_column=plot_x_column,
         y_column=smooth_out_column,
         y_std_column=None,
@@ -272,7 +281,7 @@ def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source):
     
     # Prepare legend if needed
     if args.plot_use_legend:
-        legend_handles_labels = plot.prepare_legend(df, args.curve)
+        legend_handles_labels = plot.prepare_legend(df, args.plot_curve)
     else:
         legend_handles_labels = None
     
@@ -301,7 +310,7 @@ def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source):
         save_to_dir=args.output_base_dir,
         save_to_filename_prefix=args.output_prefix+data_source+'_',
         plot_eval_column=args.eval,
-        plot_curve=args.curve,
+        plot_curve=args.plot_curve,
         plot_x_column=plot_x_column,
         plot_metric=plot_metric,
     )
@@ -311,7 +320,9 @@ def _fit_multiple(args, df_map):
     return [_fit_once(args, df, data_source) for data_source, df in df_map.items()]
 
 def _fit_once(args, df, data_source):
-    print(f"\n=== Fitting on data_source: {data_source}, L({args.curve}, {args.fit_x}) ===")
+    df = _apply_curve_mask(df, args.fit_curve, args.fit_curve_mask)
+    
+    print(f"\n=== Fitting on data_source: {data_source}, L({args.fit_curve}, {args.fit_x}) ===")
     print(f"Using model: {args.fit_model}")
     
     FitterClass = get_model_class(args.fit_model)
@@ -320,12 +331,8 @@ def _fit_once(args, df, data_source):
         FitterClass,
         df, 
         eval_name=args.eval, 
-        x_column_list=[args.curve, args.fit_x],
+        x_column_list=[args.fit_curve, args.fit_x],
         y_transform=R_TO[args.fit_metric],
-        warmup_clip=0,
-        warmup_clip_to=None,
-        ending_clip=0,
-        ending_clip_to=None,
         x_inv_weight_power=args.x_inv_weight_power,
         cma_verbose_interval=args.fit_cma_verbose_interval,
     )
@@ -333,14 +340,14 @@ def _fit_once(args, df, data_source):
     fitter.set_context({
         "data_source": data_source,
         "fit_model": args.fit_model,
-        "fit_curve": args.curve,
+        "fit_curve": args.fit_curve,
         "fit_x": args.fit_x,
         "eval": args.eval,
         "metric": args.fit_metric,
         "warmup_clip": args.warmup_clip if args.warmup_clip is not None else 0,
         "ending_clip": args.ending_clip if args.ending_clip is not None else 0,
         "x_inv_weight_power": args.x_inv_weight_power,
-        "curve_mask": args.curve_mask,
+        "fit_curve_mask": args.fit_curve_mask,
     })
     
     info = fitter.get_info()

@@ -180,10 +180,10 @@ GRPO
 
 Cross Domain (one line per domain)
 ```bash
-uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 72e9 --eval-group in_domain
-uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 72e9 --eval-group out_of_domain
-uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 72e9 --eval-group in_domain
-uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 72e9 --eval-group out_of_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 72e9 --warmup-clip-to 10 --eval-group in_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source base -N 72e9 --warmup-clip-to 10 --eval-group out_of_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 72e9 --warmup-clip-to 10 --eval-group in_domain
+uv run -m src.run.eval_curves_by_model --x-columns C --metrics ErrRate --data-source instruct -N 72e9 --warmup-clip-to 10 --eval-group out_of_domain
 uv run -m src.run.eval_curves_by_model --help
 ```
 

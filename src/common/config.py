@@ -139,6 +139,27 @@ CSV_MAP = {
     "grpo-instruct": CSV_GRPO_INSTRUCT_RUNS,
 }
 
+# Physical dimensions for merge_duplicate_steps
+# Defines which columns uniquely identify experimental conditions for each data source
+# Format: [primary_dimension, 'step'] where primary_dimension is the experimental variable
+PHYSICAL_DIMENSIONS = {
+    "base": ['N', 'step'],                    # Experiment 1: varying model size N
+    "instruct": ['N', 'step'],                # Experiment 1: varying model size N
+    "llama-base": ['N', 'step'],              # Llama: varying model size N
+    "llama-instruct": ['N', 'step'],          # Llama: varying model size N
+    "exp2-base": ['slice_factor', 'step'],    # Experiment 2: fixed N=7B, varying data reuse slice_factor
+    "exp2-instruct": ['slice_factor', 'step'],# Experiment 2: fixed N=7B, varying data reuse slice_factor
+    "grpo-base": ['rollout_n', 'step'],       # GRPO: fixed N=7B, varying rollout strategy
+    "grpo-instruct": ['rollout_n', 'step'],   # GRPO: fixed N=7B, varying rollout strategy
+}
+
+def get_physical_dimensions(data_source: str):
+    if data_source not in PHYSICAL_DIMENSIONS:
+        raise ValueError(
+            f"Physical dimensions not configured for data_source: '{data_source}'. "
+        )
+    return PHYSICAL_DIMENSIONS[data_source]
+
 # =============================================================================
 # COLOR MAPPING - 统一的渐变配色方案
 # =============================================================================

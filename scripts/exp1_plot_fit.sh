@@ -10,10 +10,12 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
-  --curve N \
-  -x C_raw \
+  --fit-curve N \
+  --fit-metric ErrRate \
+  --plot-curve N \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --plot-x-scale log \
   --plot-y-scale log \
   --y-tick-spacing 0.1 \
@@ -37,10 +39,12 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
-  --curve N \
-  -x E \
+  --fit-curve N \
+  --fit-metric ErrRate \
+  --plot-curve N \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --plot-x-scale log \
   --plot-y-scale log \
   --y-tick-spacing 0.1 \
@@ -63,10 +67,12 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \
-  --curve N \
-  -x C_raw \
+  --fit-curve N \
+  --fit-metric ErrRate \
+  --plot-curve N \
+  --plot-x C_raw \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --plot-x-scale log \
   --plot-y-scale log \
   --y-tick-spacing 0.1 \
@@ -89,10 +95,12 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \
-  --curve N \
-  -x E \
+  --fit-curve N \
+  --fit-metric ErrRate \
+  --plot-curve N \
+  --plot-x E \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --plot-x-scale log \
   --plot-y-scale log \
   --y-tick-spacing 0.1 \

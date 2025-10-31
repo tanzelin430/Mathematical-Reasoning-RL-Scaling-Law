@@ -41,8 +41,14 @@ def main():
                         choices=['base', 'instruct', 'llama-base', 'llama-instruct', 
                                 'exp2-base', 'exp2-instruct', 'grpo-base'],
                         help='Data source to use (default: base)')
-    parser.add_argument('--warmup-clip', type=int, default=10,
-                        help='Number of warmup steps to clip (default: 10)')
+    parser.add_argument('--warmup-clip', type=int, default=None,
+                        help='Number of warmup steps to clip (default: None)')
+    parser.add_argument('--warmup-clip-to', type=int, default=None,
+                        help='Warmup clip to step (default: None)')
+    parser.add_argument('--ending-clip', type=int, default=None,
+                        help='Number of ending steps to clip (default: None)')
+    parser.add_argument('--ending-clip-to', type=int, default=None,
+                        help='Ending clip to step (default: None)')
     parser.add_argument('-N', '--model-size', type=float, default=14e9,
                         choices=list(config.COLOR_MAPPING.keys()),
                         help='Model size N to analyze (default: 14e9). Must be one of the available model sizes.')
@@ -54,6 +60,9 @@ def main():
     metrics = [m.strip() for m in args.metrics.split(',')]
     data_source = args.data_source
     warmup_clip = args.warmup_clip
+    warmup_clip_to = args.warmup_clip_to
+    ending_clip = args.ending_clip
+    ending_clip_to = args.ending_clip_to
     N = args.model_size
     
     print(f"Configuration:")
@@ -68,17 +77,19 @@ def main():
     # Load data
     df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
     
+    # Get physical dimensions for this data source
+    physical_dimensions = config.get_physical_dimensions(data_source)
+    physical_curve_column = physical_dimensions[0]
+    physical_x_column = physical_dimensions[1]
+    
     # Filter for specified model size only
     df = df[df['N'] == N].copy()
     if len(df) == 0:
         print(f"No data found for {plot.human_format_N(N)} model!")
         return
     
-    # Merge duplicate steps (aggregate multiple runs) by averaging
-    df = data_proc.merge_duplicate_steps(df, group_columns=['N', 'step'], mode='mean')
-    print(f"After merging runs: {df.shape[0]} data points")
-    
     # Remove step=0 data (because E=0 will cause log10(E)=-inf)
+    # Note: merge_duplicate_steps is done inside prepare_eval_data
     df = df[df['step'] > 0].reset_index(drop=True)
     
     # Define evaluation group keys (using config.TEST_EVALS for metadata)
@@ -156,21 +167,20 @@ def main():
                     df_eval,
                     eval_column=eval_name,
                     curve_column='eval_curve',
-                    x_columns=[x_column],
+                    x_column=x_column,
                     calc_delta=metric.startswith('Delta'),
                     delta_base_step=1
                 )
                 
                 # Apply clipping if specified
-                if warmup_clip > 0:
-                    df_eval = data_proc.apply_clip(
-                        df_eval,
-                        curve_column='eval_curve',
-                        warmup_clip=warmup_clip,
-                        warmup_clip_to=None,
-                        ending_clip=0,
-                        ending_clip_to=None
-                    )
+                df_eval = data_proc.apply_clip(
+                    df_eval,
+                    curve_column='eval_curve',
+                    warmup_clip=warmup_clip,
+                    warmup_clip_to=warmup_clip_to,
+                    ending_clip=ending_clip,
+                    ending_clip_to=ending_clip_to,
+                )
                 
                 # Create color mapping for this eval
                 eval_color = config.get_color_for_curve(eval_name)
