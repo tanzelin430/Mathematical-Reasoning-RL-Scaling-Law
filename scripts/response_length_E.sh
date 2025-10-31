@@ -7,10 +7,10 @@ echo "=== Run 1/2: Response Length - base ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources base \
-  --curve N \
-  -x E \
+  --plot-curve N \
+  --plot-x E \
   --eval response_length \
-  --metric R \
+  --plot-metric R \
   --add-smooth \
   --s-factor 250 \
   --k-spline 3 \
@@ -36,10 +36,10 @@ echo "=== Run 2/2: Response Length - instruct ==="
 uv run -m src.scaling_analysis \
   --plot \
   --data-sources instruct \
-  --curve N \
-  -x E \
+  --plot-curve N \
+  --plot-x E \
   --eval response_length \
-  --metric R \
+  --plot-metric R \
   --add-smooth \
   --s-factor 250 \
   --k-spline 3 \

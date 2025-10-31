@@ -6,14 +6,16 @@
 echo "=== Run 1/2: Response Length - loss - base ==="
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --data-sources base \
-  --curve N \
-  -x response_length \
+  --plot-curve N \
+  --plot-x response_length \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --warmup-clip 0 \
   --fit \
   --fit-model loglinear \
+  --fit-curve N \
   --fit-x response_length \
   --fit-metric ErrRate \
   --plot-x-label "Response Length" \
@@ -38,14 +40,16 @@ echo ""
 echo "=== Run 2/2: Response Length - loss - instruct ==="
 uv run -m src.scaling_analysis \
   --plot \
+  --plot-fit \
   --data-sources instruct \
-  --curve N \
-  -x response_length \
+  --plot-curve N \
+  --plot-x response_length \
   --eval holdout_score \
-  --metric ErrRate \
+  --plot-metric ErrRate \
   --warmup-clip 0 \
   --fit \
   --fit-model loglinear \
+  --fit-curve N \
   --fit-x response_length \
   --fit-metric ErrRate \
   --plot-x-label "Response Length" \

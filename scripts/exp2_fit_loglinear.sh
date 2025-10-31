@@ -16,6 +16,7 @@ uv run -m src.scaling_analysis \
   --fit-curve Tau \
   --fit-x step \
   --fit-metric ErrRate \
+  --fit-curve-mask 1 2 5 20 25 50 100 \
   --plot-x-scale log \
   --plot-y-scale log \
   --x-tick-spacing 0.2 \
@@ -52,6 +53,7 @@ uv run -m src.scaling_analysis \
   --fit-curve Tau \
   --fit-x step \
   --fit-metric ErrRate \
+  --fit-curve-mask 1 2 5 20 25 50 100 \
   --plot-x-scale log \
   --plot-y-scale log \
   --x-grid-spacing 0.2 \

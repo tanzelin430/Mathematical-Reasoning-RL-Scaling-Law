@@ -197,12 +197,3 @@ uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metri
 ```
 
 Single side scaling law (Deprecated)
-
-<!-- 
-```bash
-# demo plot, 5-dimention control (model type, x, eval, metric, curve), support multiple plot: etc. ["C", "E"] x ["R", "ErrRate"]
-uv run -m src.run.demo
-
-# to plot multiple figures with fitting lines, same as above (dual logistic with k(N)=log(1-xxx) version)
-uv run -m src.scaling_analysis
-``` -->

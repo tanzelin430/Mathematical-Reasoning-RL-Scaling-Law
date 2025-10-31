@@ -32,7 +32,7 @@ args=(
   --plot-fit
   --plot-x C_raw
   --plot-curve N
-  --metric ErrRate
+  --plot-metric ErrRate
   
   # Plot styling
   --plot-x-scale log

@@ -15,6 +15,26 @@ from src.fit.models import list_available_models
 from src.run.plot_fit_params import PLOT_PARAMS_SCHEMA
 
 
+# Mapping from attribute name to CLI flag name
+ARG_NAME_MAP = {
+    'data_sources': '--data-sources',
+    'eval': '--eval',
+    'plot_curve': '--plot-curve',
+    'plot_x_columns': '--plot-x',
+    'plot_metrics': '--plot-metric',
+    'fit_x': '--fit-x',
+    'fit_curve': '--fit-curve',
+    'fit_metric': '--fit-metric',
+}
+
+# Required arguments for each mode
+REQUIRED_ARGS_BY_MODE = {
+    'plot': ['data_sources', 'eval', 'plot_curve', 'plot_x_columns', 'plot_metrics'],
+    'plot_fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric'],
+    'fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval'],
+}
+
+
 def parse_list_argument(value: str) -> List[str]:
     """Parse comma-separated string into list"""
     if not value:
@@ -69,6 +89,23 @@ def validate_args(args):
     
     When --fit-load is used, most arguments are loaded from context and don't need validation.
     """
+    # Check for deprecated argument usage and provide friendly error messages
+    deprecated_args = []
+    if hasattr(args, '_deprecated_curve') and args._deprecated_curve:
+        deprecated_args.append("--curve")
+    if hasattr(args, '_deprecated_x') and args._deprecated_x:
+        deprecated_args.append("-x")
+    if hasattr(args, '_deprecated_metric') and args._deprecated_metric:
+        deprecated_args.append("--metric")
+    
+    if deprecated_args:
+        error_msg = f"Error: The following arguments are deprecated: {', '.join(deprecated_args)}\n\n"
+        error_msg += "Please use the explicit versions instead:\n"
+        error_msg += "  --curve      → Use --plot-curve or --fit-curve\n"
+        error_msg += "  -x           → Use --plot-x or --fit-x\n"
+        error_msg += "  --metric     → Use --plot-metric or --fit-metric\n"
+        raise ValueError(error_msg)
+    
     # Validate data_sources (only if provided)
     if args.data_sources:
         for data_source in args.data_sources:
@@ -81,44 +118,47 @@ def validate_args(args):
         raise ValueError(f"Invalid eval: {args.eval}. "
                         f"Must be one of: {list(config.TEST_EVALS.keys())}")
     
-    # Validate curve columns (only if provided)
-    valid_curves = list(config.DEFAULT_LABELS.keys())
-    if args.plot_curve and args.plot_curve not in valid_curves:
-        raise ValueError(f"Invalid plot-curve: {args.plot_curve}. "
-                        f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
-    if args.fit_curve and args.fit_curve not in valid_curves:
-        raise ValueError(f"Invalid fit-curve: {args.fit_curve}. "
-                        f"Must be one of: {valid_curves}, or add to config.DEFAULT_LABELS")
+    # Validate columns (only if provided)
+    valid_columns = list(config.DEFAULT_LABELS.keys())
     
-    # Validate x columns (only if provided)
-    valid_x_columns = list(config.DEFAULT_LABELS.keys())
+    # Validate plot-curve
+    if args.plot_curve and args.plot_curve not in valid_columns:
+        raise ValueError(f"Invalid --plot-curve: {args.plot_curve}. "
+                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
+    
+    # Validate fit-curve
+    if args.fit_curve and args.fit_curve not in valid_columns:
+        raise ValueError(f"Invalid --fit-curve: {args.fit_curve}. "
+                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
+    
+    # Validate plot-x columns
     if args.plot_x_columns:
         for x_col in args.plot_x_columns:
-            if x_col not in valid_x_columns:
-                raise ValueError(f"Invalid plot-x column: {x_col}. "
-                                f"Must be one of: {valid_x_columns}, or add to config.DEFAULT_LABELS")
+            if x_col not in valid_columns:
+                raise ValueError(f"Invalid --plot-x column: {x_col}. "
+                                f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
     
-    if args.fit and args.fit_x and args.fit_x not in valid_x_columns:
-        raise ValueError(f"Invalid fit-x column: {args.fit_x}. "
-                        f"Must be one of: {valid_x_columns}, or add to config.DEFAULT_LABELS")
+    # Validate fit-x
+    if args.fit_x and args.fit_x not in valid_columns:
+        raise ValueError(f"Invalid --fit-x column: {args.fit_x}. "
+                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
     
-    # Validate metrics (only if provided)
-    valid_metrics = list(config.DEFAULT_LABELS.keys())
+    # Validate plot-metric
     if args.plot_metrics:
         for metric in args.plot_metrics:
-            if metric not in valid_metrics:
-                raise ValueError(f"Invalid metric: {metric}. "
-                                f"Must be one of: {valid_metrics}, or add to config.DEFAULT_LABELS")
+            if metric not in valid_columns:
+                raise ValueError(f"Invalid --plot-metric: {metric}. "
+                                f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
     
-    if args.fit:
-        if args.fit_metric and args.fit_metric not in valid_metrics:
-            raise ValueError(f"Invalid fit metric: {args.fit_metric}. "
-                            f"Must be one of: {valid_metrics}, or add to config.DEFAULT_LABELS")
-        
-        # Validate fit-model is provided when --fit is enabled
-        if not args.fit_model:
-            raise ValueError("--fit-model is required when --fit is enabled. "
-                           f"Available models: {', '.join(list_available_models())}")
+    # Validate fit-metric
+    if args.fit_metric and args.fit_metric not in valid_columns:
+        raise ValueError(f"Invalid --fit-metric: {args.fit_metric}. "
+                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
+    
+    # Validate fit-model is provided when --fit is enabled
+    if args.fit and not args.fit_model:
+        raise ValueError("--fit-model is required when --fit is enabled. "
+                       f"Available models: {', '.join(list_available_models())}")
 
 
 def create_argument_parser():
@@ -128,19 +168,19 @@ def create_argument_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Basic usage
-  %(prog)s --data-sources exp2-instruct --curve Tau -x E --eval holdout_score --metric ErrRate
+  # Basic usage with plotting
+  %(prog)s --data-sources exp2-instruct --plot-curve Tau --plot-x E --eval holdout_score --plot-metric ErrRate --plot
 
   # Multiple data sources
-  %(prog)s --data-sources exp2-base exp2-instruct --curve Tau -x E --eval holdout_score --metric ErrRate
+  %(prog)s --data-sources exp2-base exp2-instruct --plot-curve Tau --plot-x E --eval holdout_score --plot-metric ErrRate --plot
 
   # With fitting
-  %(prog)s --data-sources exp2-instruct --curve Tau -x E --eval holdout_score --metric ErrRate \
-           --fit --fit-model InvExp --fit-x E --fit-metric ErrRate
+  %(prog)s --data-sources exp2-instruct --fit-curve Tau --fit-x E --eval holdout_score --fit-metric ErrRate \
+           --fit --fit-model InvExp
 
   # Multiple data sources, metrics and x columns with highlighting
-  %(prog)s --data-sources exp2-base exp2-instruct --curve N -x C E --eval holdout_score --metric ErrRate R \
-           --curve-mask 1e9 3e9 7e9 --highlight-curves-predict 1e9 --highlight-curves-plot 3e9
+  %(prog)s --data-sources exp2-base exp2-instruct --plot-curve N --plot-x C E --eval holdout_score --plot-metric ErrRate R \
+           --plot-curve-mask 1e9 3e9 7e9 --highlight-curves-predict 1e9 --highlight-curves-plot 3e9 --plot
 
   # Load configuration from file
   %(prog)s --config-file config.json
@@ -152,10 +192,10 @@ Examples:
                        action='append', nargs='+',
                        help='Data source(s) to use (space- or comma-separated; flag can be repeated). Valid choices: ' + ', '.join(config.CSV_MAP.keys()))
     
-    parser.add_argument('--curve', '--plot-curve', dest='plot_curve',
+    parser.add_argument('--plot-curve', dest='plot_curve',
                        help='Curve column for plotting, e.g.\'N\', \'Tau\', \'rollout_n\'')
     
-    parser.add_argument('-x', '--plot-x', dest='plot_x_columns',
+    parser.add_argument('--plot-x', dest='plot_x_columns',
                        action='append', nargs='+',
                        help='X columns for plotting (space- or comma-separated; flag can be repeated)')
     
@@ -163,13 +203,23 @@ Examples:
                        choices=list(config.TEST_EVALS.keys()),
                        help='Evaluation metric to analyze')
     
-    parser.add_argument('--metric', '--plot-metric', dest='plot_metrics',
+    parser.add_argument('--plot-metric', dest='plot_metrics',
                        action='append', nargs='+',
                        help='Metrics to plot (space- or comma-separated; flag can be repeated)')
+    
     parser.add_argument('--plot', action='store_true',
                        help='Enable model plotting')
     parser.add_argument('--plot-fit', action='store_true',
                        help='Enable model plotting with fitted curves')
+    
+    # Deprecated argument aliases with friendly error messages
+    deprecated_group = parser.add_argument_group('deprecated options (will show error)')
+    deprecated_group.add_argument('--curve', dest='_deprecated_curve',
+                       help='DEPRECATED: Use --plot-curve or --fit-curve instead')
+    deprecated_group.add_argument('-x', dest='_deprecated_x',
+                       help='DEPRECATED: Use --plot-x or --fit-x instead')
+    deprecated_group.add_argument('--metric', dest='_deprecated_metric',
+                       help='DEPRECATED: Use --plot-metric or --fit-metric instead')
 
     # Fitting arguments
     fit_group = parser.add_argument_group('fitting options')
@@ -499,7 +549,7 @@ def validate_required_args(args):
     """Validate required arguments based on context.
     
     - When --fit-load is provided: no arguments are required (all loaded from file)
-    - When --fit-load is NOT provided: data_sources, curve, plot_x_columns, eval, plot_metrics are required
+    - When --fit-load is NOT provided: specific arguments are required based on mode
     """
     # Validate: --fit and --fit-load are mutually exclusive
     if args.fit and args.fit_load:
@@ -510,28 +560,20 @@ def validate_required_args(args):
         sys.exit("Error: --fit-save and --fit-save-append cannot be used together")
     
     missing_args = []
-    # If loading from file, no required arguments (all loaded from context)
-    if args.plot:
-        # Check required arguments
-        required_args = ['data_sources', 'eval', 'plot_curve', 'plot_x_columns', 'plot_metrics']
-        for arg in required_args:
-            if not getattr(args, arg, None):
-                missing_args.append(arg.replace('_', '-'))
     
-    if args.plot_fit:
-        # Check required arguments
-        required_args = ['data_sources', 'fit_x', 'fit_curve', 'fit_metric']
-        for arg in required_args:
-            if not getattr(args, arg, None):
-                missing_args.append(arg.replace('_', '-'))
-
-    if args.fit:
-        # Check required arguments when not loading from file
-        required_args = ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval']
-        for arg in required_args:
-            if not getattr(args, arg, None):
-                missing_args.append(arg.replace('_', '-'))
+    # Check required arguments based on each active mode
+    for mode in ['plot', 'plot_fit', 'fit']:
+        if not getattr(args, mode, False):
+            continue
+            
+        required = REQUIRED_ARGS_BY_MODE[mode]
+        missing_args.extend([
+            ARG_NAME_MAP[arg] for arg in required 
+            if not getattr(args, arg, None)
+        ])
     
     if missing_args:
-        missing_str = ', '.join(f"--{arg}" for arg in missing_args)
+        # Remove duplicates while preserving order
+        missing_args = list(dict.fromkeys(missing_args))
+        missing_str = ', '.join(missing_args)
         sys.exit(f"Error: the following arguments are required: {missing_str}")
