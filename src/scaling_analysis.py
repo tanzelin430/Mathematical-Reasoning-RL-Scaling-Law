@@ -105,6 +105,10 @@ def run_scaling_analysis(args):
                     if args.add_smooth:
                         ax = _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric)
                     
+                    # Add extra lines if requested (e.g., SOTA comparison)
+                    if args.plot_extra_lines:
+                        ax = _plot_extra_lines(ax, args, plot_metric)
+                    
                     # Apply plot_basic_settings after plotting (now includes save logic)
                     ax = _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source)
                     plt.close(ax.figure)
@@ -256,6 +260,66 @@ def _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric):
         ax=ax
     )
     return ax
+
+def _plot_extra_lines(ax, args, plot_metric):
+    """Plot extra lines from JSON configuration (e.g., SOTA comparison lines)
+    
+    Expected JSON format:
+    {
+        "Line Name 1": {
+            "x": [list of x values],  # Use actual values (e.g., 1e9, 14e9)
+            "y": [list of y values],  # Must match plot_metric (ErrRate or R)
+            "color": "#228B22",
+            "linestyle": "-",  # optional: "-", "--", "-.", ":"
+            "marker": "o",  # optional
+            "markersize": 6,  # optional
+            "linewidth": 2.5,  # optional
+            "alpha": 1.0,  # optional
+            "label": "Display Name"  # optional, defaults to key name
+        }
+    }
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(6, 4), dpi=300)
+    
+    extra_lines = args.plot_extra_lines
+    
+    for line_name, line_config in extra_lines.items():
+        # Extract x and y data directly (no conversion)
+        x_data = np.array(line_config['x'])
+        y_data = np.array(line_config['y'])
+        
+        # Extract plotting parameters
+        color = line_config.get('color', 'black')
+        linestyle = line_config.get('linestyle', '-')
+        marker = line_config.get('marker', 'o')
+        markersize = line_config.get('markersize', 6)
+        linewidth = line_config.get('linewidth', 2.5)
+        alpha = line_config.get('alpha', 1.0)
+        label = line_config.get('label', line_name)
+        
+        # Plot using plot_basic
+        ax = plot.plot_basic(
+            x=x_data,
+            y=y_data,
+            use_line=True,
+            use_scatter=True,
+            line_alpha=alpha,
+            line_width=linewidth,
+            scatter_alpha=alpha * 0.8,
+            scatter_s=markersize ** 2,  # plot_basic uses scatter size squared
+            scatter_marker=marker,
+            color=color,
+            ax=ax
+        )
+        
+        # Apply line style by modifying the last added line
+        lines = ax.get_lines()
+        if lines and linestyle != '-':
+            lines[-1].set_linestyle(linestyle)
+    
+    return ax
+
 def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source):
     process_plot_x_label = args.plot_x_label if args.plot_x_label else config.DEFAULT_LABELS[plot_x_column]
     process_plot_y_label = args.plot_y_label if args.plot_y_label else config.DEFAULT_LABELS[plot_metric]

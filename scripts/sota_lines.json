@@ -1,0 +1,61 @@
+{
+  "Sota-Qwen3-(Reason, Dense)": {
+    "x": [
+      6e8,
+      1.7e9,
+      4e9,
+      8e9,
+      14e9,
+      32e9
+    ],
+    "y": [
+      0.822,
+      0.712,
+      0.582,
+      0.634,
+      0.612,
+      0.588
+    ],
+    "color": "#228B22",
+    "linestyle": "-",
+    "marker": "o",
+    "markersize": 6,
+    "linewidth": 2.5,
+    "alpha": 1.0,
+    "label": "Sota-Qwen3-(Reason, Dense)"
+  },
+  "Sota-Qwen3-(Reason, MOE)": {
+    "x": [
+      3e10,
+      2.35e11
+    ],
+    "y": [
+      0.472,
+      0.398
+    ],
+    "color": "#0066CC",
+    "linestyle": "--",
+    "marker": "o",
+    "markersize": 6,
+    "linewidth": 2.5,
+    "alpha": 1.0,
+    "label": "Sota-Qwen3-(Reason, MOE)"
+  },
+  "Sota-GPT-OSS-(Reason, MOE)": {
+    "x": [
+      2e10,
+      1.2e11
+    ],
+    "y": [
+      0.444,
+      0.340
+    ],
+    "color": "#663399",
+    "linestyle": "--",
+    "marker": "o",
+    "markersize": 6,
+    "linewidth": 2.5,
+    "alpha": 1.0,
+    "label": "Sota-GPT-OSS-(Reason, MOE)"
+  }
+}

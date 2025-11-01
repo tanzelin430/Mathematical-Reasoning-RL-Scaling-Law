@@ -351,6 +351,9 @@ Examples:
     style_group.add_argument('--y-tick-subs-log', dest='y_tick_subs_log',
                             nargs='+', type=str, default=None,
                             help='Custom y-axis log tick multipliers (space- or comma-separated list)')
+    style_group.add_argument('--plot-extra-lines', dest='plot_extra_lines',
+                            type=str, default=None,
+                            help='Path to JSON file containing extra lines to plot (e.g., SOTA comparison lines)')
 
     # Smoothing configuration
     smooth_group = parser.add_argument_group('smoothing options')
@@ -517,6 +520,23 @@ def process_parsed_args(args):
         # else: already a tuple from config file
     else:
         args.plot_legend_bbox_to_anchor = None
+
+    # Parse plot_extra_lines JSON file
+    if args.plot_extra_lines:
+        if isinstance(args.plot_extra_lines, str):
+            try:
+                # Load from file if it's a path
+                if os.path.exists(args.plot_extra_lines):
+                    with open(args.plot_extra_lines, 'r') as f:
+                        args.plot_extra_lines = json.load(f)
+                else:
+                    # Try to parse as JSON string
+                    args.plot_extra_lines = json.loads(args.plot_extra_lines)
+            except (json.JSONDecodeError, IOError) as e:
+                raise ValueError(f"Invalid plot_extra_lines: {e}")
+        # else: already a dict from config file
+    else:
+        args.plot_extra_lines = None
 
     # Set default output prefix
     if not args.output_prefix:
