@@ -29,10 +29,10 @@ uv run -m src.scaling_analysis \
   --y-tick-format auto \
   --y-grid-spacing 0.1 \
   --line-alpha 1 \
-  --line-width 2.0 \
+  --line-width 2.5 \
   --plot-use-legend \
   --plot-title "Performance Scaling of Post-RFT vs. SOTA" \
-  --scatter-alpha 0.5 \
-  --scatter-size 20 \
+  --scatter-alpha 1 \
+  --scatter-size 30 \
   --scatter-marker o \
   --output-prefix fit_singleside_

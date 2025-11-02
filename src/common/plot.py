@@ -228,15 +228,20 @@ def prepare_legend(df, curve_column: str, legend_lambda=None):
 def plot_basic(
     x: np.ndarray,
     y: np.ndarray,
+    # Scatter parameters
     use_scatter: bool = False,
-    use_line: bool = False,
     scatter_alpha: float = 0.3,
     scatter_s: int = 8,
     scatter_marker: str = 'o',
+    # Line parameters
+    use_line: bool = False,
     line_alpha: float = 0.5,
-    line_width: float = None,  # Optional linewidth for highlighting
+    line_width: float = None,
+    line_style: str = '-',
+    # Fill parameters
     fill_width: np.ndarray = None,
     fill_width_alpha: float = 0.2,
+    # Common parameters
     color: str = 'k',
     ax: plt.Axes = None
 ):
@@ -251,7 +256,7 @@ def plot_basic(
         ax.scatter(x, y, alpha=scatter_alpha, s=scatter_s, marker=scatter_marker, color=color, edgecolors='none')
     # Line
     if use_line:
-        plot_kwargs = {'alpha': line_alpha, 'color': color}
+        plot_kwargs = {'alpha': line_alpha, 'color': color, 'linestyle': line_style}
         if line_width is not None:
             plot_kwargs['linewidth'] = line_width
         ax.plot(x, y, **plot_kwargs)

@@ -366,61 +366,43 @@ def _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric, custom_color_ma
     return ax
 
 def _plot_extra_lines(ax, args, plot_metric):
-    """Plot extra lines from JSON configuration (e.g., SOTA comparison lines)
-    
-    Expected JSON format:
-    {
-        "Line Name 1": {
-            "x": [list of x values],  # Use actual values (e.g., 1e9, 14e9)
-            "y": [list of y values],  # Must match plot_metric (ErrRate or R)
-            "color": "#228B22",
-            "linestyle": "-",  # optional: "-", "--", "-.", ":"
-            "marker": "o",  # optional
-            "markersize": 6,  # optional
-            "linewidth": 2.5,  # optional
-            "alpha": 1.0,  # optional
-            "label": "Display Name"  # optional, defaults to key name
-        }
-    }
-    """
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(6, 4), dpi=300)
     
     extra_lines = args.plot_extra_lines
     
     for line_name, line_config in extra_lines.items():
-        # Extract x and y data directly (no conversion)
+        # Extract x and y data
         x_data = np.array(line_config['x'])
         y_data = np.array(line_config['y'])
         
-        # Extract plotting parameters
+        # Extract plotting parameters with unified naming
         color = line_config.get('color', 'black')
-        linestyle = line_config.get('linestyle', '-')
-        marker = line_config.get('marker', 'o')
-        markersize = line_config.get('markersize', 6)
-        linewidth = line_config.get('linewidth', 2.5)
-        alpha = line_config.get('alpha', 1.0)
         label = line_config.get('label', line_name)
+        
+        # Line parameters
+        line_style = line_config.get('line_style', '-')
+        line_width = line_config.get('line_width', 2.5)
+        line_alpha = line_config.get('line_alpha', 1.0)
+        
+        # Scatter parameters
+        scatter_marker = line_config.get('scatter_marker', 'o')
+        scatter_size = line_config.get('scatter_size', 25)
+        scatter_alpha = line_config.get('scatter_alpha', 1.0)
         
         # Plot using plot_basic
         ax = plot.plot_basic(
             x=x_data,
             y=y_data,
-            use_line=True,
             use_scatter=True,
-            line_alpha=alpha,
-            line_width=linewidth,
-            scatter_alpha=alpha * 0.8,
-            scatter_s=markersize ** 2,  # plot_basic uses scatter size squared
-            scatter_marker=marker,
+            scatter_alpha=scatter_alpha,
+            scatter_s=scatter_size,
+            scatter_marker=scatter_marker,
+            use_line=True,
+            line_alpha=line_alpha,
+            line_width=line_width,
+            line_style=line_style,
             color=color,
             ax=ax
         )
-        
-        # Apply line style by modifying the last added line
-        lines = ax.get_lines()
-        if lines and linestyle != '-':
-            lines[-1].set_linestyle(linestyle)
     
     return ax
 
