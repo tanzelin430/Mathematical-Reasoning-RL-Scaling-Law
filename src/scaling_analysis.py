@@ -4,9 +4,7 @@ Scaling Law Pipeline - Multi-Eval Analysis (CLI Version)
 Processes multiple test evals from experiment data and generates scaling law plots for each eval
 """
 
-import json
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from src.common import data_proc
@@ -34,7 +32,7 @@ R_FROM = {
 def run_scaling_analysis(args):
     """Run the scaling law analysis with given arguments"""
 
-    df_map = _data_prepare(args) if args.plot or args.fit else None
+    dfs = _data_prepare(args) if args.plot or args.fit else None
 
     fitters = []
     fitter_map = {}
@@ -54,7 +52,7 @@ def run_scaling_analysis(args):
     
     # Fitting phase
     elif args.fit:
-        fitters = _fit_multiple(args, df_map)
+        fitters = _fit_multiple(args, dfs)
         
         # Build fitter_map
         # Note: fitter_map maps data_source to the LAST fitter with that data_source
@@ -84,8 +82,11 @@ def run_scaling_analysis(args):
                 # Initialize shared ax
                 ax = None
                 
+                # Create a filtered copy for this iteration (avoid interference across plot_x_columns/plot_metrics)
+                dfs_masked = {}
+                
                 # Unified loop: process each data source
-                for data_source, df in df_map.items():
+                for data_source, df in dfs.items():
                     # Apply source-curve mask (works for both modes)
                     df = source_curve.apply_source_curve_mask(
                         df, args.plot_curve, data_source,
@@ -93,10 +94,11 @@ def run_scaling_analysis(args):
                     )
                     
                     if len(df) == 0:
+                        print(f"Warning: No data after curve mask for data_source: {data_source}")
                         continue
                     
-                    # Update df_map with filtered data (needed for legend generation in merge mode)
-                    df_map[data_source] = df
+                    # Store filtered data for this iteration (needed for legend generation in merge mode)
+                    dfs_masked[data_source] = df
                     
                     # For separate mode: reset ax for each source
                     if not args.plot_merge_sources:
@@ -119,7 +121,6 @@ def run_scaling_analysis(args):
                                 f"Available: {', '.join(available)}"
                             )
                     
-                    print(f"----------- Unique values: {df[plot_x_column]}")
                     # Plot raw data
                     ax = _plot_raw_data(ax, args, df, plot_x_column, plot_metric, custom_color_mapping)
                     
@@ -138,7 +139,7 @@ def run_scaling_analysis(args):
                 if args.plot_merge_sources and ax is not None:
                     if args.plot_extra_lines:
                         ax = _plot_extra_lines(ax, args, plot_metric)
-                    ax = _plot_settings(ax, args, None, plot_x_column, plot_metric, df_map=df_map)
+                    ax = _plot_settings(ax, args, None, plot_x_column, plot_metric, df_map=dfs_masked)
                     plt.close(ax.figure)
 
 def _build_source_curve_color(args, df, data_source):
