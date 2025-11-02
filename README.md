@@ -73,6 +73,9 @@ Note:
   4. carefully set bound `DEFAULT_BOUNDS` and initial value `DEFAULT_P0` for parameters, to guide the fitting search
   5. easy test using `exp1_fit_model_test.sh` (fit + plot, skip result saving)
 
+**Note on fitting quality:**
+- If fitted curves are significantly off or missing in plots, re-run the fitting pipeline. CMA-ES optimization has randomness and may occasionally fail to find the optimal solution.
+
 ### Config
 Important config (in config.py):
 - `DEFAULT_LABELS`: defines valid column/metric names (e.g., 'C', 'E', 'ErrRate'). Add new entries here to extend available options for `--plot-x`, `--plot-curve`, `--plot-metric`, etc.
