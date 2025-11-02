@@ -24,6 +24,7 @@ from .powlawplus import PowLawPlus
 from .powlawmul2 import PowLawMul2
 from .powlawmul3 import PowLawMul3
 from .loglinear_tau import LogLinearTau
+from .loglinear_kn import LogLinearKn
 
 MODEL_REGISTRY = {
     cls.MODEL_NAME: cls

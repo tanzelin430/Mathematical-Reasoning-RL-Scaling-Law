@@ -1,0 +1,38 @@
+{
+  "datetime": "2025-11-02T22:18:26.191595",
+  "fits": [
+    {
+      "context": {
+        "data_source": "instruct",
+        "fit_model": "powlawplus",
+        "eval": "holdout_score",
+        "fit_curve": "N",
+        "fit_x": "C_raw",
+        "fit_metric": "ErrRate",
+        "warmup_clip": 4,
+        "ending_clip": 0,
+        "x_inv_weight_power": 0.0,
+        "fit_curve_mask": [
+          500000000.0,
+          1500000000.0,
+          3000000000.0,
+          7000000000.0,
+          14000000000.0,
+          32000000000.0,
+          72000000000.0
+        ]
+      },
+      "params": {
+        "C0": 559247029258035.44,
+        "N0": 7037406427.964496,
+        "r": -2.400122135783893,
+        "k_max": 0.07783765787844273
+      },
+      "info": {
+        "r2": 0.9900985089774615,
+        "loss": 0.00035760876789546725,
+        "n_points": 703
+      }
+    }
+  ]
+}

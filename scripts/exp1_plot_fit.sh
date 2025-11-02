@@ -10,6 +10,7 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
+  --warmup-clip 0 \
   --fit-curve N \
   --fit-metric ErrRate \
   --plot-curve N \
@@ -39,6 +40,7 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources base \
+  --warmup-clip 0 \
   --fit-curve N \
   --fit-metric ErrRate \
   --plot-curve N \
@@ -67,6 +69,7 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \
+  --warmup-clip 4 \
   --fit-curve N \
   --fit-metric ErrRate \
   --plot-curve N \
@@ -95,6 +98,7 @@ uv run -m src.scaling_analysis \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
   --data-sources instruct \
+  --warmup-clip 4 \
   --fit-curve N \
   --fit-metric ErrRate \
   --plot-curve N \

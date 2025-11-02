@@ -6,7 +6,7 @@ echo "=== Run 1/1: Test fitting model ==="
 
 args=(
   # Data clip
-  --warmup-clip 0
+  --warmup-clip 4
   --ending-clip 0
   
   # Data sources and evaluation
@@ -18,7 +18,7 @@ args=(
   --fit
   # --fit-model loglinear # change model here
   # --fit-model invexp # change model here
-  --fit-model powlawmul3 # change model here
+  --fit-model loglinear_kn # change model here
   # --fit-model powlawplus # change model here
   --fit-curve N
   --fit-x C_raw

@@ -582,11 +582,156 @@ def _print_table_compact(curve_name, fit_x, curve_short, fit_x_short,
     print("\\end{table}")
 
 
+def plot_fit_params_compare_x_combined(args, fitters):
+    """Compare-x-combined schema: L(N,C) vs L(N,D) parameter comparison
+    
+    Creates separate figures for each data_source, with subplots comparing
+    L(N,C) and L(N,D) parameters side by side.
+    """
+    # Group fitters by (data_source, fit_curve)
+    fitter_groups = {}
+    for fitter in fitters:
+        context = fitter.get_context()
+        key = (context['data_source'], context['fit_curve'])
+        if key not in fitter_groups:
+            fitter_groups[key] = []
+        fitter_groups[key].append(fitter)
+    
+    # Process each data_source separately
+    data_source_groups = {}
+    for (data_source, curve_name), group_fitters in fitter_groups.items():
+        if data_source not in data_source_groups:
+            data_source_groups[data_source] = []
+        data_source_groups[data_source].extend(group_fitters)
+    
+    for data_source, all_fitters in data_source_groups.items():
+        print(f"\n--- Compare-x-combined: {data_source} ---")
+        
+        # Separate fitters by fit_x
+        fit_x_groups = {}
+        for fitter in all_fitters:
+            context = fitter.get_context()
+            fit_x = context['fit_x']
+            if fit_x not in fit_x_groups:
+                fit_x_groups[fit_x] = []
+            fit_x_groups[fit_x].append(fitter)
+        
+        if len(fit_x_groups) < 2:
+            print(f"Warning: Only {len(fit_x_groups)} fit_x found for {data_source}, need at least 2 for comparison")
+            continue
+        
+        # Collect all param names
+        all_param_names = set()
+        for fitter in all_fitters:
+            lookup_params = fitter.get_lookup_params()
+            if lookup_params:
+                all_param_names.update(lookup_params.keys())
+        
+        if not all_param_names:
+            print(f"No parameters found for {data_source}")
+            continue
+        
+        params_to_plot = _sort_param_names(all_param_names)
+        n_params = len(params_to_plot)
+        
+        # Create figure with subplots: one subplot per parameter
+        fig, axes = plt.subplots(1, n_params, figsize=(6*n_params, 5), dpi=300)
+        if n_params == 1:
+            axes = [axes]
+        
+        # Get curve info (should be same for all fitters)
+        first_context = all_fitters[0].get_context()
+        curve_name = first_context['fit_curve']
+        curve_label = config.DEFAULT_LABELS.get(curve_name, curve_name)
+        curve_short = config.DEFAULT_SHORT_NAME.get(curve_name, curve_name)
+        
+        # Plot each parameter
+        for ax_idx, param_name in enumerate(params_to_plot):
+            ax = axes[ax_idx]
+            
+            # Plot each fit_x as different curves
+            for fit_x, fit_x_fitters in fit_x_groups.items():
+                for fitter in fit_x_fitters:
+                    lookup_params = fitter.get_lookup_params()
+                    if not lookup_params or param_name not in lookup_params:
+                        continue
+                    
+                    param_table = lookup_params[param_name]
+                    x = np.array(sorted(param_table.keys()))
+                    y = np.array([param_table[k] for k in x])
+                    
+                    # Use different colors for different fit_x
+                    fit_x_short = config.DEFAULT_SHORT_NAME.get(fit_x, fit_x)
+                    color = config.get_color_for_curve(fit_x)
+                    marker = config.DEFAULT_MARKERS.get(fit_x, 'o')
+                    
+                    # Plot with both scatter and line
+                    plot.plot_basic(
+                        x=x,
+                        y=y,
+                        use_scatter=True,
+                        scatter_alpha=args.scatter_alpha,
+                        scatter_s=args.scatter_size,
+                        scatter_marker=marker,
+                        color=color,
+                        ax=ax
+                    )
+                    
+                    # Add legend entry
+                    ax.scatter([], [], 
+                              color=color,
+                              marker=marker,
+                              s=args.scatter_size,
+                              label=f'L({curve_short},{fit_x_short})')
+            
+            # Apply settings
+            plot.plot_basic_settings(
+                ax=ax,
+                x_scale=args.plot_x_scale,
+                y_scale=args.plot_y_scale,
+                x_label=f'{curve_label} ({curve_short})',
+                y_label=f'${param_name}({curve_short})$',
+                use_legend=args.plot_use_legend,
+                legend_loc=args.plot_legend_loc,
+                x_tick_on_data=True,
+                x_tick_spacing=args.x_tick_spacing,
+                y_tick_spacing=args.y_tick_spacing,
+                x_grid_spacing=args.x_grid_spacing,
+                y_grid_spacing=args.y_grid_spacing,
+            )
+        
+        # Add overall title
+        data_source_title = data_source.capitalize() if data_source in ['base', 'instruct'] else data_source
+        fit_x_list = sorted(fit_x_groups.keys())
+        fit_x_short_list = [config.DEFAULT_SHORT_NAME.get(x, x) for x in fit_x_list]
+        title = f"{data_source_title} Model: L({curve_short},{fit_x_short_list[0]}) vs L({curve_short},{fit_x_short_list[1]}) Parameter Comparison"
+        fig.suptitle(title, fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.85)  # Make room for suptitle
+        
+        # Save
+        args.output_base_dir.mkdir(parents=True, exist_ok=True)
+        first_eval = all_fitters[0].get_context()['eval']
+        eval_file_str = config.TEST_EVALS[first_eval]['file_str']
+        fit_x_list_str = "_vs_".join(sorted(fit_x_list))
+        params_str = "_".join(params_to_plot)
+        
+        save_path = args.output_base_dir / (
+            f"{args.output_prefix}{data_source}_{eval_file_str}_"
+            f"{curve_name}_{fit_x_list_str}_{params_str}_compare_x_combined.pdf"
+        )
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        print(f"Saved: {save_path}")
+        plt.close()
+
+
 # Schema registry
 PLOT_PARAMS_SCHEMA = {
     'single': plot_fit_params_single,
     'compare-source': plot_fit_params_compare_source,
     'compare-x': plot_fit_params_compare_x,
+    'compare-x-combined': plot_fit_params_compare_x_combined,
     'table': plot_fit_params_table,
     'table-compact': plot_fit_params_table_compact,
 }
