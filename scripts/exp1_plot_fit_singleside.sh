@@ -1,19 +1,23 @@
 #!/bin/bash
 
 # load fitting results and plot fitting curves
-# always use L(N, C) to plot x = Compute & x = Data Size
+# Plot base and instruct on the same figure with different E_max values
+# Matching the style of plot_multi_fit_simple_curve_fit_fixE.py
 
-echo "=== Run 1/1: fixE ==="
+echo "=== Run 1/1: fixE - Base vs Instruct Comparison ==="
 uv run -m src.scaling_analysis \
   --plot \
   --plot-fit \
+  --plot-merge-sources \
   --plot-extra-lines scripts/sota_lines.json \
   --fit-load outputs/fits_exp1.json \
   --fit-x C_raw \
-  --data-sources instruct \
+  --data-sources base instruct \
   --fit-curve N \
   --plot-curve E \
-  --plot-curve-mask 53760 \
+  --plot-source-curve-mask '{"base": [52736], "instruct": [52736]}' \
+  --plot-source-curve-label '{"base": {"52736": "Ours-Qwen2.5-(Base, Dense)"}, "instruct": {"52736": "Ours-Qwen2.5-(Instruct, Dense)"}}' \
+  --plot-source-curve-color '{"base": {"52736": "#CC0000"}, "instruct": {"52736": "#CC6600"}}' \
   --plot-x N \
   --eval holdout_score \
   --plot-metric ErrRate \
@@ -27,8 +31,8 @@ uv run -m src.scaling_analysis \
   --line-alpha 1 \
   --line-width 2.0 \
   --plot-use-legend \
-  --plot-title "Single Side Fitting" \
-  --scatter-alpha 1 \
-  --scatter-size 15 \
+  --plot-title "Performance Scaling of Post-RFT vs. SOTA" \
+  --scatter-alpha 0.5 \
+  --scatter-size 20 \
   --scatter-marker o \
   --output-prefix fit_singleside_

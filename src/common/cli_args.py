@@ -355,6 +355,21 @@ Examples:
                             type=str, default=None,
                             help='Path to JSON file containing extra lines to plot (e.g., SOTA comparison lines)')
 
+    # Source-curve configuration (for merge mode)
+    source_curve_group = parser.add_argument_group('source-curve configuration (for merge mode)')
+    source_curve_group.add_argument('--plot-merge-sources', dest='plot_merge_sources',
+                                   action='store_true', default=False,
+                                   help='Merge all data sources into a single plot (default: False, separate plots for each source)')
+    source_curve_group.add_argument('--plot-source-curve-mask', dest='plot_source_curve_mask',
+                                   type=str, default=None,
+                                   help='JSON mapping data_source to curve masks, e.g., \'{"base": [53760], "instruct": [52000]}\'')
+    source_curve_group.add_argument('--plot-source-curve-label', dest='plot_source_curve_label',
+                                   type=str, default=None,
+                                   help='JSON mapping (data_source, curve_value) to custom labels, e.g., \'{"base": {"53760": "Label"}}\'')
+    source_curve_group.add_argument('--plot-source-curve-color', dest='plot_source_curve_color',
+                                   type=str, default=None,
+                                   help='JSON mapping (data_source, curve_value) to colors, e.g., \'{"base": {"53760": "#CC0000"}}\'')
+
     # Smoothing configuration
     smooth_group = parser.add_argument_group('smoothing options')
     smooth_group.add_argument('--add-smooth', dest='add_smooth',
@@ -521,22 +536,48 @@ def process_parsed_args(args):
     else:
         args.plot_legend_bbox_to_anchor = None
 
-    # Parse plot_extra_lines JSON file
-    if args.plot_extra_lines:
-        if isinstance(args.plot_extra_lines, str):
+    # Unified JSON parameter parser supporting file path, JSON string, or dict
+    def parse_json_param(param_value, param_name):
+        """
+        Parse JSON parameter from multiple formats:
+        - None -> None
+        - dict -> dict (already parsed, e.g., from config file)
+        - file path (str) -> load from file
+        - JSON string (str) -> parse JSON
+        
+        Args:
+            param_value: The parameter value to parse
+            param_name: Name of the parameter for error messages
+            
+        Returns:
+            Parsed dict or None
+        """
+        if param_value is None:
+            return None
+        
+        if isinstance(param_value, dict):
+            # Already a dict (e.g., from config file)
+            return param_value
+        
+        if isinstance(param_value, str):
             try:
-                # Load from file if it's a path
-                if os.path.exists(args.plot_extra_lines):
-                    with open(args.plot_extra_lines, 'r') as f:
-                        args.plot_extra_lines = json.load(f)
+                # Try to load from file first if it exists
+                if os.path.exists(param_value):
+                    with open(param_value, 'r') as f:
+                        return json.load(f)
                 else:
-                    # Try to parse as JSON string
-                    args.plot_extra_lines = json.loads(args.plot_extra_lines)
+                    # Otherwise, try to parse as JSON string
+                    return json.loads(param_value)
             except (json.JSONDecodeError, IOError) as e:
-                raise ValueError(f"Invalid plot_extra_lines: {e}")
-        # else: already a dict from config file
-    else:
-        args.plot_extra_lines = None
+                raise ValueError(f"Invalid {param_name}: {e}")
+        
+        return None
+    
+    # Parse all JSON parameters using unified parser
+    args.plot_extra_lines = parse_json_param(args.plot_extra_lines, 'plot_extra_lines')
+    args.plot_source_curve_mask = parse_json_param(args.plot_source_curve_mask, 'plot_source_curve_mask')
+    args.plot_source_curve_label = parse_json_param(args.plot_source_curve_label, 'plot_source_curve_label')
+    args.plot_source_curve_color = parse_json_param(args.plot_source_curve_color, 'plot_source_curve_color')
 
     # Set default output prefix
     if not args.output_prefix:
