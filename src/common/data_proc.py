@@ -104,6 +104,7 @@ def merge_duplicate_steps(df, group_columns: list, mode: str = 'mean') -> pd.Dat
                 'experiment_id': 'first',
                 'runid': 'first',
                 'rollout_n': 'first',
+                'eval_curve': 'first',
             }
             # Remove group columns from except_dict if they exist
             for col in group_columns:

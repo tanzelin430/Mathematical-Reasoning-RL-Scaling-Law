@@ -73,9 +73,12 @@ Note:
   4. carefully set bound `DEFAULT_BOUNDS` and initial value `DEFAULT_P0` for parameters, to guide the fitting search
   5. easy test using `exp1_fit_model_test.sh` (fit + plot, skip result saving)
 
+**Note on fitting quality:**
+- If fitted curves are significantly off or missing in plots, re-run the fitting pipeline. CMA-ES optimization has randomness and may occasionally fail to find the optimal solution.
+
 ### Config
 Important config (in config.py):
-- `DEFAULT_X_LABELS` `DEFAULT_Y_LABELS`: control default figure labels
+- `DEFAULT_LABELS`: defines valid column/metric names (e.g., 'C', 'E', 'ErrRate'). Add new entries here to extend available options for `--plot-x`, `--plot-curve`, `--plot-metric`, etc.
 
 
 ## Quick start
@@ -189,11 +192,16 @@ uv run -m src.run.eval_curves_by_model --help
 
 Plot All Dataset Evaluations (deprecated, one subplot per domain)
 ```bash
-uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip-to 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip-to 10
 
-uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip-to 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip-to 10
+
+uv run -m src.run.eval_subplots --help
 ```
 
-Single side scaling law (Deprecated)
+Single side scaling law
+```bash
+./scripts/exp1_plot_fit_singleside.sh
+```

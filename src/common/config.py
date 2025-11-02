@@ -217,9 +217,6 @@ COLOR_MAPPING = {
     'run0': '#5ec962', # 黄绿
     'run1': '#440154', # 深紫
     'run2': '#21918c', # 青绿
-    # for E
-    53760: '#21918c',
-    53248: '#21918c',  # Add the actual E_max value, same as 53760
     # for model type comparison
     'base': '#27ad81',    # 绿青
     'instruct': '#440154', # 深紫

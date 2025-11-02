@@ -4,8 +4,8 @@ Scaling Law Pipeline - Multi-Eval Analysis
 Processes multiple test evals from Experiment1 data and generates scaling law plots for each eval
 
 Usage:
-  python run_plot_multi-subplot.py --data-source base --x-columns E --metrics ErrRate --warmup-clip 10
-  python run_plot_multi-subplot.py --data-source instruct --x-columns C,N --metrics ErrRate,Score --warmup-clip 5
+  python run_plot_multi-subplot.py --data-source base --x-columns E --metrics ErrRate --warmup-clip-to 10
+  python run_plot_multi-subplot.py --data-source instruct --x-columns C,N --metrics ErrRate,Score --warmup-clip 5 --ending-clip 3
 """
 
 import argparse
@@ -24,8 +24,14 @@ def main():
                         help='Comma-separated list of x-axis variables (default: E)')
     parser.add_argument('--metrics', type=str, default='ErrRate',
                         help='Comma-separated list of metrics (default: ErrRate)')
-    parser.add_argument('--warmup-clip', type=int, default=10,
-                        help='Number of warmup steps to clip (default: 10)')
+    parser.add_argument('--warmup-clip', type=int, default=None,
+                        help='Number of warmup steps to clip (default: None)')
+    parser.add_argument('--warmup-clip-to', type=int, default=None,
+                        help='Warmup clip to step (default: None)')
+    parser.add_argument('--ending-clip', type=int, default=None,
+                        help='Number of ending steps to clip (default: None)')
+    parser.add_argument('--ending-clip-to', type=int, default=None,
+                        help='Ending clip to step (default: None)')
     args = parser.parse_args()
     
     # Parse comma-separated arguments
@@ -34,13 +40,19 @@ def main():
     x_columns = [x.strip() for x in args.x_columns.split(',')]
     metrics = [m.strip() for m in args.metrics.split(',')]
     warmup_clip = args.warmup_clip
+    warmup_clip_to = args.warmup_clip_to
+    ending_clip = args.ending_clip
+    ending_clip_to = args.ending_clip_to
     
     print(f"Configuration:")
     print(f"  Data source: {data_source}")
     print(f"  Curve column: {curve_column}")
     print(f"  X columns: {x_columns}")
     print(f"  Metrics: {metrics}")
-    print(f"  Warmup clip num: {warmup_clip}")
+    print(f"  Warmup clip: {warmup_clip}")
+    print(f"  Warmup clip to: {warmup_clip_to}")
+    print(f"  Ending clip: {ending_clip}")
+    print(f"  Ending clip to: {ending_clip_to}")
     print()
     
     # Load data
@@ -91,15 +103,14 @@ def main():
                     )
                     
                     # Apply clipping if specified
-                    if warmup_clip > 0:
-                        df_eval = data_proc.apply_clip(
-                            df_eval,
-                            curve_column=physical_curve_column,
-                            warmup_clip=warmup_clip,
-                            warmup_clip_to=None,
-                            ending_clip=0,
-                            ending_clip_to=None
-                        )
+                    df_eval = data_proc.apply_clip(
+                        df_eval,
+                        curve_column=physical_curve_column,
+                        warmup_clip=warmup_clip,
+                        warmup_clip_to=warmup_clip_to,
+                        ending_clip=ending_clip,
+                        ending_clip_to=ending_clip_to
+                    )
                     
                     # Plot raw scatter points (using physical_curve_column for grouping)
                     ax = plot.plot_curves(
