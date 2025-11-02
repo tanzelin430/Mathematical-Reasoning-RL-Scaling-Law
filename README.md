@@ -196,4 +196,7 @@ uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics E
 uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip 10
 ```
 
-Single side scaling law (Deprecated)
+Single side scaling law
+```bash
+./scripts/exp1_plot_fit_singleside.sh
+```
