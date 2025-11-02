@@ -31,7 +31,7 @@ ARG_NAME_MAP = {
 REQUIRED_ARGS_BY_MODE = {
     'plot': ['data_sources', 'eval', 'plot_curve', 'plot_x_columns', 'plot_metrics'],
     'plot_fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric'],
-    'fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval'],
+    'fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval', 'fit_model'],
     'fit_load': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval'],
 }
 
@@ -85,83 +85,6 @@ def parse_curves(value: Union[str, List[str]]) -> List[Union[int, float]]:
             raise ValueError(f"Invalid curve mask value: {item}")
     return values
 
-def validate_args(args):
-    """Validate command line arguments
-    
-    When --fit-load is used, most arguments are loaded from context and don't need validation.
-    """
-    # Check for deprecated argument usage and provide friendly error messages
-    deprecated_args = []
-    if hasattr(args, '_deprecated_curve') and args._deprecated_curve:
-        deprecated_args.append("--curve")
-    if hasattr(args, '_deprecated_x') and args._deprecated_x:
-        deprecated_args.append("-x")
-    if hasattr(args, '_deprecated_metric') and args._deprecated_metric:
-        deprecated_args.append("--metric")
-    
-    if deprecated_args:
-        error_msg = f"Error: The following arguments are deprecated: {', '.join(deprecated_args)}\n\n"
-        error_msg += "Please use the explicit versions instead:\n"
-        error_msg += "  --curve      → Use --plot-curve or --fit-curve\n"
-        error_msg += "  -x           → Use --plot-x or --fit-x\n"
-        error_msg += "  --metric     → Use --plot-metric or --fit-metric\n"
-        raise ValueError(error_msg)
-    
-    # Validate data_sources (only if provided)
-    if args.data_sources:
-        for data_source in args.data_sources:
-            if data_source not in config.CSV_MAP:
-                raise ValueError(f"Invalid data-source: {data_source}. "
-                                f"Must be one of: {list(config.CSV_MAP.keys())}")
-    
-    # Validate eval (only if provided)
-    if args.eval and args.eval not in config.TEST_EVALS:
-        raise ValueError(f"Invalid eval: {args.eval}. "
-                        f"Must be one of: {list(config.TEST_EVALS.keys())}")
-    
-    # Validate columns (only if provided)
-    valid_columns = list(config.DEFAULT_LABELS.keys())
-    
-    # Validate plot-curve
-    if args.plot_curve and args.plot_curve not in valid_columns:
-        raise ValueError(f"Invalid --plot-curve: {args.plot_curve}. "
-                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate fit-curve
-    if args.fit_curve and args.fit_curve not in valid_columns:
-        raise ValueError(f"Invalid --fit-curve: {args.fit_curve}. "
-                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate plot-x columns
-    if args.plot_x_columns:
-        for x_col in args.plot_x_columns:
-            if x_col not in valid_columns:
-                raise ValueError(f"Invalid --plot-x column: {x_col}. "
-                                f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate fit-x
-    if args.fit_x and args.fit_x not in valid_columns:
-        raise ValueError(f"Invalid --fit-x column: {args.fit_x}. "
-                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate plot-metric
-    if args.plot_metrics:
-        for metric in args.plot_metrics:
-            if metric not in valid_columns:
-                raise ValueError(f"Invalid --plot-metric: {metric}. "
-                                f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate fit-metric
-    if args.fit_metric and args.fit_metric not in valid_columns:
-        raise ValueError(f"Invalid --fit-metric: {args.fit_metric}. "
-                        f"Must be one of: {valid_columns}, or add to config.DEFAULT_LABELS")
-    
-    # Validate fit-model is provided when --fit is enabled
-    if args.fit and not args.fit_model:
-        raise ValueError("--fit-model is required when --fit is enabled. "
-                       f"Available models: {', '.join(list_available_models())}")
-
-
 def create_argument_parser():
     """Create and configure argument parser"""
     parser = argparse.ArgumentParser(
@@ -191,13 +114,16 @@ Examples:
     # Basic plot arguments
     parser.add_argument('--data-sources', dest='data_sources',
                        action='append', nargs='+',
-                       help='Data source(s) to use (space- or comma-separated; flag can be repeated). Valid choices: ' + ', '.join(config.CSV_MAP.keys()))
+                       choices=list(config.CSV_MAP.keys()),
+                       help='Data source(s) to use (space- or comma-separated; flag can be repeated)')
     
     parser.add_argument('--plot-curve', dest='plot_curve',
+                       choices=list(config.DEFAULT_LABELS.keys()),
                        help='Curve column for plotting, e.g.\'N\', \'Tau\', \'rollout_n\'')
     
     parser.add_argument('--plot-x', dest='plot_x_columns',
                        action='append', nargs='+',
+                       choices=list(config.DEFAULT_LABELS.keys()),
                        help='X columns for plotting (space- or comma-separated; flag can be repeated)')
     
     parser.add_argument('--eval',
@@ -206,35 +132,29 @@ Examples:
     
     parser.add_argument('--plot-metric', dest='plot_metrics',
                        action='append', nargs='+',
+                       choices=list(config.DEFAULT_LABELS.keys()),
                        help='Metrics to plot (space- or comma-separated; flag can be repeated)')
     
     parser.add_argument('--plot', action='store_true',
                        help='Enable model plotting')
     parser.add_argument('--plot-fit', action='store_true',
                        help='Enable model plotting with fitted curves')
-    
-    # Deprecated argument aliases with friendly error messages
-    deprecated_group = parser.add_argument_group('deprecated options (will show error)')
-    deprecated_group.add_argument('--curve', dest='_deprecated_curve',
-                       help='DEPRECATED: Use --plot-curve or --fit-curve instead')
-    deprecated_group.add_argument('-x', dest='_deprecated_x',
-                       help='DEPRECATED: Use --plot-x or --fit-x instead')
-    deprecated_group.add_argument('--metric', dest='_deprecated_metric',
-                       help='DEPRECATED: Use --plot-metric or --fit-metric instead')
 
     # Fitting arguments
     fit_group = parser.add_argument_group('fitting options')
     fit_group.add_argument('--fit', action='store_true',
                           help='Enable model fitting')
     fit_group.add_argument('--fit-curve',
+                          choices=list(config.DEFAULT_LABELS.keys()),
                           help='Curve column for fitting, e.g.\'N\', \'Tau\', \'rollout_n\'')
     fit_group.add_argument('--fit-curve-mask', dest='fit_curve_mask', nargs='+',
                            help='Curves to include in fitting (space- or comma-separated, supports scientific notation)')
     fit_group.add_argument('--fit-x', dest='fit_x',
                           choices=list(config.DEFAULT_LABELS.keys()),
-                          help='X column for fitting (default: first --plot-x column)')
+                          help='X column for fitting')
     fit_group.add_argument('--fit-metric', dest='fit_metric',
-                          help='Metric to fit (default: same as first --metric)')
+                          choices=list(config.DEFAULT_LABELS.keys()),
+                          help='Metric to fit')
     fit_group.add_argument('--fit-load', dest='fit_load',
                           help='Path to load batch fitters JSON (mutually exclusive with --fit)')
     fit_group.add_argument('--fit-save', dest='fit_save',

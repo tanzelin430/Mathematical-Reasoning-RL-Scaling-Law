@@ -75,7 +75,7 @@ Note:
 
 ### Config
 Important config (in config.py):
-- `DEFAULT_X_LABELS` `DEFAULT_Y_LABELS`: control default figure labels
+- `DEFAULT_LABELS`: defines valid column/metric names (e.g., 'C', 'E', 'ErrRate'). Add new entries here to extend available options for `--plot-x`, `--plot-curve`, `--plot-metric`, etc.
 
 
 ## Quick start

@@ -13,7 +13,7 @@ from src.common import source_curve
 from src.fit import fit
 from src.fit.fit import save_batch_fitters, load_batch_fitters
 from src.common import plot
-from src.common.cli_args import create_argument_parser, process_parsed_args, validate_args, validate_required_args
+from src.common.cli_args import create_argument_parser, process_parsed_args, validate_required_args
 from src.fit.models import get_model_class
 from src.run.plot_fit_params import plot_fit_params
 # Lambda functions
@@ -554,7 +554,6 @@ def main():
     args = parser.parse_args()
     args = process_parsed_args(args)
     validate_required_args(args)
-    validate_args(args)
     run_scaling_analysis(args)
 
 if __name__ == "__main__":
