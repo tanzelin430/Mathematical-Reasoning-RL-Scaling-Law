@@ -32,6 +32,7 @@ REQUIRED_ARGS_BY_MODE = {
     'plot': ['data_sources', 'eval', 'plot_curve', 'plot_x_columns', 'plot_metrics'],
     'plot_fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric'],
     'fit': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval'],
+    'fit_load': ['data_sources', 'fit_x', 'fit_curve', 'fit_metric', 'eval'],
 }
 
 
