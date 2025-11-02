@@ -88,10 +88,6 @@ def main():
         print(f"No data found for {plot.human_format_N(N)} model!")
         return
     
-    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
-    # Note: merge_duplicate_steps is done inside prepare_eval_data
-    # df = df[df['step'] > 0].reset_index(drop=True)
-    
     # Define evaluation group keys (using config.TEST_EVALS for metadata)
     eval_group_keys = {
         'out_of_domain': [

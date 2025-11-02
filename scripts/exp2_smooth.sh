@@ -35,7 +35,7 @@ uv run -m src.scaling_analysis \
   --plot-use-legend \
   --plot-title "Data Reuse on Base model (7B)" \
   --plot-curve-mask 1 2 5 20 25 50 100 \
-  --highlight-curves-predict 1 \
+  --highlight-curves-fit 1 \
   --highlight-width 3.0 \
 
 echo ""
@@ -70,7 +70,7 @@ uv run -m src.scaling_analysis \
   --plot-use-legend \
   --plot-title "Data Reuse on Instruct model (7B)" \
   --plot-curve-mask 1 2 5 20 25 50 100 \
-  --highlight-curves-predict 1 \
+  --highlight-curves-fit 1 \
   --highlight-width 3.0 \
 
 echo ""

@@ -181,7 +181,7 @@ Examples:
 
   # Multiple data sources, metrics and x columns with highlighting
   %(prog)s --data-sources exp2-base exp2-instruct --plot-curve N --plot-x C E --eval holdout_score --plot-metric ErrRate R \
-           --plot-curve-mask 1e9 3e9 7e9 --highlight-curves-predict 1e9 --highlight-curves-plot 3e9 --plot
+           --plot-curve-mask 1e9 3e9 7e9 --highlight-curves-fit 1e9 --highlight-curves-plot 3e9 --plot
 
   # Load configuration from file
   %(prog)s --config-file config.json
@@ -255,7 +255,7 @@ Examples:
     plot_group = parser.add_argument_group('plot configuration')
     plot_group.add_argument('--plot-curve-mask', dest='plot_curve_mask', nargs='+',
                            help='Curves to include in plots (space- or comma-separated, supports scientific notation)')
-    plot_group.add_argument('--highlight-curves-predict', dest='highlight_curves_predict', nargs='+',
+    plot_group.add_argument('--highlight-curves-fit', dest='highlight_curves_fit', nargs='+',
                            help='Curves to highlight in predict_and_plot (space- or comma-separated, supports scientific notation). If not set, no highlighting in predict phase.')
     plot_group.add_argument('--highlight-curves-plot', dest='highlight_curves_plot', nargs='+',
                            help='Curves to highlight in plot phase (space- or comma-separated, supports scientific notation). If not set, no highlighting in plot phase.')
@@ -459,7 +459,7 @@ def process_parsed_args(args):
     # Parse curve masks and highlight curves
     args.fit_curve_mask = parse_curves(args.fit_curve_mask) if args.fit_curve_mask else None
     args.plot_curve_mask = parse_curves(args.plot_curve_mask) if args.plot_curve_mask else None
-    args.highlight_curves_predict = parse_curves(args.highlight_curves_predict) if args.highlight_curves_predict else None
+    args.highlight_curves_fit = parse_curves(args.highlight_curves_fit) if args.highlight_curves_fit else None
     args.highlight_curves_plot = parse_curves(args.highlight_curves_plot) if args.highlight_curves_plot else None
 
     # Parse plot_titles JSON

@@ -61,8 +61,8 @@ def run_scaling_analysis(args):
     # Plotting phase
     if args.plot:
         dfs_masked = _build_masked_dfs(dfs, args)
-        color_mappings = _build_source_curve_color(dfs, args)
-        custom_legend_handles_labels = _build_custom_legend(dfs_masked, args, color_mappings)
+        custom_source_color_maps = _build_source_curve_color(dfs, args)
+        custom_legend_handles_labels = _build_custom_legend(dfs_masked, args, custom_source_color_maps)
 
         for plot_x_column in args.plot_x_columns:
             print(f"\n=== Plotting for x_column: {plot_x_column} ===")
@@ -79,14 +79,14 @@ def run_scaling_analysis(args):
                         ax = None
                     
                     # Get custom color mapping for this data source
-                    custom_color_mapping = color_mappings.get(data_source)
+                    _custom_color_map = custom_source_color_maps.get(data_source) if custom_source_color_maps else None
                     
                     # Add fitted prediction if available
                     if args.plot_fit:
                         fitter_key = (data_source, args.fit_x, args.fit_metric, args.fit_curve, args.eval)
                         if fitter_key in fitter_map:
                             ax = _plot_fit_prediction(ax, args, df, fitter_map[fitter_key], 
-                                                     plot_x_column, plot_metric, custom_color_mapping)
+                                                     plot_x_column, plot_metric, _custom_color_map)
                         else:
                             # User requested --plot-fit but no fitter found
                             available = [str(key) for key in fitter_map.keys()] if fitter_map else ["none"]
@@ -96,11 +96,11 @@ def run_scaling_analysis(args):
                             )
                     
                     # Plot raw data
-                    ax = _plot_raw_data(ax, args, df, plot_x_column, plot_metric, custom_color_mapping)
+                    ax = _plot_raw_data(ax, args, df, plot_x_column, plot_metric, _custom_color_map)
                     
                     # Add smooth curves if requested
                     if args.add_smooth:
-                        ax = _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric, custom_color_mapping)
+                        ax = _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric, _custom_color_map)
                     
                     # Separate mode: finalize plot for each source
                     if not args.plot_merge_sources:
@@ -308,7 +308,7 @@ def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric, custo
         y_column=pred_column, 
         use_line=True,
         use_scatter=False,
-        highlight_curves=args.highlight_curves_predict,
+        highlight_curves=args.highlight_curves_fit,
         highlight_alpha=args.highlight_alpha,
         highlight_width=args.highlight_width,
         line_alpha=args.line_alpha,

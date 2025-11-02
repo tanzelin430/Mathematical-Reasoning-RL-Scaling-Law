@@ -189,11 +189,13 @@ uv run -m src.run.eval_curves_by_model --help
 
 Plot All Dataset Evaluations (deprecated, one subplot per domain)
 ```bash
-uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source base --x-columns E --metrics ErrRate --warmup-clip-to 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns E --metrics ErrRate --warmup-clip-to 10
 
-uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip 10
-uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip 10
+uv run -m src.run.eval_subplots --data-source base --x-columns C_raw --metrics ErrRate --warmup-clip-to 10
+uv run -m src.run.eval_subplots --data-source instruct --x-columns C_raw --metrics ErrRate --warmup-clip-to 10
+
+uv run -m src.run.eval_subplots --help
 ```
 
 Single side scaling law
