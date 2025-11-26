@@ -143,7 +143,8 @@ def setup_y_axis_formatter(ax, format_type='auto'):
 
 def legend_format(label_name: str, label_value: float) -> str:
     if label_name == "N":
-        return human_format_N(label_value)
+        formatted = human_format_N(label_value)
+        return formatted
     elif label_name == "Tau":
         return f"τ={label_value}"
     elif label_name == "rollout_n":
@@ -201,7 +202,11 @@ def _get_legends(_curves: list[float], legend_lambda = None):
                     x = 1000000  # Fallback for invalid rollout numbers
         return float(x)
     sort_curves = sorted(_curves, key=_flat)
-    handles = [Line2D([0], [0], color=get_color_for_curve(n), linewidth=2) for n in sort_curves]
+    # Create legend handles
+    handles = [
+        Line2D([0], [0], color=get_color_for_curve(n), linewidth=2, linestyle='-')
+        for n in sort_curves
+    ]
     labels = [legend_lambda(n) for n in sort_curves]
     return handles, labels, sort_curves
 
@@ -563,11 +568,20 @@ def plot_curves(
     scatter_marker: str = 'o',
     # Custom color mapping override
     custom_color_mapping: dict = None,
+    # Split line style at x value (for prediction tasks)
+    split_line_at_x: dict = None,  # Dict mapping curve_id -> x_value where line changes from solid to dashed
+    # Extrapolation curves (use dashed line for entire curve)
+    extrapolation_curves: set = None,  # Set of curve_id values to show as dashed (for extrapolation)
     ax=None
 ):
     """
     Generic plotting function for curves grouped by curve_column.
     Only handles data plotting; settings and legend should be handled by caller.
+
+    Args:
+        split_line_at_x: Optional dict mapping curve_id -> x_split_value.
+            If provided, curves will be drawn with solid line for x <= x_split
+            and dashed line for x > x_split (for prediction visualization).
     """
     df = df.sort_values(x_column)
     # Plot curves by group
@@ -577,34 +591,78 @@ def plot_curves(
         x = g[x_column].to_numpy()
         y = g[y_column].to_numpy()
         y_width = g[y_std_column].to_numpy() if y_std_column and y_std_column in g.columns else None
-        
+
         # Determine if this curve should be highlighted
         is_highlighted = highlight_curves is not None and curve_id in highlight_curves
         final_line_alpha = highlight_alpha if is_highlighted else line_alpha
         final_line_width = highlight_width if is_highlighted and highlight_width is not None else line_width
         final_scatter_size = highlight_width if is_highlighted and highlight_width is not None else scatter_size
-        
+
         # Use custom color mapping if provided, otherwise use config color mapping
         if custom_color_mapping is not None and curve_id in custom_color_mapping:
             color = custom_color_mapping[curve_id]
         else:
             color = get_color_for_curve(curve_id)
-            
-        ax = plot_basic(
-            x, y, 
-            use_scatter=use_scatter, 
-            scatter_alpha=scatter_alpha, 
-            scatter_s=final_scatter_size,
-            scatter_marker=scatter_marker,
-            use_line=use_line, 
-            line_alpha=final_line_alpha, 
-            line_width=final_line_width,
-            fill_width=y_width, 
-            fill_width_alpha=0.2, 
-            color=color, 
-            ax=ax
-        )
-    
+
+        # Check if we need to split this curve at a specific x value
+        if split_line_at_x is not None and curve_id in split_line_at_x:
+            x_split = split_line_at_x[curve_id]
+
+            # Split data into fitted (solid) and predicted (dashed) segments
+            mask_fit = x <= x_split
+            mask_pred = x >= x_split
+
+            # Plot fitted segment (solid line)
+            if np.any(mask_fit):
+                ax = plot_basic(
+                    x[mask_fit], y[mask_fit],
+                    use_scatter=use_scatter,
+                    scatter_alpha=scatter_alpha,
+                    scatter_s=final_scatter_size,
+                    scatter_marker=scatter_marker,
+                    use_line=use_line,
+                    line_alpha=final_line_alpha,
+                    line_width=final_line_width,
+                    line_style='-',
+                    fill_width=y_width[mask_fit] if y_width is not None else None,
+                    fill_width_alpha=0.2,
+                    color=color,
+                    ax=ax
+                )
+
+            # Plot predicted segment (dashed line, no scatter)
+            if np.any(mask_pred):
+                ax = plot_basic(
+                    x[mask_pred], y[mask_pred],
+                    use_scatter=False,  # No scatter for prediction
+                    use_line=use_line,
+                    line_alpha=final_line_alpha,
+                    line_width=final_line_width,
+                    line_style='--',
+                    fill_width=None,  # No fill for prediction
+                    color=color,
+                    ax=ax
+                )
+        else:
+            # Check if this curve should be shown as extrapolation (dashed line)
+            line_style = '--' if (extrapolation_curves is not None and curve_id in extrapolation_curves) else '-'
+
+            ax = plot_basic(
+                x, y,
+                use_scatter=use_scatter,
+                scatter_alpha=scatter_alpha,
+                scatter_s=final_scatter_size,
+                scatter_marker=scatter_marker,
+                use_line=use_line,
+                line_alpha=final_line_alpha,
+                line_width=final_line_width,
+                line_style=line_style,
+                fill_width=y_width,
+                fill_width_alpha=0.2,
+                color=color,
+                ax=ax
+            )
+
     return ax
 
 def plot_empirical_f_of_R(

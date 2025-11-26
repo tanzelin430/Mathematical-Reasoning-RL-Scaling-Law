@@ -16,3 +16,4 @@ tests/
 /uv.lock
 /*.tar.gz
 /*.zip
+.claude/

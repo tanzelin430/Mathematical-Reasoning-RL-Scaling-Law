@@ -241,23 +241,23 @@ def apply_clip(df, curve_column: str, warmup_clip: int = None, warmup_clip_to: i
     # Handle default case
     if all(x is None for x in [warmup_clip, warmup_clip_to, ending_clip, ending_clip_to]):
         return df
-    
+
     # Apply clipping functions (merge operations to reduce passes)
     result_df = df
-    
+
     # Apply index-based clipping (warmup and ending together)
     if warmup_clip is not None or ending_clip is not None:
         # Convert 0 to None (0 means no clipping)
         start_idx = warmup_clip if warmup_clip else None
         end_idx = -ending_clip if (ending_clip is not None and ending_clip > 0) else None
-        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=start_idx, end_idx=end_idx) 
+        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=start_idx, end_idx=end_idx)
                                for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
-    
+
     # Apply value-based clipping (warmup_clip_to and ending_clip_to together)
     if warmup_clip_to is not None or ending_clip_to is not None:
-        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=ending_clip_to) 
+        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=ending_clip_to)
                                for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
-    
+
     return result_df
 
 

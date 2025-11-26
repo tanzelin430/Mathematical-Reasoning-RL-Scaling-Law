@@ -71,22 +71,45 @@ def run_scaling_analysis(args):
             for plot_metric in args.plot_metrics:
                 # Initialize shared ax
                 ax = None
-                
+
+                # Track whether we're using prediction or extrapolation (across all sources)
+                has_prediction_any = False
+                has_extrapolation_any = False
+
                 # Unified loop: process each data source
                 for data_source, df in dfs_masked.items():
                     # For separate mode: reset ax for each source
                     if not args.plot_merge_sources:
                         ax = None
-                    
+
                     # Get custom color mapping for this data source
                     _custom_color_map = custom_source_color_maps.get(data_source) if custom_source_color_maps else None
-                    
+
+                    # Track whether we're using prediction or extrapolation visualization
+                    has_prediction = False
+                    has_extrapolation = False
+
                     # Add fitted prediction if available
                     if args.plot_fit:
                         fitter_key = (data_source, args.fit_x, args.fit_metric, args.fit_curve, args.eval)
                         if fitter_key in fitter_map:
-                            ax = _plot_fit_prediction(ax, args, df, fitter_map[fitter_key], 
+                            fitter = fitter_map[fitter_key]
+                            ax = _plot_fit_prediction(ax, args, df, fitter,
                                                      plot_x_column, plot_metric, _custom_color_map)
+                            # Check if using prediction (ending_clip > 0)
+                            ending_clip = fitter.get_context().get("ending_clip", 0)
+                            has_prediction = ending_clip is not None and ending_clip > 0
+
+                            # Check if using extrapolation (72B present in data but not in fit_curve_mask)
+                            # Note: prediction and extrapolation are mutually exclusive
+                            if not has_prediction and args.plot_curve == "N":
+                                fit_curve_mask = fitter.get_context().get("fit_curve_mask", None)
+                                if fit_curve_mask is not None and 72e9 in df[args.plot_curve].unique() and 72e9 not in fit_curve_mask:
+                                    has_extrapolation = True
+
+                            # Update global flags for merge mode
+                            has_prediction_any = has_prediction_any or has_prediction
+                            has_extrapolation_any = has_extrapolation_any or has_extrapolation
                         else:
                             # User requested --plot-fit but no fitter found
                             available = [str(key) for key in fitter_map.keys()] if fitter_map else ["none"]
@@ -106,15 +129,19 @@ def run_scaling_analysis(args):
                     if not args.plot_merge_sources:
                         if args.plot_extra_lines:
                             ax = _plot_extra_lines(ax, args, plot_metric)
-                        ax = _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source)
+                        ax = _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source,
+                                           show_prediction_legend=has_prediction,
+                                           show_extrapolation_legend=has_extrapolation)
                         plt.close(ax.figure)
                 
                 # Merge mode: finalize plot after all sources
                 if args.plot_merge_sources and ax is not None:
                     if args.plot_extra_lines:
                         ax = _plot_extra_lines(ax, args, plot_metric)
-                    ax = _plot_settings(ax, args, None, plot_x_column, plot_metric, 
-                                       custom_legend_handles_labels=custom_legend_handles_labels)
+                    ax = _plot_settings(ax, args, None, plot_x_column, plot_metric,
+                                       custom_legend_handles_labels=custom_legend_handles_labels,
+                                       show_prediction_legend=has_prediction_any,
+                                       show_extrapolation_legend=has_extrapolation_any)
                     plt.close(ax.figure)
 
 def _build_masked_dfs(dfs, args):
@@ -268,7 +295,7 @@ def _data_prepare_single_source(args, data_source):
     # Apply clipping (use curve_column for curve grouping)
     if args.warmup_clip is not None or args.warmup_clip_to is not None or args.ending_clip is not None or args.ending_clip_to is not None:
         df = data_proc.apply_clip(
-            df, 
+            df,
             curve_column=physical_curve_column,
             warmup_clip=args.warmup_clip,
             warmup_clip_to=args.warmup_clip_to,
@@ -279,7 +306,7 @@ def _data_prepare_single_source(args, data_source):
 
 def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric, custom_color_mapping=None):
     """Plot fitted prediction curves.
-    
+
     Args:
         custom_color_mapping: Optional dict mapping curve values to colors
     """
@@ -287,25 +314,51 @@ def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric, custo
     fit_curve_column = fitter_context["fit_curve"]
     fit_x = fitter_context["fit_x"]
     fit_metric = fitter_context["fit_metric"]
+    ending_clip = fitter_context.get("ending_clip", 0)
 
     predict_x_column_list = [fit_curve_column, fit_x]
     pred_column = plot_metric + "_pred"
     # predict R
     _pred_R = fit.predict_on(
-        fitter, 
-        df, 
-        x_column_list=predict_x_column_list, 
+        fitter,
+        df,
+        x_column_list=predict_x_column_list,
         y_transform_recover=R_FROM[fit_metric],
     )
-    
+
     # Add prediction column (df is already a copy from the outer loop)
     df[pred_column] = R_TO[plot_metric](_pred_R)
-    
+
+    # Compute split points for prediction visualization
+    # If ending_clip was used during fitting, split the line at the boundary
+    split_line_at_x = None
+    if ending_clip is not None and ending_clip > 0:
+        split_line_at_x = {}
+        # For each curve, find the x value at the split point (last point kept after ending_clip)
+        for curve_value in df[args.plot_curve].unique():
+            df_curve = df[df[args.plot_curve] == curve_value].copy()
+            df_curve = df_curve.sort_values(plot_x_column)
+
+            # Apply ending_clip to find the split point
+            if len(df_curve) > ending_clip:
+                # The split point is at the (n - ending_clip)-th point
+                split_idx = len(df_curve) - ending_clip - 1
+                x_split = df_curve.iloc[split_idx][plot_x_column]
+                split_line_at_x[curve_value] = x_split
+
+    # Detect extrapolation curves (curves present in data but not in fit_curve_mask)
+    extrapolation_curves = None
+    fit_curve_mask = fitter_context.get("fit_curve_mask", None)
+    if fit_curve_mask is not None and args.plot_curve == "N":
+        # Check if 72B is in data but not in fit_curve_mask
+        if 72e9 in df[args.plot_curve].unique() and 72e9 not in fit_curve_mask:
+            extrapolation_curves = {72e9}
+
     ax = plot.plot_curves(
-        df, 
+        df,
         curve_column=args.plot_curve, # go with plot_curve
-        x_column=plot_x_column, 
-        y_column=pred_column, 
+        x_column=plot_x_column,
+        y_column=pred_column,
         use_line=True,
         use_scatter=False,
         highlight_curves=args.highlight_curves_fit,
@@ -317,6 +370,8 @@ def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric, custo
         scatter_size=args.scatter_size,
         scatter_marker=args.scatter_marker,
         custom_color_mapping=custom_color_mapping,
+        split_line_at_x=split_line_at_x,
+        extrapolation_curves=extrapolation_curves,
         ax=ax,
     )
     return ax
@@ -435,10 +490,10 @@ def _plot_extra_lines(ax, args, plot_metric):
     
     return ax
 
-def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source=None, custom_legend_handles_labels=None):
+def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source=None, custom_legend_handles_labels=None, show_prediction_legend=False, show_extrapolation_legend=False):
     process_plot_x_label = args.plot_x_label if args.plot_x_label else config.DEFAULT_LABELS[plot_x_column]
     process_plot_y_label = args.plot_y_label if args.plot_y_label else config.DEFAULT_LABELS[plot_metric]
-    
+
     # Generate title
     if args.plot_title:
         process_plot_title = args.plot_title
@@ -457,7 +512,7 @@ def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source=None, c
             process_plot_title = f"{config.TEST_EVALS[args.eval]['plot_str']} (fitted on {args.fit_x}, plotted on {plot_x_column})"
         else:
             process_plot_title = f"{config.TEST_EVALS[args.eval]['plot_str']} (plotted on {plot_x_column})"
-    
+
     # Generate legend
     if args.plot_use_legend:
         if custom_legend_handles_labels is not None:
@@ -466,6 +521,28 @@ def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source=None, c
         else:
             # Separate mode: use default legend
             legend_handles_labels = plot.prepare_legend(df, args.plot_curve)
+
+        # Add line style legend (prediction and extrapolation are mutually exclusive)
+        if show_prediction_legend and legend_handles_labels is not None:
+            from matplotlib.lines import Line2D
+            handles, labels = legend_handles_labels
+            # Add two additional legend items for line style explanation
+            handles = handles + [
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='-'),
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='--')
+            ]
+            labels = labels + ['Fitted', 'Extrapolated']
+            legend_handles_labels = (handles, labels)
+        elif show_extrapolation_legend and legend_handles_labels is not None:
+            from matplotlib.lines import Line2D
+            handles, labels = legend_handles_labels
+            # Add two additional legend items for line style explanation
+            handles = handles + [
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='-'),
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='--')
+            ]
+            labels = labels + ['Fitted', 'Extrapolated']
+            legend_handles_labels = (handles, labels)
     else:
         legend_handles_labels = None
     

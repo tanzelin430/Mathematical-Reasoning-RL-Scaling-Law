@@ -12,12 +12,13 @@ uv run -m src.scaling_analysis \
   --eval response_length \
   --plot-metric R \
   --add-smooth \
-  --s-factor 250 \
+  --s-factor 500 \
   --k-spline 3 \
-  --rolling-window 40 \
+  --rolling-window 70 \
   --min-se 1e-6 \
   --x-inv-weight-power 2 \
   --warmup-clip 10 \
+  --ending-clip 5 \
   --plot-x-scale log \
   --x-tick-spacing 0.5 \
   --x-tick-format sci \
@@ -41,12 +42,13 @@ uv run -m src.scaling_analysis \
   --eval response_length \
   --plot-metric R \
   --add-smooth \
-  --s-factor 250 \
+  --s-factor 400 \
   --k-spline 3 \
-  --rolling-window 40 \
-  --min-se 1 \
+  --rolling-window 30 \
+  --min-se 1e-6 \
   --x-inv-weight-power 2 \
   --warmup-clip 10 \
+  --ending-clip 5 \
   --plot-x-scale log \
   --x-tick-spacing 0.5 \
   --x-tick-format sci \

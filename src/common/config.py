@@ -92,7 +92,7 @@ COLUMN_RENAME_MAP = {
 DEBUG = False
 
 CSV_INSTRUCT_RUNS = [
-        # PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
+        PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run0.csv" ,
         PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run1.csv" ,
         PROJECT_DIR / "csv" / "scaling_law_data_experiment1_instruct_run2.csv" ,
     ]

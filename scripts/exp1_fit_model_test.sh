@@ -6,12 +6,12 @@ echo "=== Run 1/1: Test fitting model ==="
 
 args=(
   # Data clip
-  --warmup-clip 4
+  --warmup-clip 0
   --ending-clip 0
   
   # Data sources and evaluation
-  # --data-sources base
-  --data-sources instruct
+  --data-sources base
+  # --data-sources instruct
   --eval holdout_score
   
   # Fit configuration
@@ -19,7 +19,12 @@ args=(
   # --fit-model loglinear # change model here
   # --fit-model invexp # change model here
   --fit-model loglinear_kn # change model here
+  # --fit-model loglinear_kn_reciprocal # change model here
+  # --fit-model loglinear_kn_powerexp # change model here
+  # --fit-model loglinear_kn_double_sat # change model here
+  # --fit-model asymptotic_power # change model here
   # --fit-model powlawplus # change model here
+  # --fit-model postopenai # change model here
   --fit-curve N
   --fit-x C_raw
   --fit-metric ErrRate
@@ -30,6 +35,8 @@ args=(
   # Plot configuration
   --plot
   --plot-fit
+  --warmup-clip 0
+  --ending-clip 0
   --plot-x C_raw
   --plot-curve N
   --plot-metric ErrRate
@@ -45,7 +52,7 @@ args=(
   --line-alpha 1
   --line-width 2.0
   --plot-use-legend
-  --plot-title "Fitted L(N, C)"
+  --plot-title "Fitted L(N, C) - PostOpenAI Model"
   --scatter-alpha 0.3
   --scatter-size 15
   --scatter-marker o

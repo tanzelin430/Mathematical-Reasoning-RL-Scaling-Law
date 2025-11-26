@@ -53,17 +53,21 @@ Note:
 
 ### Fitting
 - Existing models:
-  - loglinear: 
+  - loglinear:
     - log(y) = -k(n) * log(x) + E0(n)
     - k & E0 lookup table
-  - invexp: 
-    - L = (S/x)^k(n); 
+  - invexp:
+    - L = (S/x)^k(n);
     - k lookup table, all curve cross same point x=S
-  - powlaw: 
+  - powlaw:
     - L = E + (A/n)^alpha + (B/x)^beta
-  - powlawmul: 
+  - powlawmul:
     - L(N, C) = ((C0 * N^r) / C )^( k_{max} * N / (N + N0) )
     - cross point varies with N
+  - postopenai:
+    - L(N, C) = [(N0/N)^β + B0(N)/(C+C0(N))]^α
+    - 17 params: N0, β, α (global) + B0(N), C0(N) lookup tables
+    - R² > 0.995 on full dataset (0.5B-72B)
   - invexp_klinear, invexp_kquadlog, invexp_kexp: other invariants
 
 - Adding new fitting model
@@ -82,6 +86,50 @@ Important config (in config.py):
 
 
 ## Quick start
+
+### Model Extrapolation with E0_72 Compensation
+
+**Recommended workflow for 32B→72B extrapolation:**
+
+```bash
+# Step 1: Fit loglinear_kn model on 0.5B-32B data
+./scripts/exp1_fits_save_up32B.sh
+# Output: outputs/fits_exp1_up32B.json
+
+# Step 2: Optimize E0_72 as compensation parameter
+uv run python scripts/optimize_e072_compensation.py
+# Output: outputs/fits_hybrid_kn_e072.json
+
+# Step 3: Plot extrapolation results (72B shown with dashed line)
+./scripts/plot_hybrid_extrapolation.sh
+# Output: outputs/extrap_*.pdf (4 plots)
+
+# Step 4: Plot K(N) coefficient comparison (4-subplot layout)
+./scripts/plot_hybrid_coefficients.sh
+# Output: outputs/holdout_N_C_raw_vs_E_k_compare_x_combined.pdf
+# Layout: 2×2 grid [Base L(N,C), Base L(N,E), Instruct L(N,C), Instruct L(N,E)]
+# Each subplot shows: 0.5-32B fit points, K(N) curve (dashed), Actual 72B point (star)
+
+# Step 5: Generate K(N) and E0(N) value tables
+uv run python scripts/generate_kn_e0_tables.py > outputs/kn_e0_tables.txt
+# Output: LaTeX tables with K(N) and E0(N) values for all model sizes (0.5B-72B)
+```
+
+**Key features:**
+- **K(N) function**: k(N) = k_max × N/(N+N0) fitted on 0.5B-32B data
+- **E0_72 compensation**: Optimized separately to minimize 72B prediction error
+- **Actual 72B comparison**: Star markers show ground truth K(72B) from full dataset fit
+- **Extrapolation quality**: R² = 0.81-0.88 on 72B with only 1 compensated parameter
+
+### Per-Model Analysis (K, E0, R² Tables)
+
+Generate LaTeX tables with per-model K(N), E0(N), R² values (requires steps 1-2 above):
+```bash
+./scripts/analyze_per_model.sh
+# Output: outputs/per_model_compact_tables.tex (ready for paper)
+```
+
+### Standard Fitting (Full Dataset)
 
 Compute(C), Datasize(E) vs TestLoss:
 **Note: to change fit model:**
@@ -179,6 +227,12 @@ uv run -m src.run.exp2_setup_rectangle
 GRPO
 ```bash
 ./scripts/grpo.sh
+```
+
+Cross Domain (8-subplot grid: 2×4 layout with all evaluations)
+```bash
+./scripts/eval_final_vs_model_size.sh
+# Output: crossdomain_base_ErrRate_vs_N.pdf, crossdomain_instruct_ErrRate_vs_N.pdf
 ```
 
 Cross Domain (one line per domain)

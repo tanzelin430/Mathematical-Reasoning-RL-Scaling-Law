@@ -10,21 +10,12 @@ from typing import Type
 from src.fit.base import BaseFitter
 # don't delete, used in MODEL_REGISTRY
 from .loglinear import LogLinear
-from .invexp import InvExp
-from .invexp_klinear import InvExpKLinear
-from .invexp_kexp import InvExpKExp
-from .invexp_kquadlog import InvExpKQuadLog
-from .powlaw import PowLaw
-from .powlaw2 import PowLaw2
-from .powlaw3 import PowLaw3
-from .powlaw4 import PowLaw4
-from .powlawmul import PowLawMul
-from .powlawmul_lstar import PowLawMulLStar
-from .powlawplus import PowLawPlus
-from .powlawmul2 import PowLawMul2
-from .powlawmul3 import PowLawMul3
-from .loglinear_tau import LogLinearTau
 from .loglinear_kn import LogLinearKn
+from .loglinear_kn_e0 import LogLinearKnE0
+from .invexp import InvExp
+from .powlaw import PowLaw
+from .powlawmul import PowLawMul
+from .postopenai import PostOpenAINRef
 
 MODEL_REGISTRY = {
     cls.MODEL_NAME: cls

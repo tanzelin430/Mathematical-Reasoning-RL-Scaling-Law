@@ -1,17 +1,15 @@
 #!/bin/bash
 
-# Fitting L(N, C) & L(N, D) on Base & Instruct models, save fit result to json.
-# Use exp1_plot_fit.sh to load and plot the fitting curves.
+# Fitting L(N, C) & L(N, D) on Base & Instruct models using only 0.5B-32B data
+# Compare results with full dataset (0.5B-72B)
 
-# Available -fit-model options: 
+# Available -fit-model options:
 #   loglinear, loglinear_kn, invexp, powlaw, powlawmul, invexp_klinear, invexp_kquadlog, invexp_kexp
 
-ENDING_CLIP=0
-CURVE_MASK="0.5e9 1.5e9 3e9 7e9 14e9 32e9 72e9"
-echo "=== Run 1/4: Fitting L(N, C) on Base models ==="
+echo "=== Run 1/4: Fitting L(N, C) on Base models (0.5B-32B only) ==="
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \
-  --ending-clip $ENDING_CLIP \
+  --ending-clip 0 \
   --data-sources base \
   --eval holdout_score \
   --fit \
@@ -19,16 +17,16 @@ uv run -m src.scaling_analysis \
   --fit-curve N \
   --fit-x C_raw \
   --fit-metric ErrRate \
-  --fit-save outputs/fits_exp1.json \
+  --fit-save outputs/fits_exp1_up32B.json \
   --x-inv-weight-power 0 \
-  --fit-curve-mask $CURVE_MASK\
+  --fit-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 \
 
 echo ""
-echo "=== Run 2/4: Fitting L(N, D) on Base models ==="
+echo "=== Run 2/4: Fitting L(N, D) on Base models (0.5B-32B only) ==="
 
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \
-  --ending-clip $ENDING_CLIP \
+  --ending-clip 0 \
   --data-sources base \
   --eval holdout_score \
   --fit \
@@ -36,16 +34,16 @@ uv run -m src.scaling_analysis \
   --fit-curve N \
   --fit-x E \
   --fit-metric ErrRate \
-  --fit-save-append outputs/fits_exp1.json \
+  --fit-save-append outputs/fits_exp1_up32B.json \
   --x-inv-weight-power 0 \
-  --fit-curve-mask $CURVE_MASK\
+  --fit-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 \
 
 echo ""
-echo "=== Run 3/4: Fitting L(N, C) on Instruct models ==="
+echo "=== Run 3/4: Fitting L(N, C) on Instruct models (0.5B-32B only) ==="
 
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \
-  --ending-clip $ENDING_CLIP \
+  --ending-clip 0 \
   --data-sources instruct \
   --eval holdout_score \
   --fit \
@@ -53,16 +51,16 @@ uv run -m src.scaling_analysis \
   --fit-curve N \
   --fit-x C_raw \
   --fit-metric ErrRate \
-  --fit-save-append outputs/fits_exp1.json \
+  --fit-save-append outputs/fits_exp1_up32B.json \
   --x-inv-weight-power 0 \
-  --fit-curve-mask $CURVE_MASK\
+  --fit-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 \
 
 echo ""
-echo "=== Run 4/4: Fitting L(N, D) on Instruct models ==="
+echo "=== Run 4/4: Fitting L(N, D) on Instruct models (0.5B-32B only) ==="
 
 uv run -m src.scaling_analysis \
   --warmup-clip 0 \
-  --ending-clip $ENDING_CLIP \
+  --ending-clip 0 \
   --data-sources instruct \
   --eval holdout_score \
   --fit \
@@ -70,6 +68,6 @@ uv run -m src.scaling_analysis \
   --fit-curve N \
   --fit-x E \
   --fit-metric ErrRate \
-  --fit-save-append outputs/fits_exp1.json \
+  --fit-save-append outputs/fits_exp1_up32B.json \
   --x-inv-weight-power 0 \
-  --fit-curve-mask $CURVE_MASK\
+  --fit-curve-mask 0.5e9 1.5e9 3e9 7e9 14e9 32e9 \
