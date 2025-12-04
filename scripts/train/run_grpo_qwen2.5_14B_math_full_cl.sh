@@ -2,50 +2,19 @@
 set -x
 
 # =================== Environment Configuration ===================
-# STEM LLM Judge Configuration
-# STEM_JUDGE_PORT=8040  # Port for STEM LLM Judge server
-# STEM_JUDGE_MODEL_PATH="/mnt/shared-storage-user/ma4agi-gpu/data/model/general-verifier/"  # Path to STEM Judge model
-# STEM_JUDGE_GPU=0,1,2,3  # GPU for STEM LLM Judge (separate from training GPUs)
-
 # GPU Configuration
-TRAINING_GPUS="0,1,2,3,4,5,6,7"  # GPUs for training (excluding GPU 0 which is used by vLLM)
+TRAINING_GPUS="0,1,2,3,4,5,6,7"
 AUTHOR_NAME="tanzl"
 export WANDB_DIR=/home/yinzhenfei/Agentic-RL-Scaling-Law/wandb_tanzl/wandb
 mkdir -p $WANDB_DIR
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export HYDRA_FULL_ERROR=1
 export VLLM_USE_V1=0
-export WANDB_API_KEY='1328200322cf91b211452e5b4ca7ce9148bc7250'
-# export DAYTONA_API_KEY="dtn_2d9adc998ab6f2766510546599f5ebd29afb218941bc0e66c02f41f2128021f9"
 export STEM_LLM_JUDGE_URL="http://localhost:${STEM_JUDGE_PORT}"
 export WANDB_MODE=offline
 
-# =================== SandboxFusion Configuration ===================
-# Enable SandboxFusion for code execution
-# export CODER1_EXEC=sandboxfusion
-# NUM_SANDBOX=8
-# BASE_PORT=10086
-# SERVERS=""
-# for i in $(seq 0 $((NUM_SANDBOX-1))); do
-#     PORT=$((BASE_PORT + i))
-#     [ -z "$SERVERS" ] && SERVERS="localhost:$PORT" || SERVERS="$SERVERS,localhost:$PORT"
-# done
-# export SANDBOX_FUSION_SERVERS="$SERVERS"
-# Optional: For multiple servers (load balancing)
-# export SANDBOX_FUSION_SERVERS="server1:8080,server2:8080,server3:8080"
-
 # =================== Data Configuration ===================
-# Prepare difficulty-ordered math dataset
 OUTPUT_DATA_DIR="../../data/math_curriculum"
-# mkdir -p ${OUTPUT_DATA_DIR}
-
-# echo "Preparing curriculum math dataset..."
-# python3 /home/tanzelin-p/Agentic-RL-Scaling-Law/src/data/prepare_math_by_difficulty_full.py \
-#     --input_file="/mnt/shared-storage-user/ma4agi-gpu/data/dataset/guru-RL-92k/train/math__combined_54.4k.parquet" \
-#     --output_dir="${OUTPUT_DATA_DIR}" \
-#     --test_size=500
-
-# Check if data preparation was successful
 if [ $? -ne 0 ]; then
     echo "ERROR: Data preparation failed!"
     exit 1
@@ -62,43 +31,35 @@ VAL_DATA_DIR=${SHARED_DATA_PATH}/online_eval/
 # Training data - single file format
 train_files="['${TRAIN_FILE}']"
 
-# Validation files - include our test split + original eval files + AIME + GSM8K
 val_files="['${TEST_FILE}', '${VAL_DATA_DIR}/math__math_500.parquet', '${VAL_DATA_DIR}/logic__zebra_puzzle_dataset_200.parquet', '${VAL_DATA_DIR}/stem__supergpqa_200.parquet', '${VAL_DATA_DIR}/codegen__humaneval_164.parquet', '${VAL_DATA_DIR}/aime2024.parquet', '${VAL_DATA_DIR}/gsm8k.parquet', '${VAL_DATA_DIR}/amc2023.parquet']"
 
-# Batch sizes (adjusted for GRPO and 7B model)
-train_prompt_bsz=512  # Reduced from 256 for mixed domain
-n_resp_per_prompt=8  # GRPO needs multiple responses
-train_prompt_mini_bsz=128  # Reduced for mixed domain
+train_prompt_bsz=512
+n_resp_per_prompt=8
+train_prompt_mini_bsz=128 
 
 # =================== Output and Checkpoint Configuration ===================
-# Save checkpoints and outputs to results directory
-# Use absolute path to ensure checkpoints are saved in the correct location
 RESULTS_DIR=/mnt/shared-storage-user/ma4agi-gpu/RLscaleckpt
 CHECKPOINT_DIR=${RESULTS_DIR}/checkpoints
-# Create checkpoint directory if it doesn't exist
 mkdir -p ${CHECKPOINT_DIR}      
 
 # =================== Model Configuration ===================
-MODEL_NAME=Qwen2.5-14B-Instruct
+MODEL_NAME=Qwen2.5-14B
 BASE_MODEL=/mnt/shared-storage-user/ma4agi-gpu/data/model/${MODEL_NAME}
 
 # =================== Logging Configuration ===================
 WANDB_PROJECT=agentic_rl_scaling_law
 
 DOMAIN_NAME="math_curriculum_full"
-WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL_run0
+WANDB_EXPERIMENT_NAME=${MODEL_NAME}_${DOMAIN_NAME}_grpo_verl_builtin_CL_run2
 
 # =================== GRPO Training Parameters ===================
-# Algorithm settings - GRPO specific
-adv_estimator=grpo  # GRPO estimator
+adv_estimator=grpo
 
-# KL settings for GRPO
-use_kl_in_reward=False  # GRPO doesn't use KL in reward
-use_kl_loss=True  # GRPO uses KL loss instead
-kl_loss_coef=0.001  # Standard GRPO KL coefficient
-kl_loss_type=low_var_kl  # Low variance KL for GRPO
+use_kl_in_reward=False
+use_kl_loss=True
+kl_loss_coef=0.001
+kl_loss_type=low_var_kl
 
-# PPO clipping (still used in GRPO)
 clip_ratio_low=0.2
 clip_ratio_high=0.2
 
@@ -108,93 +69,34 @@ max_response_length=4096
 
 # Hardware Platform
 num_nodes=1
-n_gpus_per_node=8  # Default to 8 GPUs
+n_gpus_per_node=8
 
-# Set epochs to 1 as requested
 EPOCHS=1
 
-# Dynamic batch size configuration
 use_dynamic_bsz=True
 
-# Calculate max sequence length from input/output settings
-max_seq_length=$((max_prompt_length + max_response_length))  # 1024 + 8192 = 9216
+max_seq_length=$((max_prompt_length + max_response_length))
 
-# Token limit multipliers based on VeRL official example
-# For GRPO, we don't need critic, so only actor and rollout
-actor_seq_multiplier=8  # Actor should be ~2x max sequence length
+actor_seq_multiplier=8
 rollout_seq_multiplier=10
-# Calculate token limits for GRPO (no critic needed)
-actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))  # 18432
-rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))  # Same as actor
+actor_ppo_max_token_len=$((max_seq_length * actor_seq_multiplier))
+rollout_log_prob_max_token_len=$((max_seq_length * rollout_seq_multiplier))
 
 # Sampling parameters
 temperature=1.0
 top_p=1.0
 top_k=-1
 
-#validation parameters
 val_temperature=0.7
 val_top_p=1.0
 val_top_k=-1
 
-# Model parallelism settings
 gen_tp=1
 sp_size=1
 
-# Memory optimization
 offload=False
-gpu_memory_utilization=0.65  # Reduced from 0.65 for stability with mixed domains
+gpu_memory_utilization=0.65
 
-# =================== Conditional STEM LLM Judge Setup ===================
-start_stem_judge() {
-    echo "Starting STEM LLM Judge server for mixed domain training..."
-    echo "Using GPU ${STEM_JUDGE_GPU} for vLLM server..."
-    
-    # Start vLLM server in background with dedicated GPU
-    CUDA_VISIBLE_DEVICES=${STEM_JUDGE_GPU} python -m vllm.entrypoints.openai.api_server \
-        --host localhost \
-        --port ${STEM_JUDGE_PORT} \
-        --model ${STEM_JUDGE_MODEL_PATH} \
-        --served-model-name TIGER-Lab/general-verifier \
-        --gpu-memory-utilization 0.1 \
-        --max-model-len 1024 \
-        --tensor-parallel-size 4 \
-        --trust-remote-code > stem_judge.log 2>&1 &
-    
-    STEM_JUDGE_PID=$!
-    echo "STEM Judge server started with PID: $STEM_JUDGE_PID"
-    
-    # Wait for server to be ready
-    echo "Waiting for STEM Judge server to be ready..."
-    for i in {1..30}; do
-        if curl -s http://localhost:${STEM_JUDGE_PORT}/health > /dev/null 2>&1; then
-            echo "✅ STEM Judge server is ready!"
-            return 0
-        fi
-        echo -n "."
-        sleep 3
-    done
-    
-    echo "❌ STEM Judge server failed to start. Check stem_judge.log"
-    exit 1
-}
-
-# Cleanup function
-cleanup_stem_judge() {
-    if [ ! -z "$STEM_JUDGE_PID" ]; then
-        echo "Stopping STEM Judge server (PID: $STEM_JUDGE_PID)..."
-        kill $STEM_JUDGE_PID 2>/dev/null
-        wait $STEM_JUDGE_PID 2>/dev/null
-        echo "STEM Judge server stopped."
-    fi
-}
-
-# Set trap to cleanup on script exit
-# trap cleanup_stem_judge EXIT
-
-# Since we're training on mixed domains including STEM, start the STEM judge
-# echo "Mixed domain training includes STEM. Starting STEM LLM Judge..."
-# start_stem_judge
 export CUDA_VISIBLE_DEVICES=${TRAINING_GPUS}
 
 # =================== Start GRPO Training ===================
@@ -270,9 +172,3 @@ python3 -m verl.trainer.main_ppo \
     trainer.max_actor_ckpt_to_keep=1 \
     trainer.resume_mode=auto \
     trainer.default_local_dir=${CHECKPOINT_DIR}/${WANDB_PROJECT}/${WANDB_EXPERIMENT_NAME} $@
-    # +reward_model.daytona.api_key="${DAYTONA_API_KEY}" \
-    # +reward_model.daytona.max_concurrent=8 \
-    # +reward_model.daytona.timeout=5 \
-    # actor_rollout_ref.rollout.enable_chunked_prefill=True \
-    # actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
-    # actor_rollout_ref.rollout.max_model_len=10240 \

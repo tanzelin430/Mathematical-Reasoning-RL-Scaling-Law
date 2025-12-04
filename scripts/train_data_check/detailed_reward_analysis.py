@@ -11,7 +11,6 @@ from src.reward.guru_reward_improved import compute_score, extract_answer, norma
 from pathlib import Path
 
 def analyze_domain_rewards():
-    """详细分析每个领域的reward计算机制"""
     
     domains = [
         ('math', 'math__combined_54.4k.parquet'),
@@ -20,12 +19,10 @@ def analyze_domain_rewards():
         ('stem', 'stem__web_3.6k.parquet')
     ]
     
-    base_dir = Path('~/work/Agentic-RL-Scaling-Law/data/guru_verl/train').expanduser()
+    base_dir = Path('../../data/guru_verl/train')
     
     print("="*120)
-    print("各领域Reward计算机制详细分析")
-    print("="*120)
-    
+
     for domain_name, filename in domains:
         filepath = base_dir / filename
         if not filepath.exists():

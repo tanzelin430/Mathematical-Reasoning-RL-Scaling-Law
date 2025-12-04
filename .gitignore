@@ -13,5 +13,9 @@ start.sh
 # Training artifacts
 /scripts/train/outputs/
 /scripts/train/wandb/
+/scripts/train_data_check/
 /general-verifier/
 wandb_*/
+
+# sandbox
+/SandboxFusion/
