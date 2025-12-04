@@ -1,0 +1,551 @@
+# -*- coding: utf-8 -*-
+"""Data processing and inspection utilities for RL scaling law analysis"""
+
+from typing import List
+import numpy as np
+import pandas as pd
+from src.common import config
+from src.common import fit_utils
+from scipy.optimize import curve_fit
+
+
+# =============================================================================
+# DATA PROCESSING
+# =============================================================================
+
+def load_and_preprocess(
+    csv_files: list[str],
+):
+    global phi_global
+    # ===========================
+    # Data Prepare
+    # ===========================
+
+    df_runs_list = [pd.read_csv(csv) for csv in csv_files]
+    df = pd.concat(df_runs_list, ignore_index=True)
+    # print (df.columns)
+    
+    # Sort, Inspect, Validate and Normalize data
+    df = df.sort_values(['model_size','runid','step']).reset_index(drop=True)
+    # inspect_data(df)
+    validate_data(df, eval_columns=config.TEST_EVALS.keys())
+    df = rename_columns(df)
+    
+    df['E'] = df['step'] * float(config.SAMPLE_SIZE_PER_STEP)
+
+    # Estimate global efficiency parameter phi
+    phi_global, phi_by_N, phi_stats_df = estimate_phi_from_runs(
+        df, 
+        sample_size_per_step=config.SAMPLE_SIZE_PER_STEP, 
+        tail_fraction=0.5
+    )
+    # print(f"phi (global tail median) = {phi_global}")
+    
+    # Recalculate C using the estimated phi_global
+    df['C'] = df['N'] * df['E'] * phi_global
+    return df
+
+def validate_data(df, eval_columns=[]) -> pd.DataFrame:
+    if eval_columns is None or len(eval_columns) == 0:
+        raise ValueError("provide eval_columns to validate")
+    required_cols = ['model_params','runid','step','tokens', 'cumulative_flops']
+    required_cols.extend(eval_columns)
+    # Check which cols are missing
+    missing_col = [col for col in required_cols if col not in df.columns]
+    if missing_col:
+        raise ValueError(f"Data must contain columns: {missing_col}")
+    
+    # validate if containing NaN
+    nan_col = [col for col in required_cols if df[col].isna().any()]
+    if nan_col:
+        raise ValueError(f"Data must not contain NaN in columns: {nan_col}")
+    
+    return df
+
+def rename_columns(df) -> pd.DataFrame:
+    """Normalize column names and data types to standard format"""
+    for k, v in list(config.COLUMN_RENAME_MAP.items()):
+        if k in df.columns and v != k:
+            df[v] = df[k]
+
+    def _ensure_numeric(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
+        for c in cols:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors='coerce')
+        return df
+        
+    df = _ensure_numeric(df, ['N','C_raw','tokens','step'])
+    return df
+
+def merge_duplicate_steps(df, group_columns: list, mode: str = 'mean') -> pd.DataFrame:
+    """Handle duplicate step values within the same group
+    
+    Args:
+        df: Input data
+        group_columns: List of columns to group by (e.g., ['N', 'step'] or ['runid', 'step'])
+        mode: Strategy for handling duplicate step values
+            - 'mean': Average points with same group values (default)
+            - 'first'/'last': Keep first/last occurrence
+    """
+    # Check duplicate situations within each group
+    duplicates = df.duplicated(subset=group_columns).sum()
+    if duplicates > 0:
+        if config.DEBUG:
+            print(f"Found {duplicates} duplicate rows for columns {group_columns}, using strategy: {mode}")
+        
+        if mode == 'mean':
+            # Average points with same group values
+            agg_dict = {c: "mean" for c in df.columns if c not in group_columns}
+            except_dict = {
+                'N': 'first',
+                'model_params': 'first',
+                'model_size': 'first',
+                'experiment_name': 'first',
+                'experiment_id': 'first',
+                'runid': 'first',
+                'rollout_n': 'first',
+                'eval_curve': 'first',
+            }
+            # Remove group columns from except_dict if they exist
+            for col in group_columns:
+                except_dict.pop(col, None)
+            
+            # Filter except_dict to only include columns that exist in the DataFrame
+            except_dict = {col: agg_func for col, agg_func in except_dict.items() if col in df.columns}
+
+            df = df.groupby(group_columns).agg({**agg_dict, **except_dict}).reset_index()
+        elif mode in ['first', 'last']:
+            # Keep only the first/last occurrence
+            df = df.drop_duplicates(subset=group_columns, keep=mode)
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+    
+    return df
+
+def split_df(df: pd.DataFrame, by_column: str) -> List[pd.DataFrame]:
+    return [g.copy().reset_index(drop=True) for _, g in df.groupby(by_column, sort=False)]
+
+
+def prepare_eval_data(
+    df,
+    eval_column: str,
+    curve_column: str,
+    x_column: str,
+    calc_delta: bool = False,
+    delta_base_step: int = 0,
+):
+    """
+    为评估数据准备用于绘图的处理
+    
+    处理流程：
+    1. Copy eval_column to 'R'
+    2. 计算 ErrRate, DeltaReward, DeltaErrRate
+    3. 计算 std（基于多个 rollout）
+    4. merge_duplicate_steps（平均多个 rollout）
+    5. 把 std 列 merge 回去
+    
+    Args:
+        df: 原始数据
+        eval_column: 评估列名（如 'holdout_score'）
+        curve_column: 主要实验变量（如 'N', 'slice_factor', 'rollout_n'），用于 delta 分组
+        x_column: 第二维度（通常是 'step'），与 curve_column 一起构成物理维度
+        calc_delta: 是否计算 Delta 指标
+        delta_base_step: Delta 计算的基准 step
+    
+    Returns:
+        df: 处理后的数据，包含 'R', 'ErrRate', 'R_std', 'ErrRate_std' 等列
+    
+    Note:
+        Merge 基于物理维度 [curve_column, x_column]（如 ['N', 'step']），
+        而不是显示维度（plot_curve/plot_x）。
+    """
+    # 1. Copy to R
+    # df = df.rename(columns={eval_column: 'R'})
+    df['R'] = df[eval_column]
+    
+    # 2. Calculate ErrRate
+    df['ErrRate'] = 1 - df['R']
+    
+    # 3. Calculate std BEFORE merging - based on physical dimensions
+    physical_dimensions = [curve_column, x_column]
+    R_std = df.groupby(physical_dimensions)['R'].std().to_frame('R_std')
+    ErrRate_std = df.groupby(physical_dimensions)['ErrRate'].std().to_frame('ErrRate_std')
+    
+    # 4. Calculate delta if needed (group by curve_column)
+    if calc_delta:
+        df['DeltaReward'] = calc_delta_y(df, 'R', base_step=delta_base_step, curve_column=curve_column)
+        df['DeltaErrRate'] = calc_delta_y(df, 'ErrRate', base_step=delta_base_step, curve_column=curve_column)
+        DeltaReward_std = df.groupby(physical_dimensions)['DeltaReward'].std().to_frame('DeltaReward_std')
+        DeltaErrRate_std = df.groupby(physical_dimensions)['DeltaErrRate'].std().to_frame('DeltaErrRate_std')
+    
+    # 5. Merge duplicate steps (average multiple rollouts) by physical dimensions
+    df = merge_duplicate_steps(df, group_columns=physical_dimensions, mode='mean')
+    
+    # 6. Add std cols back - based on physical dimensions
+    df = df.merge(R_std, on=physical_dimensions)
+    df = df.merge(ErrRate_std, on=physical_dimensions)
+    if calc_delta:
+        df = df.merge(DeltaReward_std, on=physical_dimensions)
+        df = df.merge(DeltaErrRate_std, on=physical_dimensions)
+    
+    return df
+
+
+def estimate_phi_from_runs(
+    df,
+    sample_size_per_step: float = 512.0,
+    tail_fraction: float = 1.0,
+):
+    """
+    Estimate φ = C / (N * E), where E = step * sample_size_per_step.
+    Returns:
+      - phi_global: Global median of tail φ for all runs (recommended as κ)
+      - phi_by_N: {N: tail median for that N} (optional finer granularity)
+      - stats: Tail q25/median/q75 for each run, for inspection
+    """
+    rows = []
+    byN = {}
+
+    for g in split_df(df, by_column='N'):
+        _df = g[['runid','N','step','C_raw']].dropna().sort_values('step')
+        if _df.empty: continue
+        N = float(_df['N'].iloc[0])
+        step = _df['step'].to_numpy(float)
+        E = step * float(sample_size_per_step)
+        denom = np.maximum(N * E, 1e-30)
+        phi = _df['C_raw'].to_numpy(float) / denom
+
+        m = len(phi)
+        k0 = int(max(0, np.floor((1.0 - tail_fraction) * m)))
+        tail = phi[k0:]
+        tail = tail[np.isfinite(tail) & (tail > 0)]
+        if tail.size == 0: continue
+
+        q25, med, q75 = np.quantile(tail, [0.25, 0.5, 0.75])
+        rows.append(dict(runid=str(_df['runid'].iloc[0]), N=N,
+                         phi_q25=float(q25), phi_median=float(med),
+                         phi_q75=float(q75), n_tail=int(tail.size)))
+
+        byN.setdefault(N, []).append(float(med))
+
+    stats = pd.DataFrame(rows).sort_values('N').reset_index(drop=True)
+    if not stats.empty:
+        phi_global = float(np.median(stats['phi_median'].to_numpy()))
+    else:
+        phi_global = np.nan
+
+    phi_by_N = {float(N): float(np.median(meds)) for N, meds in byN.items()}
+    return phi_global, phi_by_N, stats
+
+def apply_clip(df, curve_column: str, warmup_clip: int = None, warmup_clip_to: int = None, ending_clip: int = None, ending_clip_to: int = None):
+    # Handle default case
+    if all(x is None for x in [warmup_clip, warmup_clip_to, ending_clip, ending_clip_to]):
+        return df
+
+    # Apply clipping functions (merge operations to reduce passes)
+    result_df = df
+
+    # Apply index-based clipping (warmup and ending together)
+    if warmup_clip is not None or ending_clip is not None:
+        # Convert 0 to None (0 means no clipping)
+        start_idx = warmup_clip if warmup_clip else None
+        end_idx = -ending_clip if (ending_clip is not None and ending_clip > 0) else None
+        result_df = pd.concat([_clip_single_curve_by_index(g, start_idx=start_idx, end_idx=end_idx)
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+
+    # Apply value-based clipping (warmup_clip_to and ending_clip_to together)
+    if warmup_clip_to is not None or ending_clip_to is not None:
+        result_df = pd.concat([_clip_single_curve_by_step_value(g, min_step=warmup_clip_to, max_step=ending_clip_to)
+                               for g in split_df(result_df, by_column=curve_column)], ignore_index=True)
+
+    return result_df
+
+
+def _clip_single_curve_by_index(df, start_idx=None, end_idx=None):
+    """
+    Clip dataframe by row index (after sorting by step).
+    
+    Args:
+        df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
+        start_idx: Start index (None means from beginning), can use negative indices
+        end_idx: End index (None means to end), can use negative indices
+        
+    Returns:
+        DataFrame with rows outside [start_idx:end_idx] removed
+    """
+    if len(df) == 0:
+        return df
+        
+    if 'step' not in df.columns:
+        return df.iloc[0:0]
+    
+    # Sort by step to ensure proper ordering
+    df_sorted = df.sort_values('step').reset_index(drop=True)
+    
+    # Apply index slicing
+    return df_sorted.iloc[start_idx:end_idx].reset_index(drop=True)
+
+
+def _clip_single_curve_by_step_value(df, min_step=None, max_step=None):
+    """
+    Clip dataframe by step value range.
+    
+    Args:
+        df: DataFrame with columns ['runid', 'step', 'N', 'E', 'C', 'R', ...]
+        min_step: Keep step >= min_step (None means no lower bound)
+        max_step: Keep step <= max_step (None means no upper bound)
+        
+    Returns:
+        DataFrame with steps outside [min_step, max_step] removed
+    """
+    if len(df) == 0:
+        return df
+        
+    if 'step' not in df.columns:
+        return df.iloc[0:0]
+    
+    # Build filter condition
+    mask = pd.Series(True, index=df.index)
+    if min_step is not None:
+        mask &= (df['step'] >= min_step)
+    if max_step is not None:
+        mask &= (df['step'] <= max_step)
+    
+    return df[mask].reset_index(drop=True)
+
+
+def calc_delta_y(df, y_column: str, base_step: int, curve_column: str, debug=config.DEBUG):
+    """Calculate improvement relative to step=0 for each N group"""
+    # Calculate improvement rate relative to step=0 for each N
+    def _calc_delta_reward(group):
+        group_df = df.loc[group.index]
+        step_0_rows = group_df[group_df['step'] == base_step]
+        if len(step_0_rows) == 0:
+            raise ValueError(f"No step=0 found for {curve_column}={group_df[curve_column].iloc[0]}")
+        baseline_y = step_0_rows[y_column].iloc[0]
+        return group - baseline_y
+    
+    improve_column = df.groupby(curve_column)[y_column].transform(_calc_delta_reward)
+    
+    # Print some sample data after calculation  
+    if config.DEBUG:
+        print("\n=== AFTER Delta calculation ===")
+        sample_steps = [0, 1, 20, 50, 100]
+        for N in sorted(df[curve_column].unique())[:2]:  # Show first 2 N values
+            print(f"\nN = {N}:")
+            for step in sample_steps:
+                mask = (df[curve_column] == N) & (df['step'] == step)
+                if mask.any():
+                    y_val = df.loc[mask, y_column].iloc[0]
+                    improve_val = improve_column.loc[mask].iloc[0]
+                    print(f"  step={step}: {y_column}={y_val:.4f}, Delta={improve_val:.4f} ({y_column}-{y_column}_step0={improve_val:.4f})")
+    
+    return improve_column
+
+# =============================================================================
+# SMOOTHING
+# =============================================================================
+
+def sort_dfs(runs_raw_dfs):
+    return [g.sort_values('C').reset_index(drop=True) for g in runs_raw_dfs]
+
+
+def smooth_df_single_curve_linear(
+    df,
+    col_x: str,
+    col_y: str,
+    col_y_out: str,
+):
+    # use curve_fit
+    x = df[col_x]
+    y = df[col_y]
+    popt, pcov = curve_fit(lambda x, a, b: a * x + b, x, y)
+    df[col_y_out] = popt[0] * x + popt[1]
+    return df
+
+def smooth_df_single_curve(
+    df,
+    col_x: str,
+    col_y: str,
+    col_y_out: str,
+    monotonic: bool = True,
+    increasing: bool = True,
+    strict: bool = True,
+    s_factor: float = 0.1,
+    k_spline: int = 3,
+
+    rolling_window: int = 20,
+    min_se: float = 1e-3,
+    x_inv_weight_power: float = 0.2,
+):
+    # Sort by x column first to ensure x is increasing
+    df_sorted = df.sort_values(col_x).reset_index(drop=True)
+    
+    x = df_sorted[col_x]
+    y = df_sorted[col_y]
+    w = fit_utils.get_weight(
+        x, y, 
+        rolling_window=rolling_window, 
+        min_se=min_se, 
+        x_inv_weight_power=x_inv_weight_power)
+    
+    y_smooth, _f = fit_utils.fit_smooth_monotonic(
+        x, y, 
+        monotonic=monotonic, 
+        increasing=increasing, 
+        strict=strict,
+        s_factor=s_factor, 
+        w=w, 
+        k_spline=k_spline)
+    df_sorted[col_y_out] = y_smooth
+    return df_sorted
+
+def smooth_df(
+    df,
+    curve_column: str,
+    col_x: str,
+    col_y: str,
+    col_y_out: str,
+    monotonic: bool = True,
+    increasing: bool = True,
+    strict: bool = True,
+    s_factor: float = 0.1,
+    k_spline: int = 3,
+    rolling_window: int = 20,
+    min_se: float = 1e-3,
+    x_inv_weight_power: float = 0.2,
+    use_linear: bool = False,
+) -> pd.DataFrame:
+    if use_linear:
+        return pd.concat(
+            [smooth_df_single_curve_linear(g, col_x, col_y, col_y_out) for g in split_df(df, by_column=curve_column)],
+            ignore_index=True)
+    else:
+        return pd.concat([
+            smooth_df_single_curve(g, col_x, col_y, col_y_out, monotonic, increasing, strict, s_factor, k_spline, rolling_window, min_se, x_inv_weight_power) 
+            for g in split_df(df, by_column=curve_column)
+        ], 
+        ignore_index=True)
+
+# =============================================================================
+# DATA INSPECTION
+# =============================================================================
+
+def print_data_statistics(df):
+    """Print detailed statistics about the loaded dataframe"""
+    print(f"Loaded {len(df)} rows")
+    
+    # Display data preview
+    print("\n=== Data Preview ===")
+    print("Column names:", list(df.columns))
+    print("Data types:")
+    print(df.dtypes)
+    print("\nFirst 5 rows:")
+    print(df.head())
+    
+    # Check if data is aggregated (by runid format: agg_N_xxx indicates aggregated data)
+    is_aggregated = 'runid' in df.columns and df['runid'].str.startswith('agg_N_').all() if 'runid' in df.columns else 'runid' not in df.columns
+    
+    if is_aggregated:
+        # Aggregated data statistics
+        print("\n=== Aggregated Data Statistics (by N) ===")
+        n_stats = df.groupby('N').agg({
+            'C': 'count',        # Grid points per N
+            'R': ['min', 'max', 'mean'],  # R statistics
+            'count': 'sum'       # Total run count
+        }).round(3)
+        n_stats.columns = ['grid_points', 'R_min', 'R_max', 'R_mean', 'total_runs']
+        print(n_stats)
+        
+        print(f"\nTotal {df['N'].nunique()} different N values")
+        print(f"Total grid points: {len(df)}")
+        print(f"Average grid points per N: {len(df) / df['N'].nunique():.1f}")
+        
+        if 'R_std' in df.columns:
+            print(f"\nR_std statistics:")
+            print(f"  Average std: {df['R_std'].mean():.4f}")
+            print(f"  Max std: {df['R_std'].max():.4f}")
+    else:
+        # Raw data statistics
+        print("\n=== <N, runid> Combination Statistics ===")
+        group_stats = df.groupby(['N', 'runid']).agg({
+            'step': ['count', 'min', 'max'],
+        }).round(2)
+        group_stats.columns = ['step_count', 'step_min', 'step_max']
+        print(group_stats)
+        
+        print(f"\nTotal {len(group_stats)} <N, runid> combinations")
+        print(f"Step range: {group_stats['step_count'].min()} - {group_stats['step_count'].max()}")
+        print(f"Average steps per combination: {group_stats['step_count'].mean():.1f}")
+        
+        # Statistics by N
+        print("\n=== Statistics by N ===")
+        n_stats = df.groupby('N').agg({
+            'runid': 'nunique',  # Number of unique runids
+            'step': 'count',     # Total steps
+        }).round(2)
+        n_stats.columns = ['unique_runs', 'total_steps']
+        print(n_stats)
+
+
+def inspect_data(df):
+    """Inspect data statistics including model_size, runid distribution and step continuity"""
+    print("\n---- Inspection ----")
+    print(f"Total records: {len(df)}")
+    model_sizes = sorted(df['model_size'].unique())
+    print(f"Model sizes: {model_sizes}")
+    unique_runids = df['runid'].nunique()
+    print(f"Unique runid: {unique_runids}")
+    step_min, step_max = df['step'].min(), df['step'].max()
+    print(f"Step range: {step_min} - {step_max}")
+    
+    print("\n---- Detailed ----")
+    for model_size in sorted(model_sizes):
+        model_data = df[df['model_size'] == model_size]
+        runids = model_data['runid'].unique()
+        print(f"  {model_size}: {len(runids)} runid", end="")
+        
+        # Check if step ranges are consistent across runids
+        step_ranges = {}
+        for runid in runids:
+            run_data = model_data[model_data['runid'] == runid]
+            steps = sorted(run_data['step'].unique())
+            min_step, max_step = min(steps), max(steps)
+            step_ranges[runid] = (min_step, max_step)
+        
+        if len(step_ranges) > 1:
+            ranges = list(step_ranges.values())
+            min_ranges = [r[0] for r in ranges]
+            max_ranges = [r[1] for r in ranges]
+            if not (len(set(min_ranges)) == 1 and len(set(max_ranges)) == 1):
+                print("  ⚠️  step range inconsistent")
+            else:
+                print()
+        else:
+            print()
+        
+        # Individual run details
+        for runid in sorted(runids):
+            run_data = model_data[model_data['runid'] == runid]
+            steps = sorted(run_data['step'].unique())
+            min_step, max_step = min(steps), max(steps)
+            unique_step_count = len(steps)
+            
+            print(f"  {runid}: {unique_step_count} steps (unique) (min: {min_step}, max: {max_step})", end="")
+            
+            # Check for missing steps
+            expected_steps = list(range(min_step, max_step + 1))
+            missing_steps = set(expected_steps) - set(steps)
+            if missing_steps:
+                missing_list = sorted(list(missing_steps))
+                print(f",  ⚠️  Missing steps: {missing_list}", end="")
+            
+            # Check for duplicated steps
+            step_counts = run_data['step'].value_counts()
+            duplicated_steps = step_counts[step_counts > 1]
+            if not duplicated_steps.empty:
+                dup_dict = {k: int(v) for k, v in dict(duplicated_steps).items()}
+                print(f",  ⚠️  Duplicated: {dup_dict}", end="")
+            
+            print()  # New line after each run
+    
