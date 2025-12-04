@@ -12,6 +12,7 @@ dependencies = [
     "cma",
     "pyyaml",
     "seaborn",
+    "pymupdf",
 ]
 
 [build-system]

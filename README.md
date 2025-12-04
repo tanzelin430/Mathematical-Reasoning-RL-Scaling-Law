@@ -70,12 +70,12 @@ Note:
     - R² > 0.995 on full dataset (0.5B-72B)
   - invexp_klinear, invexp_kquadlog, invexp_kexp: other invariants
 
-- Adding new fitting model
+<!-- - Adding new fitting model
   1. implement `BaseFitter`-based class
   2. import in `src/fit/models/__init__.py`: `from .loglinear_tau import LogLinearTau`
   3. use it as `--fit-model {MODEL_NAME}`
   4. carefully set bound `DEFAULT_BOUNDS` and initial value `DEFAULT_P0` for parameters, to guide the fitting search
-  5. easy test using `./scripts/exp1_fit_model_test.sh` (fit + plot, skip result saving)
+  5. easy test using `./scripts/exp1_fit_model_test.sh` (fit + plot, skip result saving) -->
 
 **Note on fitting quality:**
 - If fitted curves are significantly off or missing in plots, re-run the fitting pipeline. CMA-ES optimization has randomness and may occasionally fail to find the optimal solution.
