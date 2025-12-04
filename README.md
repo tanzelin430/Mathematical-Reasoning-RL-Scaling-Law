@@ -27,10 +27,13 @@ This research systematically investigates scaling behaviors in RL-based post-tra
 
 The relationship between test loss `L` (where `L = 1 - Pass@1`) and compute `C` follows robust power-law patterns:
 
-```
-log(L(N,C)) = -k_C(N) · log(C) + E_C(N)
-where k_C(N) = K_Cmax / (1 + N_C/N)
-```
+$$
+\log L(N, C) = -k_C(N) \cdot \log C + E_C(N)
+$$
+where
+$$
+k_C(N) = \frac{K_{C\mathrm{max}}}{1 + \frac{N_C}{N}}
+$$
 
 This enables accurate predictions for both unseen model sizes and remaining training trajectories.
 
@@ -196,11 +199,14 @@ Agentic-RL-Scaling-Law/
 If you find this work helpful, please consider citing:
 
 ```bibtex
-@inproceedings{tan2026scaling,
-  title={Scaling Behaviors of LLM Reinforcement Learning Post-Training: An Empirical Study in Mathematical Reasoning},
-  author={Tan, Zelin and Geng, Hejia and Yu, Xiaohang and Zhang, Mulei and Wan, Guancheng and Zhou, Yifan and He, Qiang and Xue, Xiangyuan and Zhou, Heng and Fan, Yutao and Li, Zhongzhi and Zhang, Zaibin and Zhang, Guibin and Zhang, Chen and Yin, Zhenfei and Bai, Lei},
-  booktitle={International Conference on Learning Representations},
-  year={2026}
+@misc{tan2025scalingbehaviorsllmreinforcement,
+      title={Scaling Behaviors of LLM Reinforcement Learning Post-Training: An Empirical Study in Mathematical Reasoning}, 
+      author={Zelin Tan and Hejia Geng and Mulei Zhang and Xiaohang Yu and Guancheng Wan and Yifan Zhou and Qiang He and Xiangyuan Xue and Heng Zhou and Yutao Fan and Zhongzhi Li and Zaibin Zhang and Guibin Zhang and Chen Zhang and Zhenfei Yin and Lei Bai},
+      year={2025},
+      eprint={2509.25300},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2509.25300}, 
 }
 ```
 
@@ -208,9 +214,9 @@ If you find this work helpful, please consider citing:
 
 ## 🙏 Acknowledgments
 
-- **VeRL Framework** from the Reasoning360 project
+- **VeRL Framework** from [Verl](https://github.com/volcengine/verl)
 - **Guru-RL-92k Dataset** from [LLM360](https://huggingface.co/datasets/LLM360/guru-RL-92k)
-- **Qwen2.5 Models** from [Alibaba Cloud](https://huggingface.co/Qwen)
+- **Qwen2.5 Models** from [Qwen](https://huggingface.co/Qwen)
 
 ---
 
