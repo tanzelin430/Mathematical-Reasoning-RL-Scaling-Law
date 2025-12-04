@@ -185,12 +185,15 @@ Agentic-RL-Scaling-Law/
 │   │   ├── pre_verl.py            # Convert to VeRL format
 │   │   └── prepare_math_by_difficulty_full.py
 │   └── plot/                      # Visualization scripts
+├── analysis/                      # Scaling law fitting and analysis code
 ├── data/                          # Datasets
 │   ├── math_curriculum/           # Difficulty-ordered math
 │   └── guru_verl/online_eval/     # Multi-domain validation
 ├── outputs/                       # Generated figures and results
 └── SandboxFusion/                 # Code execution sandbox
 ```
+
+> 💡 **For detailed information on how we analyze the scaling laws and generate the figures in this paper, please refer to the [`analysis/`](analysis/) folder.**
 
 ---
 
