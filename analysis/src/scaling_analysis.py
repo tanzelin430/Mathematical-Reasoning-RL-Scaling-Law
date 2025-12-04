@@ -1,0 +1,637 @@
+#!/usr/bin/env python3
+"""
+Scaling Law Pipeline - Multi-Eval Analysis (CLI Version)
+Processes multiple test evals from experiment data and generates scaling law plots for each eval
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from src.common import data_proc
+from src.common import config
+from src.common import source_curve
+from src.fit import fit
+from src.fit.fit import save_batch_fitters, load_batch_fitters
+from src.common import plot
+from src.common.cli_args import create_argument_parser, process_parsed_args, validate_required_args
+from src.fit.models import get_model_class
+from src.run.plot_fit_params import plot_fit_params
+# Lambda functions
+R_TO = {
+    'R': lambda r: r,
+    'ErrRate': lambda r: 1 - r,
+    'LogErrRate': lambda r: np.log10(np.clip(1 - r, 1e-12, None)),
+}
+
+R_FROM = {
+    'R': lambda r: r,
+    'ErrRate': lambda errrate: 1 - errrate,
+    'LogErrRate': lambda logerrrate: 1 - 10**logerrrate,
+}
+
+def run_scaling_analysis(args):
+    """Run the scaling law analysis with given arguments"""
+
+    dfs = _data_prepare(args) if args.plot or args.fit else None
+
+    fitters = []
+    fitter_map = {}
+    
+    # Fitting Load
+    if args.fit_load:
+        print(f"\n=== Loading fitters from {args.fit_load} ===")
+        fitters = load_batch_fitters(args.fit_load)
+        fitter_map = _build_fitter_map(fitters)
+    
+    # Fitting phase
+    elif args.fit:
+        fitters = _fit_multiple(args, dfs)
+        fitter_map = _build_fitter_map(fitters)
+        
+        # Save or append if requested
+        if args.fit_save:
+            save_batch_fitters(args.fit_save, fitters)
+        elif args.fit_save_append:
+            save_batch_fitters(args.fit_save_append, fitters, append=True)
+ 
+    # Plot params (e.g. k, E0) scatter plots if fitting was done
+    if (args.fit or args.fit_load) and args.fit_param_plot_schema and fitters:
+        plot_fit_params(args, fitters)
+    
+    # Plotting phase
+    if args.plot:
+        dfs_masked = _build_masked_dfs(dfs, args)
+        custom_source_color_maps = _build_source_curve_color(dfs, args)
+        custom_legend_handles_labels = _build_custom_legend(dfs_masked, args, custom_source_color_maps)
+
+        for plot_x_column in args.plot_x_columns:
+            print(f"\n=== Plotting for x_column: {plot_x_column} ===")
+            
+            # Process each plot metric
+            for plot_metric in args.plot_metrics:
+                # Initialize shared ax
+                ax = None
+
+                # Track whether we're using prediction or extrapolation (across all sources)
+                has_prediction_any = False
+                has_extrapolation_any = False
+
+                # Unified loop: process each data source
+                for data_source, df in dfs_masked.items():
+                    # For separate mode: reset ax for each source
+                    if not args.plot_merge_sources:
+                        ax = None
+
+                    # Get custom color mapping for this data source
+                    _custom_color_map = custom_source_color_maps.get(data_source) if custom_source_color_maps else None
+
+                    # Track whether we're using prediction or extrapolation visualization
+                    has_prediction = False
+                    has_extrapolation = False
+
+                    # Add fitted prediction if available
+                    if args.plot_fit:
+                        fitter_key = (data_source, args.fit_x, args.fit_metric, args.fit_curve, args.eval)
+                        if fitter_key in fitter_map:
+                            fitter = fitter_map[fitter_key]
+                            ax = _plot_fit_prediction(ax, args, df, fitter,
+                                                     plot_x_column, plot_metric, _custom_color_map)
+                            # Check if using prediction (ending_clip > 0)
+                            ending_clip = fitter.get_context().get("ending_clip", 0)
+                            has_prediction = ending_clip is not None and ending_clip > 0
+
+                            # Check if using extrapolation (72B present in data but not in fit_curve_mask)
+                            # Note: prediction and extrapolation are mutually exclusive
+                            if not has_prediction and args.plot_curve == "N":
+                                fit_curve_mask = fitter.get_context().get("fit_curve_mask", None)
+                                if fit_curve_mask is not None and 72e9 in df[args.plot_curve].unique() and 72e9 not in fit_curve_mask:
+                                    has_extrapolation = True
+
+                            # Update global flags for merge mode
+                            has_prediction_any = has_prediction_any or has_prediction
+                            has_extrapolation_any = has_extrapolation_any or has_extrapolation
+                        else:
+                            # User requested --plot-fit but no fitter found
+                            available = [str(key) for key in fitter_map.keys()] if fitter_map else ["none"]
+                            raise ValueError(
+                                f"No fitter found for key: {fitter_key}. "
+                                f"Available keys: {', '.join(available)}"
+                            )
+                    
+                    # Plot raw data
+                    ax = _plot_raw_data(ax, args, df, plot_x_column, plot_metric, _custom_color_map)
+                    
+                    # Add smooth curves if requested
+                    if args.add_smooth:
+                        ax = _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric, _custom_color_map)
+                    
+                    # Separate mode: finalize plot for each source
+                    if not args.plot_merge_sources:
+                        if args.plot_extra_lines:
+                            ax = _plot_extra_lines(ax, args, plot_metric)
+                        ax = _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source,
+                                           show_prediction_legend=has_prediction,
+                                           show_extrapolation_legend=has_extrapolation)
+                        plt.close(ax.figure)
+                
+                # Merge mode: finalize plot after all sources
+                if args.plot_merge_sources and ax is not None:
+                    if args.plot_extra_lines:
+                        ax = _plot_extra_lines(ax, args, plot_metric)
+                    ax = _plot_settings(ax, args, None, plot_x_column, plot_metric,
+                                       custom_legend_handles_labels=custom_legend_handles_labels,
+                                       show_prediction_legend=has_prediction_any,
+                                       show_extrapolation_legend=has_extrapolation_any)
+                    plt.close(ax.figure)
+
+def _build_masked_dfs(dfs, args):
+    """Prepare data for plotting: apply masks, copy, and build color mappings.
+    
+    Args:
+        dfs: Dict mapping data_source to DataFrame
+        args: Command-line arguments
+    
+    Returns:
+        Tuple of (dfs_masked, color_mappings)
+        - dfs_masked: Dict mapping data_source to filtered/copied DataFrame
+        - color_mappings: Dict mapping data_source to {curve_val: color}
+    """
+    dfs_masked = {}
+    
+    for data_source, df in dfs.items():
+        # Apply curve masks
+        df = _apply_curve_mask(df, args.plot_curve, args.plot_curve_mask)
+        df = _apply_source_curve_mask(df, args.plot_curve, args.plot_source_curve_mask, data_source)
+        
+        if len(df) == 0:
+            print(f"Warning: No data after curve mask for data_source: {data_source}")
+            continue
+        
+        # Copy once to avoid SettingWithCopyWarning when adding columns later
+        df = df.copy()
+        dfs_masked[data_source] = df
+    
+    return dfs_masked
+
+def _build_custom_legend(dfs_masked, args, color_mappings):
+    """Build legend info (handles, labels) for merged plot mode.
+    
+    Args:
+        dfs_masked: Dict mapping data_source to DataFrame
+        args: Command-line arguments
+    
+    Returns:
+        Tuple of (handles, labels) for legend
+    """
+    if not args.plot_merge_sources:
+        return None
+    handles = []
+    labels = []
+    # Iterate through each data source and get unique curve values
+    for data_source, df in dfs_masked.items():
+        for curve_val in df[args.plot_curve].unique():
+            color = color_mappings[data_source][curve_val]
+            label = source_curve.get_source_curve_label(data_source, args.plot_curve, curve_val, args.plot_source_curve_label)
+            handles.append(Line2D([0], [0], color=color, linewidth=2))
+            labels.append(label)
+
+    # Add extra lines legend
+    if args.plot_extra_lines:
+        for line_name, line_config in args.plot_extra_lines.items():
+            color = line_config.get('color', 'black')
+            linestyle = line_config.get('linestyle', '-')
+            marker = line_config.get('marker', 'o')
+            label = line_config.get('label', line_name)
+            handles.append(Line2D([0], [0], color=color, linestyle=linestyle,
+                                 marker=marker, markersize=6, linewidth=2.5))
+            labels.append(label)
+    
+    return handles, labels
+
+def _build_fitter_map(fitters):
+    fitter_map = {}
+    for fitter in fitters:
+        context = fitter.get_context()
+        fitter_key = (
+            context["data_source"],
+            context["fit_x"],
+            context["fit_metric"],
+            context["fit_curve"],
+            context["eval"]
+        )
+        fitter_map[fitter_key] = fitter
+    return fitter_map
+
+def _apply_curve_mask(df, curve_column, curve_mask):
+    if curve_mask is not None:
+        return df[df[curve_column].isin(curve_mask)]
+    return df
+
+def _apply_source_curve_mask(df, curve_column, plot_source_curve_mask, data_source):
+    if plot_source_curve_mask is not None:
+        curve_values = plot_source_curve_mask.get(data_source, None)
+        return _apply_curve_mask(df, curve_column, curve_values)
+    return df
+
+def _build_source_curve_color(dfs, args):
+    """Build custom color mapping for this data source based on source-curve-color settings.
+    
+    Args:
+        args: Command-line arguments
+        df: DataFrame for the data source
+        data_source: Name of the data source
+    
+    Returns:
+        Dict mapping curve values to colors, or None if no custom coloring is requested
+    """
+    custom_color_mapping = None
+    if args.plot_source_curve_color:
+        custom_color_mapping = {}
+        for data_source, df in dfs.items():
+            custom_color_mapping[data_source] = {}
+            for curve_val in df[args.plot_curve].unique():
+                color = source_curve.get_source_curve_color(
+                    data_source, curve_val, args.plot_source_curve_color
+                )
+                custom_color_mapping[data_source][curve_val] = color
+    return custom_color_mapping
+
+def _data_prepare(args):
+    """Prepare data for all sources.
+    
+    Returns a dict mapping data_source to DataFrame.
+    """
+    df_map = {}    
+    for data_source in args.data_sources:
+        df = _data_prepare_single_source(args, data_source)
+        df_map[data_source] = df
+    return df_map
+
+def _data_prepare_single_source(args, data_source):
+    print(f"Loading data for data_source: {data_source}")
+    df = data_proc.load_and_preprocess(config.CSV_MAP[data_source])
+    
+    # Get physical dimensions for this data source (must be configured)
+    physical_dimensions = config.get_physical_dimensions(data_source)
+    physical_curve_column = physical_dimensions[0]  # N, slice_factor, or rollout_n
+    physical_x_column = physical_dimensions[1]      # step
+    
+    # Collect all metrics that might need delta calculation
+    all_metrics = list(set((args.plot_metrics or []) + ([args.fit_metric] if args.fit_metric else [])))
+    
+    # Prepare eval data
+    df = data_proc.prepare_eval_data(
+        df,
+        eval_column=args.eval,
+        curve_column=physical_curve_column,
+        x_column=physical_x_column,
+        calc_delta=any(metric is not None and metric.startswith('Delta') for metric in all_metrics),
+        delta_base_step=args.delta_base_step
+    )
+    
+    # Remove step=0 data (because E=0 will cause log10(E)=-inf)
+    df = df[df['step'] > 0].reset_index(drop=True)
+    
+    # Apply clipping (use curve_column for curve grouping)
+    if args.warmup_clip is not None or args.warmup_clip_to is not None or args.ending_clip is not None or args.ending_clip_to is not None:
+        df = data_proc.apply_clip(
+            df,
+            curve_column=physical_curve_column,
+            warmup_clip=args.warmup_clip,
+            warmup_clip_to=args.warmup_clip_to,
+            ending_clip=args.ending_clip,
+            ending_clip_to=args.ending_clip_to
+        )
+    return df
+
+def _plot_fit_prediction(ax, args, df, fitter, plot_x_column, plot_metric, custom_color_mapping=None):
+    """Plot fitted prediction curves.
+
+    Args:
+        custom_color_mapping: Optional dict mapping curve values to colors
+    """
+    fitter_context = fitter.get_context()
+    fit_curve_column = fitter_context["fit_curve"]
+    fit_x = fitter_context["fit_x"]
+    fit_metric = fitter_context["fit_metric"]
+    ending_clip = fitter_context.get("ending_clip", 0)
+
+    predict_x_column_list = [fit_curve_column, fit_x]
+    pred_column = plot_metric + "_pred"
+    # predict R
+    _pred_R = fit.predict_on(
+        fitter,
+        df,
+        x_column_list=predict_x_column_list,
+        y_transform_recover=R_FROM[fit_metric],
+    )
+
+    # Add prediction column (df is already a copy from the outer loop)
+    df[pred_column] = R_TO[plot_metric](_pred_R)
+
+    # Compute split points for prediction visualization
+    # If ending_clip was used during fitting, split the line at the boundary
+    split_line_at_x = None
+    if ending_clip is not None and ending_clip > 0:
+        split_line_at_x = {}
+        # For each curve, find the x value at the split point (last point kept after ending_clip)
+        for curve_value in df[args.plot_curve].unique():
+            df_curve = df[df[args.plot_curve] == curve_value].copy()
+            df_curve = df_curve.sort_values(plot_x_column)
+
+            # Apply ending_clip to find the split point
+            if len(df_curve) > ending_clip:
+                # The split point is at the (n - ending_clip)-th point
+                split_idx = len(df_curve) - ending_clip - 1
+                x_split = df_curve.iloc[split_idx][plot_x_column]
+                split_line_at_x[curve_value] = x_split
+
+    # Detect extrapolation curves (curves present in data but not in fit_curve_mask)
+    extrapolation_curves = None
+    fit_curve_mask = fitter_context.get("fit_curve_mask", None)
+    if fit_curve_mask is not None and args.plot_curve == "N":
+        # Check if 72B is in data but not in fit_curve_mask
+        if 72e9 in df[args.plot_curve].unique() and 72e9 not in fit_curve_mask:
+            extrapolation_curves = {72e9}
+
+    ax = plot.plot_curves(
+        df,
+        curve_column=args.plot_curve, # go with plot_curve
+        x_column=plot_x_column,
+        y_column=pred_column,
+        use_line=True,
+        use_scatter=False,
+        highlight_curves=args.highlight_curves_fit,
+        highlight_alpha=args.highlight_alpha,
+        highlight_width=args.highlight_width,
+        line_alpha=args.line_alpha,
+        line_width=args.line_width,
+        scatter_alpha=args.scatter_alpha,
+        scatter_size=args.scatter_size,
+        scatter_marker=args.scatter_marker,
+        custom_color_mapping=custom_color_mapping,
+        split_line_at_x=split_line_at_x,
+        extrapolation_curves=extrapolation_curves,
+        ax=ax,
+    )
+    return ax
+
+def _plot_raw_data(ax, args, df, plot_x_column, plot_metric, custom_color_mapping=None):
+    """Plot raw data points/lines.
+    
+    Args:
+        custom_color_mapping: Optional dict mapping curve values to colors
+    """
+    ax = plot.plot_curves(
+        df,
+        curve_column=args.plot_curve,
+        x_column=plot_x_column,
+        y_column=plot_metric,
+        y_std_column=plot_metric + '_std' if args.add_std else None,
+        use_scatter=args.plot_use_scatter,
+        use_line=args.plot_use_line,
+        highlight_curves=args.highlight_curves_plot,
+        highlight_alpha=args.highlight_alpha,
+        highlight_width=args.highlight_width,
+        line_alpha=args.line_alpha,
+        line_width=args.line_width,
+        scatter_alpha=args.scatter_alpha,
+        scatter_size=args.scatter_size,
+        scatter_marker=args.scatter_marker,
+        custom_color_mapping=custom_color_mapping,
+        ax=ax,
+    )
+    return ax
+
+def _plot_smooth_curve(ax, args, df, plot_x_column, plot_metric, custom_color_mapping=None):
+    """Plot smoothed curves.
+    
+    Args:
+        custom_color_mapping: Optional dict mapping curve values to colors
+    """
+    smooth_out_column = plot_metric + "_smooth"
+    
+    df_smooth = data_proc.smooth_df(
+        df,
+        curve_column=args.plot_curve,
+        col_x=plot_x_column,
+        col_y=plot_metric,
+        col_y_out=smooth_out_column,
+        monotonic=args.smooth_monotonic,
+        increasing=args.smooth_increasing,
+        strict=args.smooth_strict,
+        s_factor=args.s_factor, 
+        k_spline=args.k_spline,
+        rolling_window=args.rolling_window, 
+        min_se=args.min_se, 
+        x_inv_weight_power=args.x_inv_weight_power,
+        use_linear=False
+    )
+    
+    ax = plot.plot_curves(
+        df_smooth,
+        curve_column=args.plot_curve,
+        x_column=plot_x_column,
+        y_column=smooth_out_column,
+        y_std_column=None,
+        use_scatter=False,
+        use_line=True,
+        highlight_curves=args.highlight_curves_plot,
+        highlight_alpha=args.highlight_alpha,
+        highlight_width=args.highlight_width,
+        line_alpha=args.line_alpha,
+        line_width=args.line_width,
+        scatter_alpha=args.scatter_alpha,
+        scatter_size=args.scatter_size,
+        scatter_marker=args.scatter_marker,
+        custom_color_mapping=custom_color_mapping,
+        ax=ax
+    )
+    return ax
+
+def _plot_extra_lines(ax, args, plot_metric):
+    
+    extra_lines = args.plot_extra_lines
+    
+    for line_name, line_config in extra_lines.items():
+        # Extract x and y data
+        x_data = np.array(line_config['x'])
+        y_data = np.array(line_config['y'])
+        
+        # Extract plotting parameters with unified naming
+        color = line_config.get('color', 'black')
+        label = line_config.get('label', line_name)
+        
+        # Line parameters
+        line_style = line_config.get('line_style', '-')
+        line_width = line_config.get('line_width', 2.5)
+        line_alpha = line_config.get('line_alpha', 1.0)
+        
+        # Scatter parameters
+        scatter_marker = line_config.get('scatter_marker', 'o')
+        scatter_size = line_config.get('scatter_size', 25)
+        scatter_alpha = line_config.get('scatter_alpha', 1.0)
+        
+        # Plot using plot_basic
+        ax = plot.plot_basic(
+            x=x_data,
+            y=y_data,
+            use_scatter=True,
+            scatter_alpha=scatter_alpha,
+            scatter_s=scatter_size,
+            scatter_marker=scatter_marker,
+            use_line=True,
+            line_alpha=line_alpha,
+            line_width=line_width,
+            line_style=line_style,
+            color=color,
+            ax=ax
+        )
+    
+    return ax
+
+def _plot_settings(ax, args, df, plot_x_column, plot_metric, data_source=None, custom_legend_handles_labels=None, show_prediction_legend=False, show_extrapolation_legend=False):
+    process_plot_x_label = args.plot_x_label if args.plot_x_label else config.DEFAULT_LABELS[plot_x_column]
+    process_plot_y_label = args.plot_y_label if args.plot_y_label else config.DEFAULT_LABELS[plot_metric]
+
+    # Generate title
+    if args.plot_title:
+        process_plot_title = args.plot_title
+    elif args.plot_titles and plot_x_column in args.plot_titles:
+        process_plot_title = args.plot_titles[plot_x_column]
+    elif args.plot_title_template:
+        template_vars = {
+            'eval': config.TEST_EVALS[args.eval]['plot_str'],
+            'fit_x': args.fit_x if args.fit else 'None',
+            'plot_x': plot_x_column,
+            'metric': plot_metric
+        }
+        process_plot_title = args.plot_title_template.format(**template_vars)
+    else:
+        if args.fit:
+            process_plot_title = f"{config.TEST_EVALS[args.eval]['plot_str']} (fitted on {args.fit_x}, plotted on {plot_x_column})"
+        else:
+            process_plot_title = f"{config.TEST_EVALS[args.eval]['plot_str']} (plotted on {plot_x_column})"
+
+    # Generate legend
+    if args.plot_use_legend:
+        if custom_legend_handles_labels is not None:
+            # Merge mode: use pre-built merged legend
+            legend_handles_labels = custom_legend_handles_labels
+        else:
+            # Separate mode: use default legend
+            legend_handles_labels = plot.prepare_legend(df, args.plot_curve)
+
+        # Add line style legend (prediction and extrapolation are mutually exclusive)
+        if show_prediction_legend and legend_handles_labels is not None:
+            from matplotlib.lines import Line2D
+            handles, labels = legend_handles_labels
+            # Add two additional legend items for line style explanation
+            handles = handles + [
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='-'),
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='--')
+            ]
+            labels = labels + ['Fitted', 'Extrapolated']
+            legend_handles_labels = (handles, labels)
+        elif show_extrapolation_legend and legend_handles_labels is not None:
+            from matplotlib.lines import Line2D
+            handles, labels = legend_handles_labels
+            # Add two additional legend items for line style explanation
+            handles = handles + [
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='-'),
+                Line2D([0], [0], color='gray', linewidth=2, linestyle='--')
+            ]
+            labels = labels + ['Fitted', 'Extrapolated']
+            legend_handles_labels = (handles, labels)
+    else:
+        legend_handles_labels = None
+    
+    # Determine filename prefix
+    if data_source is None:
+        # Merge mode: combine all sources
+        filename_prefix = args.output_prefix + "_".join(args.data_sources) + "_"
+    else:
+        # Separate mode: single source
+        filename_prefix = args.output_prefix + data_source + "_"
+    
+    plot.plot_basic_settings(
+        ax=ax,
+        x_scale=args.plot_x_scale,
+        y_scale=args.plot_y_scale,
+        x_label=process_plot_x_label,
+        y_label=process_plot_y_label,
+        title=process_plot_title,
+        use_legend=args.plot_use_legend,
+        legend_handles_labels=legend_handles_labels,
+        legend_loc=args.plot_legend_loc,
+        legend_bbox_to_anchor=args.plot_legend_bbox_to_anchor,
+        x_tick_format=args.x_tick_format,
+        y_tick_format=args.y_tick_format,
+        x_tick_spacing=args.x_tick_spacing,
+        y_tick_spacing=args.y_tick_spacing,
+        x_grid_spacing=args.x_grid_spacing,
+        y_grid_spacing=args.y_grid_spacing,
+        x_tick_subs=args.x_tick_subs,
+        y_tick_subs=args.y_tick_subs,
+        x_tick_subs_log=args.x_tick_subs_log,
+        y_tick_subs_log=args.y_tick_subs_log,
+        # Save configuration
+        save_to_dir=args.output_base_dir,
+        save_to_filename_prefix=filename_prefix,
+        plot_eval_column=args.eval,
+        plot_curve=args.plot_curve,
+        plot_x_column=plot_x_column,
+        plot_metric=plot_metric,
+    )
+    return ax
+
+def _fit_multiple(args, df_map):
+    return [_fit_once(args, df, data_source) for data_source, df in df_map.items()]
+
+def _fit_once(args, df, data_source):
+    # Apply fit curve mask if provided
+    df = _apply_curve_mask(df, args.fit_curve, args.fit_curve_mask)
+    
+    print(f"\n=== Fitting on data_source: {data_source}, L({args.fit_curve}, {args.fit_x}) ===")
+    print(f"Using model: {args.fit_model}")
+    
+    FitterClass = get_model_class(args.fit_model)
+    
+    fitter = fit.fit_on(
+        FitterClass,
+        df, 
+        eval_name=args.eval, 
+        x_column_list=[args.fit_curve, args.fit_x],
+        y_transform=R_TO[args.fit_metric],
+        x_inv_weight_power=args.x_inv_weight_power,
+        cma_verbose_interval=args.fit_cma_verbose_interval,
+    )
+
+    fitter.set_context({
+        "data_source": data_source,
+        "fit_model": args.fit_model,
+        "eval": args.eval,
+        "fit_curve": args.fit_curve,
+        "fit_x": args.fit_x,
+        "fit_metric": args.fit_metric,
+        "warmup_clip": args.warmup_clip if args.warmup_clip is not None else 0,
+        "ending_clip": args.ending_clip if args.ending_clip is not None else 0,
+        "x_inv_weight_power": args.x_inv_weight_power,
+        "fit_curve_mask": args.fit_curve_mask,
+    })
+    
+    info = fitter.get_info()
+    print(f"Fit quality: R²={info['r2']:.6f}, Loss={info['loss']:.6f}, n_points={info['n_points']}")
+    
+    return fitter
+
+        
+def main():
+    parser = create_argument_parser()
+    args = parser.parse_args()
+    args = process_parsed_args(args)
+    validate_required_args(args)
+    run_scaling_analysis(args)
+
+if __name__ == "__main__":
+    main()
