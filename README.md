@@ -14,8 +14,8 @@ This research systematically investigates scaling behaviors in RL-based post-tra
 
 ### Key Contributions
 
-- 🔬 **Comprehensive Scaling Analysis**: First systematic study of RL post-training scaling laws across 0.5B-72B parameters
-- 📊 **Predictive Power Laws**: Established robust relationships between test loss, compute, and data
+- 🔬 **Comprehensive Scaling Analysis**: First systematic study of RL post-training scaling laws across 0.5B-72B parameters for mathematical reasoning
+- 📊 **Predictive Power Laws**: Established robust relationships between model performance, compute, and data
 - 🎯 **Learning Efficiency Insights**: Discovered efficiency saturation trends in larger models
 - 💾 **Data Reuse Strategy**: Demonstrated effectiveness of data reuse in constrained settings (up to 25× reuse with minimal degradation)
 
@@ -25,24 +25,24 @@ This research systematically investigates scaling behaviors in RL-based post-tra
 
 **🔑 Finding 1: Predictive Scaling Laws**
 
-The relationship between test loss `L` (where `L = 1 - Pass@1`) and compute `C` follows robust power-law patterns:
+The relationship between test loss `L` (where `L = 1 - Pass@1`) and training resource `X` (Either compute `C` or Data `D`) follows robust power-law patterns:
 
 $$
-\log L(N, C) = -k_C(N) \cdot \log C + E_C(N)
+\log L(N, X) = -k(N) \cdot \log X + E(N)
 $$
 where
 $$
-k_C(N) = \frac{K_{C\mathrm{max}}}{1 + \frac{N_C}{N}}
+k(N) = \frac{K_{\mathrm{max}}}{1 + \frac{N_0}{N}}
 $$
 
-This enables accurate predictions for both unseen model sizes and remaining training trajectories.
+It enables accurate **PREDICTIONS** for both unseen model sizes and remaining training trajectories.
 
 <p align="center">
   <img src="png_exports/extrap_base_holdout_N_C_raw_ErrRate.png" width="44%" />
   <img src="png_exports/extrap_instruct_holdout_N_C_raw_ErrRate.png" width="45%" />
 </p>
 <p align="center">
-  <b>Inter-model Extrapolation:</b> Fitted on 0.5B-32B, extrapolated to 72B
+  <b>Inter-model Extrapolation in compute scenario:</b> Fitted on 0.5B-32B, extrapolated to 72B
 </p>
 
 <p align="center">
@@ -50,7 +50,7 @@ This enables accurate predictions for both unseen model sizes and remaining trai
   <img src="png_exports/predict_instruct40_instruct_holdout_N_C_raw_ErrRate.png" width="45%" />
 </p>
 <p align="center">
-  <b>Intra-model Prediction:</b> Predict remaining trajectory from early steps
+  <b>Intra-model Prediction in compute scenario:</b> Predict remaining trajectory from early steps
 </p>
 
 **🔑 Finding 2: Learning Efficiency Saturation**
@@ -134,7 +134,7 @@ bash scripts/train/run_grpo_qwen2.5_72B_math_full_cl.sh    # 72B
 
 **Training Configuration:**
 - **Algorithm**: GRPO (Group Relative Policy Optimization)
-- **Batch Size**: 512 prompts
+- **Batch Size**: 512
 - **Rollout**: 8 responses per prompt
 - **Learning Rate**: 1e-6
 - **KL Coefficient**: 0.001
