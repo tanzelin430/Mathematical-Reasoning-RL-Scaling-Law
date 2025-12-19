@@ -204,7 +204,7 @@ If you find this work helpful, please consider citing:
 ```bibtex
 @misc{tan2025scalingbehaviorsllmreinforcement,
       title={Scaling Behaviors of LLM Reinforcement Learning Post-Training: An Empirical Study in Mathematical Reasoning}, 
-      author={Zelin Tan and Hejia Geng and Mulei Zhang and Xiaohang Yu and Guancheng Wan and Yifan Zhou and Qiang He and Xiangyuan Xue and Heng Zhou and Yutao Fan and Zhongzhi Li and Zaibin Zhang and Guibin Zhang and Chen Zhang and Zhenfei Yin and Lei Bai},
+      author={Zelin Tan and Hejia Geng and Xiaohang Yu and Mulei Zhang and Guancheng Wan and Yifan Zhou and Qiang He and Xiangyuan Xue and Heng Zhou and Yutao Fan and Zhongzhi Li and Zaibin Zhang and Guibin Zhang and Chen Zhang and Zhenfei Yin and Lei Bai},
       year={2025},
       eprint={2509.25300},
       archivePrefix={arXiv},
