@@ -2,7 +2,7 @@
 
 [![Framework](https://img.shields.io/badge/framework-VeRL%20v0.3.1-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Paper](https://img.shields.io/badge/arXiv-2509.25300-b31b1b)](https://arxiv.org/abs/2509.25300)
+[![Paper](https://img.shields.io/badge/arXiv-2509.25300v2-b31b1b)](https://arxiv.org/abs/2509.25300v2)
 
 **An Empirical Study in Mathematical Reasoning**
 
