@@ -203,14 +203,38 @@ Agentic-RL-Scaling-Law/
 If you find this work helpful, please consider citing:
 
 ```bibtex
-@misc{tan2025scalingbehaviorsllmreinforcement,
-      title={Scaling Behaviors of LLM Reinforcement Learning Post-Training: An Empirical Study in Mathematical Reasoning}, 
-      author={Zelin Tan and Hejia Geng and Xiaohang Yu and Mulei Zhang and Guancheng Wan and Yifan Zhou and Qiang He and Xiangyuan Xue and Heng Zhou and Yutao Fan and Zhongzhi Li and Zaibin Zhang and Guibin Zhang and Chen Zhang and Zhenfei Yin and Philip Torr and Lei Bai},
-      year={2025},
-      eprint={2509.25300},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2509.25300}, 
+@inproceedings{tan-etal-2026-scaling,
+    title = "Scaling Behaviors of {LLM} Reinforcement Learning Post-Training: An Empirical Study in Mathematical Reasoning",
+    author = "Tan, Zelin  and
+      Geng, Hejia  and
+      Yu, Xiaohang  and
+      Zhang, Mulei  and
+      Wan, Guancheng  and
+      Zhou, Yifan  and
+      He, Qiang  and
+      Xue, Xiangyuan  and
+      Zhou, Heng  and
+      Fan, Yutao  and
+      Li, Zhong-Zhi  and
+      Zhang, Zaibin  and
+      Zhang, Guibin  and
+      Zhang, Chen  and
+      Yin, Zhenfei  and
+      Torr, Philip  and
+      Bai, Lei",
+    editor = "Liakata, Maria  and
+      Moreira, Viviane P.  and
+      Zhang, Jiajun  and
+      Jurgens, David",
+    booktitle = "Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.acl-long.1444/",
+    pages = "31300--31319",
+    ISBN = "979-8-89176-390-6",
+    abstract = "While scaling laws for large language models (LLMs) during pre-training have been extensively studied, their behavior under reinforcement learning (RL) post-training remains largely unexplored. This paper investigates the scaling behavior of Large Language Model (LLM) reinforcement learning post-training, focusing on mathematical reasoning. Through experiments across the Qwen2.5 series (0.5B to 72B), we characterize how model scale, data, and compute interact. Our analysis yields four key findings: 1. Larger models consistently demonstrate superior compute and data efficiency. 2. The relationship between model performance and training resources follows a **predictive power-law** across both base and instruction-tuned models. 3. RL learning efficiency exhibits a latent **saturation trend** with increasing model scale. 4. In data-constrained regimes, performance is primarily driven by the **total volume of training data** rather than sample uniqueness. These results offer practical guidelines for scaling reasoning capabilities through reinforcement learning post-training."
 }
 ```
 
